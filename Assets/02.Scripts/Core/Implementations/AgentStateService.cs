@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenDesk.Core.Models;
 using OpenDesk.Core.Services;
 using R3;
@@ -7,8 +8,10 @@ using R3;
 namespace OpenDesk.Core.Implementations
 {
     /// <summary>
-    /// 에이전트별 상태(Idle/Typing/Done)를 관리
-    /// AgentEvent를 받아 상태 전환 규칙을 적용
+    /// 에이전트별 상태를 관리
+    /// - AgentEvent를 받아 상태 전환 규칙 적용
+    /// - 에이전틱 루프 세부 단계(Planning/Executing/Reviewing) 지원
+    /// - 글로벌 상태 조회 (IsAnyAgentBusy, BusyAgentCount)
     /// </summary>
     public class AgentStateService : IAgentStateService, IDisposable
     {
@@ -17,6 +20,12 @@ namespace OpenDesk.Core.Implementations
 
         public Observable<(string SessionId, AgentActionType State)> OnStateChanged
             => _stateChanged;
+
+        /// <summary>어느 에이전트라도 작업 중인지 조회</summary>
+        public bool IsAnyAgentBusy => _states.Values.Any(IsWorkingState);
+
+        /// <summary>현재 작업 중인 에이전트 수</summary>
+        public int BusyAgentCount => _states.Values.Count(IsWorkingState);
 
         public AgentActionType GetState(string sessionId)
         {
@@ -50,11 +59,29 @@ namespace OpenDesk.Core.Implementations
             {
                 AgentActionType.TaskStarted      => AgentActionType.TaskStarted,
                 AgentActionType.Thinking         => AgentActionType.Thinking,
+                AgentActionType.Planning         => AgentActionType.Planning,
+                AgentActionType.Executing        => AgentActionType.Executing,
+                AgentActionType.Reviewing        => AgentActionType.Reviewing,
+                AgentActionType.ToolUsing        => AgentActionType.Executing,   // 도구 사용 = 실행 중
+                AgentActionType.ToolResult       => AgentActionType.Reviewing,   // 도구 결과 = 검토 중
                 AgentActionType.TaskCompleted    => AgentActionType.TaskCompleted,
                 AgentActionType.TaskFailed       => AgentActionType.TaskFailed,
                 AgentActionType.Disconnected     => AgentActionType.Disconnected,
                 AgentActionType.Connected        => AgentActionType.Idle,
                 _                                => AgentActionType.Idle,
+            };
+        }
+
+        private static bool IsWorkingState(AgentActionType state)
+        {
+            return state switch
+            {
+                AgentActionType.TaskStarted => true,
+                AgentActionType.Thinking    => true,
+                AgentActionType.Planning    => true,
+                AgentActionType.Executing   => true,
+                AgentActionType.Reviewing   => true,
+                _                           => false,
             };
         }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using OpenDesk.Core.Models;
@@ -10,41 +11,59 @@ namespace OpenDesk.Core.Installers
 {
     /// <summary>
     /// 앱 시작 시 자동 실행되는 진입점
-    /// 서비스들을 연결하고 OpenClaw Gateway에 접속
+    /// - 온보딩 완료 여부 확인 후 Gateway 접속
+    /// - 이벤트 파이프라인: Bridge → State/SubAgent/ConsoleLog/CostMonitor
+    /// - IDisposable로 정리 보장
     /// </summary>
-    public class AppBootstrapper : IStartable
+    public class AppBootstrapper : IStartable, IDisposable
     {
         private readonly IOpenClawBridgeService _bridge;
-        private readonly IEventParserService    _parser;
         private readonly IAgentStateService     _agentState;
         private readonly ISubAgentService       _subAgent;
+        private readonly IConsoleLogService     _consoleLog;
+        private readonly ICostMonitorService    _costMonitor;
 
-        // OpenClaw Gateway 기본 주소 (설정에서 변경 가능)
-        private const string DefaultGatewayUrl = "ws://localhost:18800/events";
+        private IDisposable _eventSubscription;
+        private CancellationTokenSource _cts;
+
+        private const string DefaultGatewayUrl = "ws://localhost:18789/events";
 
         public AppBootstrapper(
             IOpenClawBridgeService bridge,
-            IEventParserService    parser,
             IAgentStateService     agentState,
-            ISubAgentService       subAgent)
+            ISubAgentService       subAgent,
+            IConsoleLogService     consoleLog,
+            ICostMonitorService    costMonitor)
         {
-            _bridge     = bridge;
-            _parser     = parser;
-            _agentState = agentState;
-            _subAgent   = subAgent;
+            _bridge      = bridge;
+            _agentState  = agentState;
+            _subAgent    = subAgent;
+            _consoleLog  = consoleLog;
+            _costMonitor = costMonitor;
         }
 
         public void Start()
         {
-            BootAsync(CancellationToken.None).Forget();
+            var isFirstRun = PlayerPrefs.GetInt("OpenDesk_IsFirstRun", 1) == 1;
+            if (isFirstRun)
+            {
+                Debug.Log("[Boot] 온보딩 미완료 — AppBootstrapper 대기");
+                return;
+            }
+
+            _cts = new CancellationTokenSource();
+            BootAsync(_cts.Token).Forget();
         }
 
         private async UniTaskVoid BootAsync(CancellationToken ct)
         {
             Debug.Log("[Boot] OpenDesk 시작");
 
-            // 이벤트 스트림 구독 — Bridge → State/SubAgent 연결
-            _bridge.OnEventReceived.Subscribe(e => OnEventReceived(e));
+            // 이벤트 스트림 구독 — Bridge → 모든 하위 서비스 연결
+            _eventSubscription = _bridge.OnEventReceived.Subscribe(OnEventReceived);
+
+            // 리소스 모니터링 시작 (백그라운드)
+            _costMonitor.StartMonitoringAsync(ct).Forget();
 
             // Gateway 연결
             var gatewayUrl = PlayerPrefs.GetString("OpenDesk_GatewayUrl", DefaultGatewayUrl);
@@ -54,9 +73,9 @@ namespace OpenDesk.Core.Installers
                 await _bridge.ConnectAsync(gatewayUrl, ct);
                 Debug.Log($"[Boot] Gateway 연결 완료: {gatewayUrl}");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                Debug.LogWarning($"[Boot] Gateway 연결 실패 (나중에 재시도): {ex.Message}");
+                Debug.LogWarning($"[Boot] Gateway 초기 연결 실패 (자동 재연결 대기): {ex.Message}");
             }
         }
 
@@ -65,7 +84,10 @@ namespace OpenDesk.Core.Installers
             // 1. 에이전트 상태 업데이트
             _agentState.ApplyEvent(e);
 
-            // 2. 서브에이전트 처리
+            // 2. 콘솔 로그 기록
+            _consoleLog.AddFromAgentEvent(e);
+
+            // 3. 서브에이전트 처리
             switch (e.ActionType)
             {
                 case AgentActionType.SubAgentSpawned:
@@ -78,6 +100,14 @@ namespace OpenDesk.Core.Installers
                     _subAgent.OnSubAgentFailed(e);
                     break;
             }
+        }
+
+        public void Dispose()
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _eventSubscription?.Dispose();
+            _eventSubscription = null;
         }
     }
 }

@@ -15,15 +15,28 @@ namespace OpenDesk.Core.Implementations
         // JSON eventType 키 → ActionType 매핑 테이블
         private readonly Dictionary<string, AgentActionType> _rules = new()
         {
-            { "task_started",        AgentActionType.TaskStarted     },
-            { "task_completed",      AgentActionType.TaskCompleted   },
-            { "task_failed",         AgentActionType.TaskFailed      },
-            { "thinking",            AgentActionType.Thinking        },
-            { "subagent_spawned",    AgentActionType.SubAgentSpawned },
-            { "subagent_completed",  AgentActionType.SubAgentCompleted },
-            { "subagent_failed",     AgentActionType.SubAgentFailed  },
-            { "connected",           AgentActionType.Connected       },
-            { "disconnected",        AgentActionType.Disconnected    },
+            { "task_started",        AgentActionType.TaskStarted        },
+            { "task_completed",      AgentActionType.TaskCompleted      },
+            { "task_failed",         AgentActionType.TaskFailed         },
+            { "thinking",            AgentActionType.Thinking           },
+
+            // 에이전틱 루프 세부 단계
+            { "planning",            AgentActionType.Planning           },
+            { "executing",           AgentActionType.Executing          },
+            { "reviewing",           AgentActionType.Reviewing          },
+
+            // 도구 사용
+            { "tool_call",           AgentActionType.ToolUsing          },
+            { "tool_result",         AgentActionType.ToolResult         },
+
+            // 서브 에이전트
+            { "subagent_spawned",    AgentActionType.SubAgentSpawned    },
+            { "subagent_completed",  AgentActionType.SubAgentCompleted  },
+            { "subagent_failed",     AgentActionType.SubAgentFailed     },
+
+            // 연결
+            { "connected",           AgentActionType.Connected          },
+            { "disconnected",        AgentActionType.Disconnected       },
         };
 
         public AgentEvent? Parse(string rawJson)

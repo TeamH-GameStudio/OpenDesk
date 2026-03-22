@@ -51,7 +51,7 @@ Assets/
 
 1. 빈 GameObject 생성 → `CoreInstaller` 컴포넌트 추가
 2. VContainer가 자동으로 `AppBootstrapper.Start()` 호출
-3. `PlayerPrefs`에 `OpenDesk_GatewayUrl` 없으면 `ws://localhost:18800/events` 사용
+3. `PlayerPrefs`에 `OpenDesk_GatewayUrl` 없으면 `ws://localhost:18789/events` 사용
 
 ## 🔑 Google Drive 설정
 

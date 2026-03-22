@@ -17,7 +17,7 @@ namespace OpenDesk.Onboarding.Implementations
         private const int CurrentAppVersion   = 1;
 
         public bool   IsFirstRun      => PlayerPrefs.GetInt(Key_IsFirstRun, 1) == 1;
-        public string SavedGatewayUrl => PlayerPrefs.GetString(Key_GatewayUrl, "ws://localhost:18800/events");
+        public string SavedGatewayUrl => PlayerPrefs.GetString(Key_GatewayUrl, "ws://localhost:18789/events");
         public string SavedLocalPath  => PlayerPrefs.GetString(Key_LocalPath, "");
         public int    AppVersion      => PlayerPrefs.GetInt(Key_AppVersion, 0);
 

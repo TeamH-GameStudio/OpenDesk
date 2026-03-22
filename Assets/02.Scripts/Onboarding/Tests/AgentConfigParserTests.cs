@@ -50,7 +50,7 @@ agents:
         {
             var yaml = @"
 gateway:
-  port: 18800
+  port: 18789
 model: claude-sonnet-4-6
 ";
             var result = _parser.ParseFromString(yaml);
