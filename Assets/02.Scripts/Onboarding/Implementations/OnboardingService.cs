@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using OpenDesk.Core.Services;
@@ -9,26 +10,30 @@ using UnityEngine;
 namespace OpenDesk.Onboarding.Implementations
 {
     /// <summary>
-    /// 온보딩 상태 머신 오케스트레이터
+    /// 온보딩 상태 머신 오케스트레이터 (명세서 1단계 기준)
     ///
-    /// 결합도 최소화 원칙:
-    ///   - 코어 서비스(IOpenClawBridgeService 등)는 인터페이스로만 참조
-    ///   - 각 스텝 서비스(Detector/Installer/Parser)도 인터페이스로만 참조
-    ///   - Presentation(UI)은 이 서비스의 StateChanged만 구독
+    /// 풀 플로우:
+    ///   환경 스캔(Node.js/WSL2) → OpenClaw 감지/설치 → Gateway 연결
+    ///   → 에이전트 파싱 → 워크스페이스 → 완료
     /// </summary>
     public class OnboardingService : IOnboardingService
     {
-        // ── 의존성 (인터페이스만) ─────────────────────────────────────────────
-        private readonly IOpenClawDetector      _detector;
-        private readonly IOpenClawInstaller     _installer;
-        private readonly IAgentConfigParser     _parser;
-        private readonly IOnboardingSettings    _settings;
-        private readonly IOpenClawBridgeService _bridge;      // Core 서비스 연결
-        private readonly IWorkspaceService      _workspace;   // Core 서비스 연결
+        // ── 의존성 ──────────────────────────────────────────────────────
+        private readonly IOpenClawDetector       _detector;
+        private readonly IOpenClawInstaller      _installer;
+        private readonly IAgentConfigParser      _parser;
+        private readonly IOnboardingSettings     _settings;
+        private readonly IOpenClawBridgeService  _bridge;
+        private readonly IWorkspaceService       _workspace;
+        private readonly INodeEnvironmentService _nodeEnv;
+        private readonly IAdminPrivilegeService  _admin;
+
+        // WSL2는 Windows 전용이므로 nullable
+        private readonly IWsl2Service _wsl2;
 
         private const int MaxGatewayRetry = 3;
 
-        // ── 상태 ──────────────────────────────────────────────────────────────
+        // ── 상태 ────────────────────────────────────────────────────────
         private readonly ReactiveProperty<OnboardingState> _state =
             new(OnboardingState.Init);
 
@@ -37,12 +42,15 @@ namespace OpenDesk.Onboarding.Implementations
         public OnboardingContext Context { get; } = new();
 
         public OnboardingService(
-            IOpenClawDetector      detector,
-            IOpenClawInstaller     installer,
-            IAgentConfigParser     parser,
-            IOnboardingSettings    settings,
-            IOpenClawBridgeService bridge,
-            IWorkspaceService      workspace)
+            IOpenClawDetector       detector,
+            IOpenClawInstaller      installer,
+            IAgentConfigParser      parser,
+            IOnboardingSettings     settings,
+            IOpenClawBridgeService  bridge,
+            IWorkspaceService       workspace,
+            INodeEnvironmentService nodeEnv,
+            IAdminPrivilegeService  admin,
+            IWsl2Service            wsl2 = null)  // Windows 아닐 때 null 허용
         {
             _detector  = detector;
             _installer = installer;
@@ -50,9 +58,12 @@ namespace OpenDesk.Onboarding.Implementations
             _settings  = settings;
             _bridge    = bridge;
             _workspace = workspace;
+            _nodeEnv   = nodeEnv;
+            _admin     = admin;
+            _wsl2      = wsl2;
         }
 
-        // ── 진입점 ────────────────────────────────────────────────────────────
+        // ── 진입점 ──────────────────────────────────────────────────────
 
         public async UniTask StartAsync(CancellationToken ct = default)
         {
@@ -69,7 +80,7 @@ namespace OpenDesk.Onboarding.Implementations
             await RunFullOnboardingAsync(ct);
         }
 
-        // ── 재방문 복원 ───────────────────────────────────────────────────────
+        // ── 재방문 복원 ─────────────────────────────────────────────────
 
         private async UniTask ResumeFromSavedSettingsAsync(CancellationToken ct)
         {
@@ -79,33 +90,100 @@ namespace OpenDesk.Onboarding.Implementations
             var connected = await TryConnectGatewayAsync(ct);
             if (!connected)
             {
-                // 저장된 URL 실패 → 재탐색
                 await RunGatewayStepAsync(ct);
                 return;
             }
 
-            // 워크스페이스 경로 유효성 재확인
             if (!string.IsNullOrEmpty(Context.LocalWorkspacePath))
                 _workspace.SetLocalPath(Context.LocalWorkspacePath);
 
             TransitionTo(OnboardingState.Completed);
         }
 
-        // ── 최초 실행 풀 플로우 ────────────────────────────────────────────────
+        // ── 최초 실행 풀 플로우 ──────────────────────────────────────────
 
         private async UniTask RunFullOnboardingAsync(CancellationToken ct)
         {
+            // Step 0: 환경 스캔 (Node.js, WSL2)
+            var envOk = await RunEnvironmentScanAsync(ct);
+            if (!envOk) return;
+
+            // Step 1: OpenClaw 감지/설치
             var detectResult = await RunDetectStepAsync(ct);
             if (!detectResult.IsSuccess) return;
 
+            // Step 2: Gateway 연결
             var gatewayResult = await RunGatewayStepAsync(ct);
             if (!gatewayResult.IsSuccess) return;
 
+            // Step 3: 에이전트 파싱
             await RunParseAgentsStepAsync(ct);
-            // WorkspaceSetup은 유저 액션 대기 (UI에서 트리거)
+            // Step 4: WorkspaceSetup은 유저 액션 대기 (UI에서 트리거)
         }
 
-        // ── Step 1: OpenClaw 감지 / 설치 ──────────────────────────────────────
+        // ── Step 0: 환경 스캔 (M1 핵심) ─────────────────────────────────
+
+        private async UniTask<bool> RunEnvironmentScanAsync(CancellationToken ct)
+        {
+            TransitionTo(OnboardingState.ScanningEnvironment);
+
+            // ── Node.js 확인 ────────────────────────────────────────────
+            var hasNode = await _nodeEnv.IsInstalledAsync(ct);
+
+            if (!hasNode)
+            {
+                TransitionTo(OnboardingState.InstallingNodeJs);
+                var nodeInstalled = await _nodeEnv.InstallAsync(ct);
+                if (!nodeInstalled)
+                {
+                    Context.LastErrorMessage = "Node.js 설치에 실패했습니다.";
+                    TransitionTo(OnboardingState.NodeJsFailed);
+                    return false;
+                }
+            }
+            else
+            {
+                var meetsMin = await _nodeEnv.MeetsMinVersionAsync("22.16.0", ct);
+                if (!meetsMin)
+                {
+                    var ver = await _nodeEnv.GetVersionAsync(ct);
+                    Context.LastErrorMessage = $"Node.js {ver} → 22.16 이상이 필요합니다.";
+                    TransitionTo(OnboardingState.NodeJsFailed);
+                    return false;
+                }
+            }
+
+            // ── WSL2 확인 (Windows 전용) ─────────────────────────────────
+            if (_wsl2 != null)
+            {
+                TransitionTo(OnboardingState.CheckingWsl2);
+                var wslEnabled = await _wsl2.IsEnabledAsync(ct);
+
+                if (!wslEnabled)
+                {
+                    TransitionTo(OnboardingState.InstallingWsl2);
+                    var wslResult = await _wsl2.EnableAsync(ct);
+
+                    if (!wslResult.Success)
+                    {
+                        Context.LastErrorMessage = wslResult.Message;
+                        TransitionTo(OnboardingState.InstallFailed);
+                        return false;
+                    }
+
+                    if (wslResult.NeedsReboot)
+                    {
+                        Context.LastErrorMessage = wslResult.Message;
+                        TransitionTo(OnboardingState.Wsl2NeedsReboot);
+                        return false; // 재부팅 후 재시작 필요
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        // ── Step 1: OpenClaw 감지/설치 ───────────────────────────────────
 
         private async UniTask<StepResult> RunDetectStepAsync(CancellationToken ct)
         {
@@ -120,17 +198,22 @@ namespace OpenDesk.Onboarding.Implementations
                 return StepResult.Success(OnboardingState.ConnectingGateway);
             }
 
-            // 미설치 → 설치 시도
             TransitionTo(OnboardingState.OpenClawNotFound);
             return StepResult.Fail(OnboardingState.OpenClawNotFound, "OpenClaw 미설치");
         }
 
-        // ── Step 2: OpenClaw 설치 (UI에서 "설치하기" 버튼 클릭 후 호출) ────────
+        // ── Step 2: OpenClaw 설치 (UI 트리거) ───────────────────────────
 
         public async UniTask RetryCurrentStepAsync(CancellationToken ct = default)
         {
             switch (CurrentState)
             {
+                case OnboardingState.NodeJsFailed:
+                    await RunEnvironmentScanAsync(ct);
+                    if (CurrentState == OnboardingState.NodeJsFailed) return;
+                    await RunDetectStepAsync(ct);
+                    break;
+
                 case OnboardingState.OpenClawNotFound:
                 case OnboardingState.InstallFailed:
                     await RunInstallStepAsync(ct);
@@ -159,10 +242,11 @@ namespace OpenDesk.Onboarding.Implementations
             }
 
             Context.IsOpenClawInstalled = true;
+            Context.OpenClawConfigPath  = await _detector.GetInstallPathAsync(ct) ?? "";
             await RunGatewayStepAsync(ct);
         }
 
-        // ── Step 3: Gateway 연결 ──────────────────────────────────────────────
+        // ── Step 3: Gateway 연결 ────────────────────────────────────────
 
         private async UniTask<StepResult> RunGatewayStepAsync(CancellationToken ct)
         {
@@ -182,7 +266,6 @@ namespace OpenDesk.Onboarding.Implementations
                 await UniTask.Delay(1000, cancellationToken: ct);
             }
 
-            // 3회 실패
             Context.LastErrorMessage = $"Gateway 연결 실패 ({Context.GatewayUrl})";
             TransitionTo(OnboardingState.GatewayFailed);
             return StepResult.Fail(OnboardingState.GatewayFailed, Context.LastErrorMessage);
@@ -202,24 +285,34 @@ namespace OpenDesk.Onboarding.Implementations
             }
         }
 
-        // ── Gateway 수동 URL 입력 (UI 액션) ──────────────────────────────────
+        // ── Gateway 수동 URL 입력 (UI 액션) ─────────────────────────────
 
         public async UniTask SubmitGatewayUrlAsync(string url, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(url)) return;
 
-            Context.GatewayUrl = url.Trim();
+            url = url.Trim();
+
+            // URL 유효성 검증
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != "ws" && uri.Scheme != "wss"))
+            {
+                Context.LastErrorMessage = "유효한 WebSocket URL이 필요합니다 (ws:// 또는 wss://)";
+                TransitionTo(OnboardingState.GatewayFailed);
+                return;
+            }
+
+            Context.GatewayUrl = url;
             TransitionTo(OnboardingState.ConnectingGateway);
             await RunGatewayStepAsync(ct);
         }
 
-        // ── Step 4: 에이전트 파싱 ────────────────────────────────────────────
+        // ── Step 4: 에이전트 파싱 ───────────────────────────────────────
 
         private async UniTask RunParseAgentsStepAsync(CancellationToken ct)
         {
             TransitionTo(OnboardingState.ParsingAgents);
 
-            // 파일 I/O → 스레드 풀
             var agents = await UniTask.RunOnThreadPool(() =>
                 _parser.ParseFromFile(Context.OpenClawConfigPath),
                 cancellationToken: ct
@@ -227,7 +320,6 @@ namespace OpenDesk.Onboarding.Implementations
 
             if (agents == null || agents.Count == 0)
             {
-                // 에이전트 없음 → 기본 main 생성 후 계속
                 Context.DetectedAgents.Add(new AgentConfig
                 {
                     SessionId = "main",
@@ -238,7 +330,6 @@ namespace OpenDesk.Onboarding.Implementations
             }
             else
             {
-                // 최대 4명 제한 (현재 오피스 슬롯)
                 foreach (var agent in agents)
                 {
                     if (Context.DetectedAgents.Count >= 4) break;
@@ -249,7 +340,7 @@ namespace OpenDesk.Onboarding.Implementations
             }
         }
 
-        // ── Step 5: 워크스페이스 설정 (UI 액션) ──────────────────────────────
+        // ── Step 5: 워크스페이스 설정 (UI 액션) ─────────────────────────
 
         public UniTask SkipWorkspaceSetupAsync()
         {
@@ -266,13 +357,12 @@ namespace OpenDesk.Onboarding.Implementations
             await UniTask.CompletedTask;
         }
 
-        // ── 오프라인 모드 (UI 액션) ───────────────────────────────────────────
+        // ── 오프라인 모드 (UI 액션) ─────────────────────────────────────
 
         public UniTask EnterOfflineMode()
         {
             Context.IsOfflineMode = true;
 
-            // 에이전트 없으면 기본 main 추가
             if (Context.DetectedAgents.Count == 0)
                 Context.DetectedAgents.Add(new AgentConfig
                 {
@@ -285,7 +375,7 @@ namespace OpenDesk.Onboarding.Implementations
             return UniTask.CompletedTask;
         }
 
-        // ── 완료 처리 ─────────────────────────────────────────────────────────
+        // ── 완료 처리 ───────────────────────────────────────────────────
 
         private void CompleteOnboarding()
         {
@@ -297,7 +387,7 @@ namespace OpenDesk.Onboarding.Implementations
             TransitionTo(OnboardingState.ReadyToEnter);
         }
 
-        // ── 내부 상태 전환 ────────────────────────────────────────────────────
+        // ── 내부 상태 전환 ──────────────────────────────────────────────
 
         private void TransitionTo(OnboardingState next)
         {

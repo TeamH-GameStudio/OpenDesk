@@ -60,7 +60,7 @@ namespace OpenDesk.Onboarding.Tests
         private class MockSettings : IOnboardingSettings
         {
             public bool   IsFirstRun       { get; set; } = true;
-            public string SavedGatewayUrl  { get; set; } = "ws://localhost:18800/events";
+            public string SavedGatewayUrl  { get; set; } = "ws://localhost:18789/events";
             public string SavedLocalPath   { get; set; } = "";
             public int    AppVersion       { get; set; } = 0;
             public string CompletedGateway { get; private set; }
@@ -111,6 +111,33 @@ namespace OpenDesk.Onboarding.Tests
             public void Dispose() { }
         }
 
+        // ── M1 Mock 추가 ────────────────────────────────────────────────────
+
+        private class MockNodeEnv : INodeEnvironmentService
+        {
+            public bool   Installed  = true;
+            public string Version    = "24.1.0";
+            public bool   MeetsMin   = true;
+            public bool   InstallOk  = true;
+
+            public ReadOnlyReactiveProperty<float>  Progress   { get; } = new ReactiveProperty<float>(0f);
+            public ReadOnlyReactiveProperty<string> StatusText { get; } = new ReactiveProperty<string>("");
+
+            public UniTask<bool>   IsInstalledAsync(System.Threading.CancellationToken ct)   => UniTask.FromResult(Installed);
+            public UniTask<string> GetVersionAsync(System.Threading.CancellationToken ct)    => UniTask.FromResult(Version);
+            public UniTask<bool>   MeetsMinVersionAsync(string v, System.Threading.CancellationToken ct) => UniTask.FromResult(MeetsMin);
+            public UniTask<bool>   InstallAsync(System.Threading.CancellationToken ct)       => UniTask.FromResult(InstallOk);
+        }
+
+        private class MockAdmin : IAdminPrivilegeService
+        {
+            public bool Elevated = false;
+            public UniTask<bool> IsElevatedAsync(System.Threading.CancellationToken ct) => UniTask.FromResult(Elevated);
+            public UniTask<ProcessOutput> RunElevatedAsync(string c, string a, System.Threading.CancellationToken ct)
+                => UniTask.FromResult(new ProcessOutput { ExitCode = 0 });
+            public UniTask DropPrivilegesAndRestartAsync(System.Threading.CancellationToken ct) => UniTask.CompletedTask;
+        }
+
         // ── 테스트 ───────────────────────────────────────────────────────────
 
         private OnboardingService CreateService(
@@ -119,7 +146,9 @@ namespace OpenDesk.Onboarding.Tests
             MockParser    parser    = null,
             MockSettings  settings  = null,
             MockBridge    bridge    = null,
-            MockWorkspace workspace = null)
+            MockWorkspace workspace = null,
+            MockNodeEnv   nodeEnv   = null,
+            MockAdmin     admin     = null)
         {
             return new OnboardingService(
                 detector  ?? new MockDetector(),
@@ -127,7 +156,10 @@ namespace OpenDesk.Onboarding.Tests
                 parser    ?? new MockParser(),
                 settings  ?? new MockSettings(),
                 bridge    ?? new MockBridge(),
-                workspace ?? new MockWorkspace()
+                workspace ?? new MockWorkspace(),
+                nodeEnv   ?? new MockNodeEnv(),
+                admin     ?? new MockAdmin(),
+                wsl2: null  // 테스트에서는 WSL2 미사용
             );
         }
 
@@ -231,6 +263,55 @@ namespace OpenDesk.Onboarding.Tests
 
             Assert.IsFalse(settings.IsFirstRun);
             Assert.IsNotEmpty(settings.CompletedGateway);
+        }
+
+        // ── M1: 환경 스캔 테스트 ─────────────────────────────────────────
+
+        [Test]
+        public async Task Start_NodeJs미설치_설치성공_계속진행()
+        {
+            var nodeEnv = new MockNodeEnv { Installed = false, InstallOk = true };
+            var svc = CreateService(nodeEnv: nodeEnv);
+
+            await svc.StartAsync();
+
+            // Node.js 설치 후 OpenClaw 감지까지 진행
+            Assert.AreNotEqual(OnboardingState.NodeJsFailed, svc.CurrentState);
+        }
+
+        [Test]
+        public async Task Start_NodeJs미설치_설치실패_NodeJsFailed()
+        {
+            var nodeEnv = new MockNodeEnv { Installed = false, InstallOk = false };
+            var svc = CreateService(nodeEnv: nodeEnv);
+
+            await svc.StartAsync();
+
+            Assert.AreEqual(OnboardingState.NodeJsFailed, svc.CurrentState);
+        }
+
+        [Test]
+        public async Task Start_NodeJs버전낮음_NodeJsFailed()
+        {
+            var nodeEnv = new MockNodeEnv { Installed = true, MeetsMin = false, Version = "16.0.0" };
+            var svc = CreateService(nodeEnv: nodeEnv);
+
+            await svc.StartAsync();
+
+            Assert.AreEqual(OnboardingState.NodeJsFailed, svc.CurrentState);
+            Assert.IsTrue(svc.Context.LastErrorMessage.Contains("22.16"));
+        }
+
+        [Test]
+        public async Task SubmitGatewayUrl_유효하지않은URL_GatewayFailed()
+        {
+            var svc = CreateService();
+            await svc.StartAsync();
+
+            await svc.SubmitGatewayUrlAsync("not-a-valid-url");
+
+            Assert.AreEqual(OnboardingState.GatewayFailed, svc.CurrentState);
+            Assert.IsTrue(svc.Context.LastErrorMessage.Contains("WebSocket"));
         }
     }
 }

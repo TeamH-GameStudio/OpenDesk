@@ -11,6 +11,8 @@ namespace OpenDesk.Onboarding.Implementations
 {
     /// <summary>
     /// OpenClaw 설치 감지 — 탐색만, 설치/실행 없음
+    /// - 크로스플랫폼 (Windows/macOS/Linux)
+    /// - WSL2 환경 내 설치도 감지
     /// </summary>
     public class OpenClawDetector : IOpenClawDetector
     {
@@ -19,19 +21,13 @@ namespace OpenDesk.Onboarding.Implementations
         {
             get
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                    return Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                        ".openclaw", "openclaw.json"
-                    );
-
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     return Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                         "openclaw", "openclaw.json"
                     );
 
-                // Linux
+                // macOS / Linux
                 return Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     ".openclaw", "openclaw.json"
@@ -43,29 +39,64 @@ namespace OpenDesk.Onboarding.Implementations
         {
             get
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     return Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                        ".openclaw", "workspace"
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "openclaw", "workspace"
                     );
 
                 return Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "openclaw", "workspace"
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".openclaw", "workspace"
                 );
+            }
+        }
+
+        // WSL2 내부 경로 (Windows에서 WSL 파일시스템 접근)
+        private static string WslConfigPath
+        {
+            get
+            {
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    return null;
+
+                // WSL 파일은 \\wsl$\ 또는 \\wsl.localhost\ 경로로 접근 가능
+                var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                var userName    = Path.GetFileName(userProfile);
+
+                return $@"\\wsl.localhost\Ubuntu\home\{userName}\.openclaw\openclaw.json";
             }
         }
 
         public UniTask<bool> IsInstalledAsync(CancellationToken ct = default)
         {
-            var result = File.Exists(DefaultConfigPath) ||
-                         Directory.Exists(Path.GetDirectoryName(DefaultConfigPath));
-            return UniTask.FromResult(result);
+            // 기본 경로 확인
+            if (File.Exists(DefaultConfigPath) ||
+                Directory.Exists(Path.GetDirectoryName(DefaultConfigPath)))
+                return UniTask.FromResult(true);
+
+            // WSL2 경로 확인 (Windows)
+            var wslPath = WslConfigPath;
+            if (wslPath != null)
+            {
+                try
+                {
+                    if (File.Exists(wslPath) ||
+                        Directory.Exists(Path.GetDirectoryName(wslPath)))
+                        return UniTask.FromResult(true);
+                }
+                catch
+                {
+                    // WSL 미설치 시 경로 접근 실패 — 무시
+                }
+            }
+
+            return UniTask.FromResult(false);
         }
 
         public UniTask<string> GetInstallPathAsync(CancellationToken ct = default)
         {
-            // yaml config는 workspace 하위에 있음
+            // 우선순위: workspace 내 yaml → 기본 json → WSL 내 json
             var candidates = new[]
             {
                 Path.Combine(WorkspacePath, "openclaw.yaml"),
@@ -79,6 +110,18 @@ namespace OpenDesk.Onboarding.Implementations
                     return UniTask.FromResult(path);
             }
 
+            // WSL2 경로 확인
+            var wslPath = WslConfigPath;
+            if (wslPath != null)
+            {
+                try
+                {
+                    if (File.Exists(wslPath))
+                        return UniTask.FromResult(wslPath);
+                }
+                catch { /* WSL 미설치 */ }
+            }
+
             return UniTask.FromResult<string>(null);
         }
 
@@ -88,10 +131,20 @@ namespace OpenDesk.Onboarding.Implementations
             {
                 try
                 {
-                    // openclaw.json에서 버전 읽기
-                    if (!File.Exists(DefaultConfigPath)) return null;
+                    var configPath = DefaultConfigPath;
 
-                    var json = File.ReadAllText(DefaultConfigPath);
+                    // 기본 경로에 없으면 WSL 경로 시도
+                    if (!File.Exists(configPath))
+                    {
+                        var wslPath = WslConfigPath;
+                        if (wslPath != null && File.Exists(wslPath))
+                            configPath = wslPath;
+                        else
+                            return null;
+                    }
+
+                    var json = File.ReadAllText(configPath);
+
                     // 간단한 버전 파싱 (정규식 없이)
                     var key = "\"version\"";
                     var idx = json.IndexOf(key, StringComparison.OrdinalIgnoreCase);
