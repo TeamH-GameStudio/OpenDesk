@@ -129,12 +129,9 @@ namespace OpenDesk.Onboarding.Implementations
             Context.GatewayUrl        = _settings.SavedGatewayUrl;
             Context.LocalWorkspacePath = _settings.SavedLocalPath;
 
-            var connected = await TryConnectGatewayAsync(ct);
-            if (!connected)
-            {
-                await RunGatewayStepAsync(ct);
-                return;
-            }
+            // Gateway 연결 (토큰 자동 읽기 + 자동 시작 포함)
+            var result = await RunGatewayStepAsync(ct);
+            if (!result.IsSuccess) return;
 
             if (!string.IsNullOrEmpty(Context.LocalWorkspacePath))
                 _workspace.SetLocalPath(Context.LocalWorkspacePath);
