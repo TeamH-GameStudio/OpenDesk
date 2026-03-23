@@ -161,13 +161,8 @@ namespace OpenDesk.Onboarding.Implementations
             var detectResult = await RunDetectStepAsync(ct);
             if (!detectResult.IsSuccess) return;
 
-            // Step 2: Gateway 연결
-            var gatewayResult = await RunGatewayStepAsync(ct);
-            if (!gatewayResult.IsSuccess) return;
-
-            // Step 3: 에이전트 파싱
-            await RunParseAgentsStepAsync(ct);
-            // Step 4: WorkspaceSetup은 유저 액션 대기 (UI에서 트리거)
+            // Step 2: Gateway 연결 → 성공 시 내부에서 에이전트 파싱 + 워크스페이스까지 진행
+            await RunGatewayStepAsync(ct);
         }
 
         // ── Mock 온보딩 (에디터 테스트용) ──────────────────────────────
