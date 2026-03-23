@@ -177,7 +177,11 @@ namespace OpenDesk.Presentation.UI.Onboarding
                 Debug.Log("[UI] 사용자가 나중에 재시작 선택 — 앱 종료 안내"));
 
             // 완료 → Office 진입 (OnboardingBootstrapper가 처리하지만 버튼도 제공)
-            _enterOfficeButton?.onClick.AddListener(() => { /* Bootstrapper가 ReadyToEnter 감지 */ });
+            _enterOfficeButton?.onClick.AddListener(() =>
+            {
+                // 워크스페이스 건너뛰고 바로 완료 처리
+                _onboarding.SkipWorkspaceSetupAsync().Forget();
+            });
 
             // "왜 필요한가요?" 토글
             _whyNeededToggle?.onClick.AddListener(ToggleWhyNeeded);
