@@ -101,7 +101,14 @@ namespace OpenDesk.Core.Installers
             // 리소스 모니터링 시작 (백그라운드)
             _costMonitor.StartMonitoringAsync(ct).Forget();
 
-            // Gateway 연결
+            // Gateway 토큰 복원 + 연결
+            var savedToken = PlayerPrefs.GetString("OpenDesk_GatewayToken", "");
+            if (!string.IsNullOrEmpty(savedToken))
+            {
+                _bridge.SetGatewayToken(savedToken);
+                Debug.Log("[Boot] 저장된 Gateway 토큰 복원됨");
+            }
+
             var gatewayUrl = PlayerPrefs.GetString("OpenDesk_GatewayUrl", DefaultGatewayUrl);
 
             try

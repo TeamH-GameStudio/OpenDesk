@@ -173,6 +173,41 @@ namespace OpenDesk.Onboarding.Implementations
             }, cancellationToken: ct);
         }
 
+        public async UniTask<string> GetGatewayTokenAsync(CancellationToken ct = default)
+        {
+            return await UniTask.RunOnThreadPool(() =>
+            {
+                try
+                {
+                    var configPath = DefaultConfigPath;
+                    if (!File.Exists(configPath)) return null;
+
+                    var json = File.ReadAllText(configPath);
+
+                    // "token": "..." 파싱
+                    var key = "\"token\"";
+                    var idx = json.IndexOf(key, StringComparison.OrdinalIgnoreCase);
+                    if (idx < 0) return null;
+
+                    var start = json.IndexOf('"', idx + key.Length + 1) + 1;
+                    var end   = json.IndexOf('"', start);
+
+                    if (start > 0 && end > start)
+                    {
+                        var token = json.Substring(start, end - start);
+                        Debug.Log($"[Detector] Gateway 토큰 발견 ({token.Length}자)");
+                        return token;
+                    }
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[Detector] 토큰 읽기 실패: {ex.Message}");
+                    return null;
+                }
+            }, cancellationToken: ct);
+        }
+
         public async UniTask<bool> IsGatewayListeningAsync(int port, CancellationToken ct = default)
         {
             return await UniTask.RunOnThreadPool(() =>

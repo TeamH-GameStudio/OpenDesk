@@ -413,6 +413,17 @@ namespace OpenDesk.Onboarding.Implementations
             TransitionTo(OnboardingState.ConnectingGateway);
             Context.GatewayRetryCount = 0;
 
+            // Gateway 인증 토큰 자동 읽기 + 저장
+            var token = await _detector.GetGatewayTokenAsync(ct);
+            if (!string.IsNullOrEmpty(token))
+            {
+                _bridge.SetGatewayToken(token);
+                // 재방문 시 AppBootstrapper에서 사용하도록 저장
+                PlayerPrefs.SetString("OpenDesk_GatewayToken", token);
+                PlayerPrefs.Save();
+                Debug.Log("[Onboarding] Gateway 토큰 자동 설정 + 저장 완료");
+            }
+
             while (Context.GatewayRetryCount < MaxGatewayRetry)
             {
                 var connected = await TryConnectGatewayAsync(ct);

@@ -31,6 +31,8 @@ namespace OpenDesk.Core.Implementations
         private const int HeartbeatIntervalMs  = 55_000; // 55초 (캐시 TTL 1시간 대응)
 
         private string _lastGatewayUrl;
+        private string _lastToken;
+        private string _pendingToken;
         private bool   _intentionalDisconnect;
 
         // 연결 끊김 시 메시지 버퍼 (재연결 후 전송)
@@ -44,6 +46,12 @@ namespace OpenDesk.Core.Implementations
         public OpenClawBridgeService(IEventParserService parser)
         {
             _parser = parser;
+        }
+
+        public void SetGatewayToken(string token)
+        {
+            _pendingToken = token;
+            Debug.Log($"[Bridge] Gateway 토큰 설정됨 ({(string.IsNullOrEmpty(token) ? "없음" : $"{token.Length}자")})");
         }
 
         public async UniTask ConnectAsync(string gatewayUrl, CancellationToken ct = default)
@@ -60,10 +68,22 @@ namespace OpenDesk.Core.Implementations
                 await DisconnectInternalAsync(intentional: true);
 
             _lastGatewayUrl = gatewayUrl;
+            _lastToken = _pendingToken;  // OnboardingService에서 설정한 토큰
             _intentionalDisconnect = false;
             _loopCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-            _socket = new WebSocket(gatewayUrl);
+            // 토큰이 있으면 헤더에 포함
+            Dictionary<string, string> headers = null;
+            if (!string.IsNullOrEmpty(_lastToken))
+            {
+                headers = new Dictionary<string, string>
+                {
+                    { "Authorization", $"Bearer {_lastToken}" },
+                };
+                Debug.Log("[Bridge] 토큰 인증 헤더 포함");
+            }
+
+            _socket = new WebSocket(gatewayUrl, headers);
 
             _socket.OnOpen    += OnOpen;
             _socket.OnMessage += OnMessage;
@@ -183,7 +203,13 @@ namespace OpenDesk.Core.Implementations
                 {
                     _loopCts = new CancellationTokenSource();
 
-                    _socket = new WebSocket(_lastGatewayUrl);
+                    // 재연결 시에도 토큰 포함
+                    Dictionary<string, string> reHeaders = null;
+                    if (!string.IsNullOrEmpty(_lastToken))
+                        reHeaders = new Dictionary<string, string>
+                            { { "Authorization", $"Bearer {_lastToken}" } };
+
+                    _socket = new WebSocket(_lastGatewayUrl, reHeaders);
                     _socket.OnOpen    += OnOpen;
                     _socket.OnMessage += OnMessage;
                     _socket.OnError   += OnError;

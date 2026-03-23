@@ -41,7 +41,13 @@ namespace OpenDesk.Editor
         };
 
         private int _selectedState;
-        private bool _useMockMode = true;
+        private bool _useMockMode;
+
+        private void OnEnable()
+        {
+            // 현재 저장된 Mock 모드 상태 반영
+            _useMockMode = PlayerPrefs.GetInt("OpenDesk_MockMode", 0) == 1;
+        }
         private Vector2 _scrollPos;
 
         [MenuItem("Window/OpenDesk/Onboarding Debug")]
@@ -64,18 +70,22 @@ namespace OpenDesk.Editor
                 "온보딩 UI 플로우를 테스트할 수 있습니다.",
                 MessageType.Info);
 
-            _useMockMode = EditorGUILayout.Toggle("Mock 모드 사용", _useMockMode);
-
-            EditorGUILayout.Space(5);
-
-            if (GUILayout.Button("▶  Mock 모드로 Play 시작", GUILayout.Height(35)))
+            var newMock = EditorGUILayout.Toggle("Mock 모드 사용", _useMockMode);
+            if (newMock != _useMockMode)
             {
+                _useMockMode = newMock;
                 if (_useMockMode)
                     EnableMockMode();
                 else
                     DisableMockMode();
+            }
 
+            EditorGUILayout.Space(5);
+
+            if (GUILayout.Button(_useMockMode ? "▶  Mock 모드로 Play 시작" : "▶  실제 모드로 Play 시작", GUILayout.Height(35)))
+            {
                 ResetPlayerPrefs();
+                // Mock 상태는 이미 토글에서 저장됨, Play만 시작
                 EditorApplication.isPlaying = true;
             }
 
@@ -444,18 +454,25 @@ namespace OpenDesk.Editor
             Debug.Log("  WSL2: 해당 없음 (macOS/Linux)");
 #endif
 
-            // OpenClaw (OS별 경로)
-            string configPath;
-#if UNITY_EDITOR_WIN
-            configPath = System.IO.Path.Combine(
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
-                "openclaw", "openclaw.json");
-#else
-            configPath = System.IO.Path.Combine(
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
-                ".openclaw", "openclaw.json");
-#endif
-            Debug.Log($"  OpenClaw 설정: {(System.IO.File.Exists(configPath) ? "발견" : "미발견")} ({configPath})");
+            // OpenClaw (여러 경로 탐색)
+            var home = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+            var appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData);
+            string[] configPaths = {
+                System.IO.Path.Combine(home, ".openclaw", "openclaw.json"),
+                System.IO.Path.Combine(appData, "openclaw", "openclaw.json"),
+            };
+            bool configFound = false;
+            foreach (var cp in configPaths)
+            {
+                if (System.IO.File.Exists(cp))
+                {
+                    Debug.Log($"  OpenClaw 설정: 발견 ({cp})");
+                    configFound = true;
+                    break;
+                }
+            }
+            if (!configFound)
+                Debug.Log($"  OpenClaw 설정: 미발견 (탐색: {string.Join(", ", configPaths)})");
 
             // 포트 18789
             try

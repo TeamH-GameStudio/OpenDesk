@@ -20,5 +20,8 @@ namespace OpenDesk.Onboarding.Services
 
         // Gateway가 현재 수신 대기 중인지 포트 체크
         UniTask<bool> IsGatewayListeningAsync(int port, CancellationToken ct = default);
+
+        // Gateway 인증 토큰 읽기 (openclaw.json에서)
+        UniTask<string> GetGatewayTokenAsync(CancellationToken ct = default);
     }
 }

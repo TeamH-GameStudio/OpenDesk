@@ -15,6 +15,9 @@ namespace OpenDesk.Core.Services
         // 이벤트 스트림 — 수신되는 모든 에이전트 이벤트
         Observable<AgentEvent> OnEventReceived { get; }
 
+        // 인증 토큰 설정 (ConnectAsync 호출 전에 설정)
+        void SetGatewayToken(string token);
+
         // 연결 / 해제
         UniTask ConnectAsync(string gatewayUrl, CancellationToken ct = default);
         UniTask DisconnectAsync();

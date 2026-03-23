@@ -34,6 +34,8 @@ namespace OpenDesk.Onboarding.Tests
                 => UniTask.FromResult(Version);
             public UniTask<bool>   IsGatewayListeningAsync(int port, System.Threading.CancellationToken ct)
                 => UniTask.FromResult(GatewayListening);
+            public UniTask<string> GetGatewayTokenAsync(System.Threading.CancellationToken ct)
+                => UniTask.FromResult("mock-token");
         }
 
         private class MockInstaller : IOpenClawInstaller
@@ -90,6 +92,7 @@ namespace OpenDesk.Onboarding.Tests
                 IsConnected = true;
                 await UniTask.CompletedTask;
             }
+            public void SetGatewayToken(string token) { }
             public UniTask DisconnectAsync() { IsConnected = false; return UniTask.CompletedTask; }
             public UniTask SendMessageAsync(string s, string m, System.Threading.CancellationToken ct)
                 => UniTask.CompletedTask;
