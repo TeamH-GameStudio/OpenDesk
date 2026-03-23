@@ -16,7 +16,6 @@ namespace OpenDesk.Core.Implementations
     /// </summary>
     public class WorkspaceService : IWorkspaceService, IDisposable
     {
-        private readonly IGoogleDriveService _driveService;
         private readonly Subject<WorkspaceEntry> _entryChanged = new();
 
         private string _localPath   = "";
@@ -30,10 +29,8 @@ namespace OpenDesk.Core.Implementations
 
         public Observable<WorkspaceEntry> OnEntryChanged => _entryChanged;
 
-        public WorkspaceService(IGoogleDriveService driveService)
+        public WorkspaceService()
         {
-            _driveService = driveService;
-
             // 저장된 경로 복원
             _localPath     = PlayerPrefs.GetString(PrefKey_LocalPath,     "");
             _driveFolderId = PlayerPrefs.GetString(PrefKey_DriveFolderId, "");
@@ -63,19 +60,8 @@ namespace OpenDesk.Core.Implementations
                 entries.AddRange(localEntries);
             }
 
-            // Google Drive 파일 수집
-            if (_driveService.IsAuthenticated && !string.IsNullOrEmpty(_driveFolderId))
-            {
-                try
-                {
-                    var driveEntries = await _driveService.ListFilesAsync(_driveFolderId, ct);
-                    entries.AddRange(driveEntries);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[Workspace] Drive 조회 실패: {ex.Message}");
-                }
-            }
+            // Google Drive 파일 수집 — GOOGLE_DRIVE_ENABLED 시에만 동작
+            // TODO: GoogleDrive 연동 활성화 시 복원
 
             return entries.OrderByDescending(e => e.LastModified).ToList();
         }

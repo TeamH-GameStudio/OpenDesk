@@ -1,5 +1,6 @@
 using OpenDesk.Core.Models;
 using OpenDesk.Core.Services;
+using OpenDesk.Presentation.UI.OfficeWizard;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,6 +19,9 @@ namespace OpenDesk.Presentation.UI.Panels
         [Header("로그")]
         [SerializeField] private TMP_Dropdown _logLevelDropdown;
         [SerializeField] private Button       _clearLogsButton;
+
+        [Header("초기 설정")]
+        [SerializeField] private Button _restartWizardButton;
 
         [Header("디버그 (에디터 전용)")]
         [SerializeField] private TMP_Dropdown _forceStateDropdown;
@@ -47,6 +51,16 @@ namespace OpenDesk.Presentation.UI.Panels
             }
 
             _clearLogsButton?.onClick.AddListener(() => _logService?.Clear());
+
+            // 초기 설정 다시 하기
+            _restartWizardButton?.onClick.AddListener(() =>
+            {
+                var wizard = FindObjectOfType<OfficeWizardController>();
+                if (wizard != null)
+                    wizard.RestartWizard();
+                else
+                    Debug.LogWarning("[Settings] OfficeWizardController를 찾을 수 없습니다.");
+            });
 
             // 디버그 상태 강제 전환
             #if UNITY_EDITOR

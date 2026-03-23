@@ -106,9 +106,12 @@ namespace OpenDesk.Editor
             var isFirstRun = PlayerPrefs.GetInt("OpenDesk_IsFirstRun", 1);
             var gatewayUrl = PlayerPrefs.GetString("OpenDesk_GatewayUrl", "(없음)");
             var rebootPending = PlayerPrefs.GetInt("OpenDesk_RebootPending", 0);
+            var officeSetup = PlayerPrefs.GetInt("OpenDesk_OfficeSetupDone", 0);
             EditorGUILayout.LabelField($"  IsFirstRun: {(isFirstRun == 1 ? "true (온보딩 실행됨)" : "false (건너뜀)")}");
             EditorGUILayout.LabelField($"  GatewayUrl: {gatewayUrl}");
             EditorGUILayout.LabelField($"  RebootPending: {(rebootPending == 1 ? "true" : "false")}");
+            EditorGUILayout.LabelField($"  OfficeSetupDone: {(officeSetup == 1 ? "true (마법사 완료)" : "false (마법사 표시됨)")}");
+
 
             EditorGUILayout.Space(15);
 
@@ -254,8 +257,9 @@ namespace OpenDesk.Editor
             PlayerPrefs.DeleteKey("OpenDesk_LocalPath");
             PlayerPrefs.DeleteKey("OpenDesk_AppVersion");
             PlayerPrefs.DeleteKey("OpenDesk_RebootPending");
+            PlayerPrefs.DeleteKey("OpenDesk_OfficeSetupDone");
             PlayerPrefs.Save();
-            Debug.Log("[Debug] OpenDesk PlayerPrefs 모두 초기화 완료");
+            Debug.Log("[Debug] OpenDesk PlayerPrefs 모두 초기화 완료 (온보딩 + Office 마법사)");
         }
 
         // ── 상태 강제 전환 ─────────────────────────────────
