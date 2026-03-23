@@ -144,10 +144,16 @@ namespace OpenDesk.Onboarding.Implementations
                     Debug.LogWarning("[Installer] 데몬 등록 실패 — 수동 시작 필요할 수 있음");
                 }
 
-                // ── Step 5: Gateway 시작 대기 + 포트 검증 ────────────────
+                // ── Step 5: Gateway 시작 + 포트 검증 ──────────────────────
 
-                SetProgress(0.85f, "Gateway 시작 대기 중...");
-                await UniTask.Delay(2000, cancellationToken: ct);
+                SetProgress(0.85f, "AI 비서 서비스 시작 중...");
+
+                // 데몬이 등록 안 됐어도 직접 Gateway 시작 시도
+                var gwCmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? "openclaw.cmd" : "openclaw";
+                _ = RunBackgroundProcessAsync(gwCmd, "gateway start");
+
+                await UniTask.Delay(3000, cancellationToken: ct);
 
                 // Gateway 포트 열림 확인 (최대 3회)
                 bool gatewayReady = false;
@@ -234,7 +240,7 @@ namespace OpenDesk.Onboarding.Implementations
             return result.ExitCode == 0;
         }
 
-        // ── 데몬 등록 ───────────────────────────────────────────────────
+        // ── 데몬 등록 (비대화형 + 관리자 권한) ────────────────────────────
 
         private async UniTask<bool> RegisterDaemonAsync(CancellationToken ct)
         {
@@ -242,7 +248,47 @@ namespace OpenDesk.Onboarding.Implementations
                 ? "openclaw.cmd"
                 : "openclaw";
 
-            return await RunCommandAsync(cmd, "onboard --install-daemon", ct);
+            // 1단계: 설정 파일 생성 (비대화형, 일반 권한으로 충분)
+            var configOk = await RunCommandAsync(cmd,
+                "onboard --non-interactive --accept-risk --skip-channels --skip-skills --skip-search --auth-choice skip --flow quickstart",
+                ct);
+            if (!configOk)
+                Debug.LogWarning("[Installer] OpenClaw 설정 파일 생성 실패");
+
+            // 2단계: 데몬 서비스 등록 (관리자 권한 필요 — UAC)
+            var daemonResult = await _admin.RunElevatedAsync(cmd,
+                "onboard --non-interactive --accept-risk --install-daemon --skip-channels --skip-skills --skip-search --auth-choice skip --flow quickstart",
+                ct);
+
+            if (daemonResult.ExitCode != 0)
+                Debug.LogWarning($"[Installer] 데몬 등록 결과: exit={daemonResult.ExitCode}");
+
+            return configOk;  // 설정 파일만 있으면 Gateway 수동 시작 가능
+        }
+
+        // ── 백그라운드 프로세스 (Gateway 등 데몬 시작용) ─────────────────
+
+        private static void RunBackgroundProcessAsync(string cmd, string args)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName        = cmd,
+                    Arguments       = args,
+                    UseShellExecute = false,
+                    CreateNoWindow  = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                };
+                var process = Process.Start(psi);
+                Debug.Log($"[Installer] 백그라운드 시작: {cmd} {args} (PID: {process?.Id})");
+                // 프로세스를 닫지 않음 — 백그라운드에서 계속 실행
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Installer] 백그라운드 시작 실패: {cmd} {args} — {ex.Message}");
+            }
         }
 
         // ── 프로세스 실행 유틸리티 ───────────────────────────────────────
