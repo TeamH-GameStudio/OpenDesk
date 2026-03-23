@@ -374,22 +374,59 @@ namespace OpenDesk.Editor
         {
             Debug.Log("=== 외부 환경 상태 확인 ===");
 
-            // Node.js
-            try
+            // Node.js (nvm/homebrew/직접설치 모두 탐색)
             {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "node", Arguments = "--version",
-                    RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true,
-                };
-                using var p = System.Diagnostics.Process.Start(psi);
-                var ver = p?.StandardOutput.ReadToEnd().Trim();
-                p?.WaitForExit(5000);
-                Debug.Log($"  Node.js: {(string.IsNullOrEmpty(ver) ? "미설치" : ver)}");
-            }
-            catch { Debug.Log("  Node.js: 미설치"); }
+                string nodeVer = null;
+                string nodePath = "node";
 
-            // WSL2
+                // 후보 경로들 (Mac nvm, homebrew, Linux 등)
+                var candidates = new[]
+                {
+                    "node",  // PATH에 있는 경우
+#if !UNITY_EDITOR_WIN
+                    System.IO.Path.Combine(System.Environment.GetFolderPath(
+                        System.Environment.SpecialFolder.UserProfile), ".nvm/current/bin/node"),
+                    "/usr/local/bin/node",
+                    "/opt/homebrew/bin/node",
+#endif
+                };
+
+                foreach (var candidate in candidates)
+                {
+                    try
+                    {
+                        var psi = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = candidate, Arguments = "--version",
+                            RedirectStandardOutput = true, RedirectStandardError = true,
+                            UseShellExecute = false, CreateNoWindow = true,
+                        };
+#if !UNITY_EDITOR_WIN
+                        // Mac/Linux: 셸 환경 로드하여 nvm PATH 포함
+                        psi.FileName = "/bin/bash";
+                        psi.Arguments = $"-l -c \"{candidate} --version\"";
+#endif
+                        using var p = System.Diagnostics.Process.Start(psi);
+                        var ver = p?.StandardOutput.ReadToEnd().Trim();
+                        p?.WaitForExit(5000);
+                        if (p?.ExitCode == 0 && !string.IsNullOrEmpty(ver))
+                        {
+                            nodeVer = ver;
+                            nodePath = candidate;
+                            break;
+                        }
+                    }
+                    catch { /* 다음 후보 시도 */ }
+                }
+
+                if (!string.IsNullOrEmpty(nodeVer))
+                    Debug.Log($"  Node.js: {nodeVer} ({nodePath})");
+                else
+                    Debug.Log("  Node.js: 미설치 (PATH, nvm, homebrew 모두 미발견)");
+            }
+
+            // WSL2 (Windows 전용)
+#if UNITY_EDITOR_WIN
             try
             {
                 var psi = new System.Diagnostics.ProcessStartInfo
@@ -403,11 +440,21 @@ namespace OpenDesk.Editor
                 Debug.Log($"  WSL2: {(p?.ExitCode == 0 ? "활성화됨" : "미설치")}");
             }
             catch { Debug.Log("  WSL2: 미설치"); }
+#else
+            Debug.Log("  WSL2: 해당 없음 (macOS/Linux)");
+#endif
 
-            // OpenClaw
-            var configPath = System.IO.Path.Combine(
+            // OpenClaw (OS별 경로)
+            string configPath;
+#if UNITY_EDITOR_WIN
+            configPath = System.IO.Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
                 "openclaw", "openclaw.json");
+#else
+            configPath = System.IO.Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
+                ".openclaw", "openclaw.json");
+#endif
             Debug.Log($"  OpenClaw 설정: {(System.IO.File.Exists(configPath) ? "발견" : "미발견")} ({configPath})");
 
             // 포트 18789

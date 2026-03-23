@@ -43,27 +43,85 @@ namespace OpenDesk.Onboarding.Implementations
             {
                 try
                 {
-                    var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
-                    var psi = new ProcessStartInfo
+                    ProcessStartInfo psi;
+
+                    // OS별 후보 경로 (PATH 기본 → nvm → 직접설치 순서)
+                    string[] candidates;
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        FileName               = cmd,
-                        Arguments              = "--version",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError  = true,
-                        UseShellExecute        = false,
-                        CreateNoWindow         = true,
-                    };
+                        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                        var progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                        // NVM_SYMLINK: nvm-windows가 활성 버전을 가리키는 심링크
+                        var nvmSymlink = Environment.GetEnvironmentVariable("NVM_SYMLINK") ?? "";
+                        candidates = new[]
+                        {
+                            "node.exe",
+                            string.IsNullOrEmpty(nvmSymlink) ? "" : Path.Combine(nvmSymlink, "node.exe"),
+                            Path.Combine(appData, "nvm", "current", "node.exe"),
+                            Path.Combine(progFiles, "nodejs", "node.exe"),
+                        };
+                    }
+                    else
+                    {
+                        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                        candidates = new[]
+                        {
+                            "node",
+                            Path.Combine(home, ".nvm/versions/node"),  // placeholder, bash -l이 해결
+                            "/usr/local/bin/node",
+                            "/opt/homebrew/bin/node",
+                        };
+                    }
 
-                    using var process = Process.Start(psi);
-                    if (process == null) return null;
+                    foreach (var candidate in candidates)
+                    {
+                        try
+                        {
+                            ProcessStartInfo tryPsi;
 
-                    var output = process.StandardOutput.ReadToEnd().Trim();
-                    process.WaitForExit(5_000);
+                            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                            {
+                                tryPsi = new ProcessStartInfo
+                                {
+                                    FileName               = candidate,
+                                    Arguments              = "--version",
+                                    RedirectStandardOutput = true,
+                                    RedirectStandardError  = true,
+                                    UseShellExecute        = false,
+                                    CreateNoWindow         = true,
+                                };
+                            }
+                            else
+                            {
+                                // macOS/Linux: login shell로 nvm PATH 포함
+                                tryPsi = new ProcessStartInfo
+                                {
+                                    FileName               = "/bin/bash",
+                                    Arguments              = $"-l -c \"{candidate} --version\"",
+                                    RedirectStandardOutput = true,
+                                    RedirectStandardError  = true,
+                                    UseShellExecute        = false,
+                                    CreateNoWindow         = true,
+                                };
+                            }
 
-                    if (process.ExitCode != 0) return null;
+                            using var p = Process.Start(tryPsi);
+                            if (p == null) continue;
 
-                    // "v24.1.0" → "24.1.0"
-                    return output.StartsWith("v") ? output.Substring(1) : output;
+                            var ver = p.StandardOutput.ReadToEnd().Trim();
+                            p.WaitForExit(5_000);
+
+                            if (p.ExitCode == 0 && !string.IsNullOrEmpty(ver))
+                            {
+                                Debug.Log($"[NodeEnv] Node.js 발견: {ver} ({candidate})");
+                                return ver.StartsWith("v") ? ver.Substring(1) : ver;
+                            }
+                        }
+                        catch { /* 다음 후보 */ }
+                    }
+
+                    return null;
                 }
                 catch
                 {
@@ -249,15 +307,33 @@ namespace OpenDesk.Onboarding.Implementations
             {
                 try
                 {
-                    var psi = new ProcessStartInfo
+                    ProcessStartInfo psi;
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        FileName               = cmd,
-                        Arguments              = args,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError  = true,
-                        UseShellExecute        = false,
-                        CreateNoWindow         = true,
-                    };
+                        psi = new ProcessStartInfo
+                        {
+                            FileName               = cmd,
+                            Arguments              = args,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError  = true,
+                            UseShellExecute        = false,
+                            CreateNoWindow         = true,
+                        };
+                    }
+                    else
+                    {
+                        // macOS/Linux: login shell로 감싸서 nvm/homebrew PATH 포함
+                        psi = new ProcessStartInfo
+                        {
+                            FileName               = "/bin/bash",
+                            Arguments              = $"-l -c \"{cmd} {args}\"",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError  = true,
+                            UseShellExecute        = false,
+                            CreateNoWindow         = true,
+                        };
+                    }
 
                     using var process = Process.Start(psi);
                     if (process == null) return false;
