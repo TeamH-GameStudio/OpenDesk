@@ -410,19 +410,26 @@ namespace OpenDesk.Onboarding.Implementations
 
         private async UniTask<StepResult> RunGatewayStepAsync(CancellationToken ct)
         {
-            TransitionTo(OnboardingState.ConnectingGateway);
-            Context.GatewayRetryCount = 0;
+            // 기존 연결 정리 (이전 시도의 재연결 루프 중단)
+            try { await _bridge.DisconnectAsync(); }
+            catch { /* 무시 */ }
 
-            // Gateway 인증 토큰 자동 읽기 + 저장
+            // Gateway 인증 토큰 먼저 읽기 (연결 전에!)
             var token = await _detector.GetGatewayTokenAsync(ct);
             if (!string.IsNullOrEmpty(token))
             {
                 _bridge.SetGatewayToken(token);
-                // 재방문 시 AppBootstrapper에서 사용하도록 저장
                 PlayerPrefs.SetString("OpenDesk_GatewayToken", token);
                 PlayerPrefs.Save();
-                Debug.Log("[Onboarding] Gateway 토큰 자동 설정 + 저장 완료");
+                Debug.Log("[Onboarding] Gateway 토큰 설정 완료 — 이제 연결 시도");
             }
+            else
+            {
+                Debug.LogWarning("[Onboarding] Gateway 토큰 없음 — 인증 없이 연결 시도");
+            }
+
+            TransitionTo(OnboardingState.ConnectingGateway);
+            Context.GatewayRetryCount = 0;
 
             while (Context.GatewayRetryCount < MaxGatewayRetry)
             {
@@ -447,11 +454,17 @@ namespace OpenDesk.Onboarding.Implementations
             try
             {
                 await _bridge.ConnectAsync(Context.GatewayUrl, ct);
+
+                // 연결 후 잠시 대기 — Gateway가 인증 확인 후 끊을 수 있으므로
+                await UniTask.Delay(2000, cancellationToken: ct);
+
                 Context.IsGatewayConnected = _bridge.IsConnected;
+                Debug.Log($"[Onboarding] Gateway 연결 결과: {(_bridge.IsConnected ? "유지됨" : "끊김")}");
                 return _bridge.IsConnected;
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.LogWarning($"[Onboarding] Gateway 연결 실패: {ex.Message}");
                 return false;
             }
         }
