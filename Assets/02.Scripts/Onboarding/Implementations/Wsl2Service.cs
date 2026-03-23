@@ -18,8 +18,14 @@ namespace OpenDesk.Onboarding.Implementations
     /// </summary>
     public class Wsl2Service : IWsl2Service, IDisposable
     {
+        private readonly IAdminPrivilegeService _admin;
         private readonly ReactiveProperty<float>  _progress   = new(0f);
         private readonly ReactiveProperty<string> _statusText = new("");
+
+        public Wsl2Service(IAdminPrivilegeService admin)
+        {
+            _admin = admin;
+        }
 
         public ReadOnlyReactiveProperty<float>  Progress   => _progress;
         public ReadOnlyReactiveProperty<string> StatusText => _statusText;
@@ -170,70 +176,29 @@ namespace OpenDesk.Onboarding.Implementations
             }
         }
 
-        private UniTask<bool> RunWslInstallAsync(CancellationToken ct)
+        private async UniTask<bool> RunWslInstallAsync(CancellationToken ct)
         {
-            return UniTask.RunOnThreadPool(() =>
-            {
-                try
-                {
-                    // wsl --install (Windows 10 2004+ / Windows 11)
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName               = "wsl",
-                        Arguments              = "--install --no-launch",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError  = true,
-                        UseShellExecute        = false,
-                        CreateNoWindow         = true,
-                    };
+            // 관리자 권한으로 wsl --install 실행 (UAC 팝업)
+            Debug.Log("[WSL2] 관리자 권한으로 wsl --install 실행 (UAC 팝업 표시됨)");
+            var result = await _admin.RunElevatedAsync("wsl", "--install --no-launch", ct);
 
-                    using var process = Process.Start(psi);
-                    if (process == null) return false;
+            if (result.ExitCode == 0) return true;
 
-                    process.WaitForExit(ProcessTimeout);
+            // 대체: DISM 방식 (구형 Windows 10) — 역시 관리자 권한
+            Debug.Log("[WSL2] wsl --install 실패, DISM 방식 시도");
 
-                    if (process.ExitCode == 0) return true;
+            var dismResult = await _admin.RunElevatedAsync(
+                "dism.exe",
+                "/online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart",
+                ct);
 
-                    // 대체: DISM 방식 (구형 Windows 10)
-                    Debug.Log("[WSL2] wsl --install 실패, DISM 방식 시도");
+            // VirtualMachinePlatform도 활성화
+            await _admin.RunElevatedAsync(
+                "dism.exe",
+                "/online /enable-feature /featurename:VirtualMachinePlatform /all /norestart",
+                ct);
 
-                    var dismPsi = new ProcessStartInfo
-                    {
-                        FileName               = "dism.exe",
-                        Arguments              = "/online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError  = true,
-                        UseShellExecute        = false,
-                        CreateNoWindow         = true,
-                    };
-
-                    using var dismProcess = Process.Start(dismPsi);
-                    if (dismProcess == null) return false;
-
-                    dismProcess.WaitForExit(ProcessTimeout);
-
-                    // VirtualMachinePlatform도 활성화
-                    var vmPsi = new ProcessStartInfo
-                    {
-                        FileName               = "dism.exe",
-                        Arguments              = "/online /enable-feature /featurename:VirtualMachinePlatform /all /norestart",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError  = true,
-                        UseShellExecute        = false,
-                        CreateNoWindow         = true,
-                    };
-
-                    using var vmProcess = Process.Start(vmPsi);
-                    vmProcess?.WaitForExit(ProcessTimeout);
-
-                    return dismProcess.ExitCode == 0;
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[WSL2] 설치 명령 실패: {ex.Message}");
-                    return false;
-                }
-            }, cancellationToken: ct);
+            return dismResult.ExitCode == 0;
         }
 
         private void SetProgress(float value, string text)

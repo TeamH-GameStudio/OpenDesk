@@ -202,20 +202,23 @@ namespace OpenDesk.Onboarding.Implementations
 
         private async UniTask<bool> InstallViaScriptWindowsAsync(CancellationToken ct)
         {
-            return await RunCommandAsync(
+            // 관리자 권한으로 PowerShell 스크립트 실행 (UAC 팝업)
+            var result = await _admin.RunElevatedAsync(
                 "powershell.exe",
                 "-NoProfile -ExecutionPolicy Bypass -Command \"iwr -useb https://openclaw.ai/install.ps1 | iex\"",
                 ct);
+            return result.ExitCode == 0;
         }
 
         // ── macOS / Linux: bash 스크립트 설치 ───────────────────────────
 
         private async UniTask<bool> InstallViaScriptUnixAsync(CancellationToken ct)
         {
-            return await RunCommandAsync(
+            var result = await _admin.RunElevatedAsync(
                 "bash",
                 "-c \"curl -fsSL https://openclaw.ai/install.sh | bash\"",
                 ct);
+            return result.ExitCode == 0;
         }
 
         // ── npm fallback ────────────────────────────────────────────────
@@ -226,7 +229,9 @@ namespace OpenDesk.Onboarding.Implementations
                 ? "npm.cmd"
                 : "npm";
 
-            return await RunCommandAsync(cmd, "install -g openclaw", ct);
+            // npm global install도 관리자 권한 필요
+            var result = await _admin.RunElevatedAsync(cmd, "install -g openclaw", ct);
+            return result.ExitCode == 0;
         }
 
         // ── 데몬 등록 ───────────────────────────────────────────────────

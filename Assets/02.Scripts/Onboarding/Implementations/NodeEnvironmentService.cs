@@ -21,8 +21,14 @@ namespace OpenDesk.Onboarding.Implementations
     /// </summary>
     public class NodeEnvironmentService : INodeEnvironmentService, IDisposable
     {
+        private readonly IAdminPrivilegeService _admin;
         private readonly ReactiveProperty<float>  _progress   = new(0f);
         private readonly ReactiveProperty<string> _statusText = new("");
+
+        public NodeEnvironmentService(IAdminPrivilegeService admin)
+        {
+            _admin = admin;
+        }
 
         public ReadOnlyReactiveProperty<float>  Progress   => _progress;
         public ReadOnlyReactiveProperty<string> StatusText => _statusText;
@@ -190,13 +196,14 @@ namespace OpenDesk.Onboarding.Implementations
                 return false;
             }
 
-            SetProgress(0.5f, "Node.js 설치 중... (잠시 기다려주세요)");
+            SetProgress(0.5f, "Node.js 설치 중... (보안 확인 창이 뜨면 '예'를 눌러주세요)");
 
-            // 사일런트 설치 (관리자 권한 필요)
-            var success = await RunCommandAsync(
+            // 관리자 권한으로 MSI 설치 (UAC 팝업)
+            var result = await _admin.RunElevatedAsync(
                 "msiexec.exe",
                 $"/i \"{msiPath}\" /qn /norestart",
                 ct);
+            var success = result.ExitCode == 0;
 
             // 설치 파일 정리
             try { File.Delete(msiPath); } catch { /* 무시 */ }
@@ -501,11 +508,20 @@ namespace OpenDesk.Onboarding.Implementations
                     }
                 }
 
+                // nvm 실행 경로 찾기 (방금 설치했으면 PATH에 없을 수 있음)
+                var nvmCmd = FindNvmCommand();
+                Debug.Log($"[NodeEnv] nvm 경로: {nvmCmd}");
+
+                if (string.IsNullOrEmpty(nvmCmd))
+                {
+                    SetProgress(0f, "nvm을 찾을 수 없어요. Unity를 재시작한 후 다시 시도해주세요.");
+                    return false;
+                }
+
                 // nvm으로 Node.js 24 설치
                 SetProgress(0.5f, $"Node.js {TargetVersion} 설치 중... (기존 버전은 유지돼요)");
-                var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nvm.exe" : "nvm";
 
-                var installNode = await RunCommandAsync(cmd, $"install {TargetVersion}", ct);
+                var installNode = await RunNvmCommandAsync(nvmCmd, $"install {TargetVersion}", ct);
                 if (!installNode)
                 {
                     SetProgress(0f, "Node.js 설치에 실패했어요.");
@@ -514,7 +530,7 @@ namespace OpenDesk.Onboarding.Implementations
 
                 // 새 버전을 기본으로 설정
                 SetProgress(0.8f, "새 버전을 활성화하고 있어요...");
-                await RunCommandAsync(cmd, $"use {TargetVersion}", ct);
+                await RunNvmCommandAsync(nvmCmd, $"use {TargetVersion}", ct);
 
                 // 확인
                 SetProgress(0.9f, "설치 확인 중...");
@@ -538,6 +554,91 @@ namespace OpenDesk.Onboarding.Implementations
                 Debug.LogError($"[NodeEnv] nvm 설치 실패: {ex}");
                 return false;
             }
+        }
+
+        /// <summary>nvm 실행 파일 경로를 찾습니다 (PATH + 기본 설치 경로)</summary>
+        private static string FindNvmCommand()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // 1. NVM_HOME 환경변수 (nvm-windows가 설정)
+                var nvmHome = Environment.GetEnvironmentVariable("NVM_HOME") ?? "";
+                if (!string.IsNullOrEmpty(nvmHome))
+                {
+                    var p = Path.Combine(nvmHome, "nvm.exe");
+                    if (File.Exists(p)) return p;
+                }
+
+                // 2. AppData 기본 경로
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var defaultPath = Path.Combine(appData, "nvm", "nvm.exe");
+                if (File.Exists(defaultPath)) return defaultPath;
+
+                // 3. ProgramFiles
+                var progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                var pfPath = Path.Combine(progFiles, "nvm", "nvm.exe");
+                if (File.Exists(pfPath)) return pfPath;
+
+                // 4. PATH에서 시도
+                return "nvm.exe";
+            }
+            else
+            {
+                // macOS/Linux: bash -l 로 실행하므로 "nvm" 자체로 OK
+                return "nvm";
+            }
+        }
+
+        /// <summary>nvm 명령을 실행합니다 (Windows: 직접 경로, Mac: bash -l)</summary>
+        private UniTask<bool> RunNvmCommandAsync(string nvmCmd, string args, CancellationToken ct)
+        {
+            return UniTask.RunOnThreadPool(() =>
+            {
+                try
+                {
+                    ProcessStartInfo psi;
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        psi = new ProcessStartInfo
+                        {
+                            FileName               = nvmCmd,
+                            Arguments              = args,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError  = true,
+                            UseShellExecute        = false,
+                            CreateNoWindow         = true,
+                        };
+                    }
+                    else
+                    {
+                        psi = new ProcessStartInfo
+                        {
+                            FileName               = "/bin/bash",
+                            Arguments              = $"-l -c \"nvm {args}\"",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError  = true,
+                            UseShellExecute        = false,
+                            CreateNoWindow         = true,
+                        };
+                    }
+
+                    using var process = Process.Start(psi);
+                    if (process == null) return false;
+
+                    var stdout = process.StandardOutput.ReadToEnd();
+                    var stderr = process.StandardError.ReadToEnd();
+                    process.WaitForExit(ProcessTimeout);
+
+                    Debug.Log($"[NodeEnv] nvm {args} → exit:{process.ExitCode} out:{stdout.Trim()}");
+                    return process.ExitCode == 0;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[NodeEnv] nvm 명령 실패: {nvmCmd} {args} — {ex.Message}");
+                    return false;
+                }
+            }, cancellationToken: ct);
         }
 
         private void SetProgress(float value, string text)
