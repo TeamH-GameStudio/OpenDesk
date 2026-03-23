@@ -148,12 +148,21 @@ namespace OpenDesk.Onboarding.Implementations
 
                 SetProgress(0.85f, "AI 비서 서비스 시작 중...");
 
-                // 데몬이 등록 안 됐어도 직접 Gateway 시작 시도
                 var gwCmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? "openclaw.cmd" : "openclaw";
-                _ = RunBackgroundProcessAsync(gwCmd, "gateway start");
 
+                // 먼저 start(데몬) 시도, 실패하면 run(포그라운드)으로 백그라운드 실행
+                RunBackgroundProcessAsync(gwCmd, "gateway start");
                 await UniTask.Delay(3000, cancellationToken: ct);
+
+                // 포트 확인 → 안 떠있으면 run으로 재시도
+                bool earlyCheck = CheckPort18789();
+                if (!earlyCheck)
+                {
+                    Debug.Log("[Installer] gateway start 응답 없음 — gateway run으로 재시도");
+                    RunBackgroundProcessAsync(gwCmd, "gateway run --allow-unconfigured");
+                    await UniTask.Delay(5000, cancellationToken: ct);
+                }
 
                 // Gateway 포트 열림 확인 (최대 3회)
                 bool gatewayReady = false;
@@ -240,7 +249,7 @@ namespace OpenDesk.Onboarding.Implementations
             return result.ExitCode == 0;
         }
 
-        // ── 데몬 등록 (비대화형 + 관리자 권한) ────────────────────────────
+        // ── 설정 생성 + Gateway 시작 ──────────────────────────────────────
 
         private async UniTask<bool> RegisterDaemonAsync(CancellationToken ct)
         {
@@ -248,22 +257,51 @@ namespace OpenDesk.Onboarding.Implementations
                 ? "openclaw.cmd"
                 : "openclaw";
 
-            // 1단계: 설정 파일 생성 (비대화형, 일반 권한으로 충분)
-            var configOk = await RunCommandAsync(cmd,
-                "onboard --non-interactive --accept-risk --skip-channels --skip-skills --skip-search --auth-choice skip --flow quickstart",
-                ct);
-            if (!configOk)
-                Debug.LogWarning("[Installer] OpenClaw 설정 파일 생성 실패");
+            // 1단계: 설정 파일이 없을 때만 생성
+            var configPath = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".openclaw", "openclaw.json");
 
-            // 2단계: 데몬 서비스 등록 (관리자 권한 필요 — UAC)
+            if (!System.IO.File.Exists(configPath))
+            {
+                Debug.Log("[Installer] 설정 파일 없음 — 생성 중");
+                var configOk = await RunCommandAsync(cmd,
+                    "onboard --non-interactive --accept-risk --skip-channels --skip-skills --skip-search --skip-health --auth-choice skip --flow quickstart",
+                    ct);
+                if (!configOk)
+                    Debug.LogWarning("[Installer] 설정 파일 생성 실패");
+            }
+            else
+            {
+                Debug.Log($"[Installer] 설정 파일 이미 존재: {configPath}");
+            }
+
+            // 2단계: 데몬 서비스 등록 시도 (관리자 권한 — 실패해도 OK)
+            Debug.Log("[Installer] 데몬 서비스 등록 시도 (UAC)...");
             var daemonResult = await _admin.RunElevatedAsync(cmd,
-                "onboard --non-interactive --accept-risk --install-daemon --skip-channels --skip-skills --skip-search --auth-choice skip --flow quickstart",
+                "onboard --non-interactive --accept-risk --install-daemon --skip-channels --skip-skills --skip-search --skip-health --auth-choice skip --flow quickstart",
                 ct);
 
             if (daemonResult.ExitCode != 0)
-                Debug.LogWarning($"[Installer] 데몬 등록 결과: exit={daemonResult.ExitCode}");
+            {
+                Debug.LogWarning("[Installer] 데몬 서비스 등록 실패 — Gateway 직접 시작으로 전환");
+            }
 
-            return configOk;  // 설정 파일만 있으면 Gateway 수동 시작 가능
+            return true;  // 설정 파일 있으면 Gateway 직접 시작 가능
+        }
+
+        // ── 포트 확인 유틸 ────────────────────────────────────────────────
+
+        private static bool CheckPort18789()
+        {
+            try
+            {
+                using var tcp = new System.Net.Sockets.TcpClient();
+                var task = tcp.ConnectAsync("127.0.0.1", 18789);
+                task.Wait(1000);
+                return tcp.Connected;
+            }
+            catch { return false; }
         }
 
         // ── 백그라운드 프로세스 (Gateway 등 데몬 시작용) ─────────────────
