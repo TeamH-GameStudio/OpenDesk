@@ -54,25 +54,45 @@ namespace OpenDesk.Editor
             StretchFull(bg.GetComponent<RectTransform>());
             bg.GetComponent<Image>().raycastTarget = false;
 
-            // WizardContainer
+            // WizardContainer — 전체 화면 사용 (여백만 약간)
             var wizard = CreateEmpty(canvas, "WizardContainer");
-            SetAnchors(wizard, 0.5f, 0.5f, 0.5f, 0.5f);
-            wizard.sizeDelta = new Vector2(800, 600);
+            SetAnchors(wizard, 0, 0, 1, 1);
+            wizard.offsetMin = new Vector2(40, 40);
+            wizard.offsetMax = new Vector2(-40, -40);
 
-            // ProgressBar
-            var progressSlider = CreateSlider(wizard.gameObject, "ProgressBar");
-            var progressRt = progressSlider.GetComponent<RectTransform>();
-            SetTopStretch(progressRt, 8, 0);
+            // ── 상단 헤더 영역 (타이틀 + 진행바 + 스텝카운트) ──
+            var header = CreateEmpty(wizard.gameObject, "Header");
+            var headerRt = header;
+            headerRt.anchorMin = new Vector2(0, 1);
+            headerRt.anchorMax = new Vector2(1, 1);
+            headerRt.offsetMin = new Vector2(0, -140);
+            headerRt.offsetMax = Vector2.zero;
+            var headerVlg = header.gameObject.AddComponent<VerticalLayoutGroup>();
+            headerVlg.spacing = 12;
+            headerVlg.padding = new RectOffset(30, 30, 20, 10);
+            headerVlg.childAlignment = TextAnchor.MiddleCenter;
+            headerVlg.childForceExpandWidth = true;
+            headerVlg.childForceExpandHeight = false;
 
-            // StepTitle
-            var stepTitle = CreateTMP(wizard.gameObject, "StepTitle", "환경 스캔 중...", 24, TextAlignmentOptions.Center);
-            var stepTitleRt = stepTitle.GetComponent<RectTransform>();
-            SetTopStretch(stepTitleRt, 50, 15);
+            // StepTitle — 크고 굵게
+            var stepTitle = CreateTMP(header.gameObject, "StepTitle",
+                "AI 비서 환경을 준비하고 있어요", 36, FontStyles.Bold, TextWhite, TextAlignmentOptions.Center);
+            stepTitle.GetComponent<LayoutElement>().preferredHeight = 50;
 
-            // ── 10개 스텝 패널 ──────────────────────────
-            var panelArea = new RectOffset(20, 20, 70, 60);
+            // ProgressBar — 높이 키움
+            var progressSlider = CreateSlider(header.gameObject, "ProgressBar");
+            progressSlider.GetComponent<LayoutElement>().preferredHeight = 14;
+
+            // StepCount + 퍼센트
+            var stepCountText = CreateTMP(header.gameObject, "StepCountText",
+                "Step 1 / 5", 18, TextAlignmentOptions.Center, TextGray);
+            stepCountText.GetComponent<LayoutElement>().preferredHeight = 28;
+
+            // ── 10개 스텝 패널 (헤더 아래, 설명 영역 위) ──
+            var panelArea = new RectOffset(30, 30, 150, 280);
 
             var scanningPanel       = CreateStepPanel(wizard.gameObject, "ScanningPanel", panelArea, true);
+            var nodeUpgradePanel   = CreateStepPanel(wizard.gameObject, "NodeUpgradePanel", panelArea, false);
             var installingNodePanel = CreateStepPanel(wizard.gameObject, "InstallingNodePanel", panelArea, false);
             var wsl2Panel           = CreateStepPanel(wizard.gameObject, "Wsl2Panel", panelArea, false);
             var detectingPanel      = CreateStepPanel(wizard.gameObject, "DetectingPanel", panelArea, false);
@@ -86,31 +106,61 @@ namespace OpenDesk.Editor
             // ScanningPanel 내부
             BuildScanningPanel(scanningPanel);
 
-            // InstallingNodePanel 내부
-            var nodeTitle = CreateTMP(installingNodePanel, "TitleText", "Node.js 설치 중...", 18);
-            var nodeSlider = CreateSlider(installingNodePanel, "InstallProgress");
-            var nodeStatus = CreateTMP(installingNodePanel, "InstallStatus", "다운로드 준비 중...", 14, color: TextGray);
+            // NodeUpgradePanel 내부 — 버전 충돌 선택지
+            var nodeUpVlg = nodeUpgradePanel.AddComponent<VerticalLayoutGroup>();
+            nodeUpVlg.spacing = 14;
+            nodeUpVlg.padding = new RectOffset(20, 20, 10, 10);
+            nodeUpVlg.childAlignment = TextAnchor.MiddleCenter;
+            nodeUpVlg.childForceExpandWidth = true;
+            nodeUpVlg.childForceExpandHeight = false;
+
+            var nodeVerText = CreateTMP(nodeUpgradePanel, "NodeVersionText",
+                "현재 설치된 버전: v20.14.0", 22, TextAlignmentOptions.Center, new Color(1f, 0.85f, 0.4f));
+            var nodeProjectList = CreateTMP(nodeUpgradePanel, "NodeProjectListText",
+                "프로젝트 스캔 중...", 16, TextAlignmentOptions.Left, TextGray);
+            nodeProjectList.GetComponent<LayoutElement>().preferredHeight = 100;
+
+            var nodeSafeBtn = CreateButton(nodeUpgradePanel, "NodeSafeInstallButton",
+                "안전하게 설치 (추천)\n기존 프로그램에 영향 없음", BtnGreen);
+            nodeSafeBtn.GetComponent<LayoutElement>().preferredHeight = 100;
+
+            var nodeOverBtn = CreateButton(nodeUpgradePanel, "NodeOverwriteButton",
+                "기존 버전 업그레이드\n기존 프로그램에 영향 있을 수 있음", new Color(0.85f, 0.55f, 0.1f));
+            nodeOverBtn.GetComponent<LayoutElement>().preferredHeight = 100;
+
+            var nodeSkipBtn = CreateButton(nodeUpgradePanel, "NodeSkipButton",
+                "건너뛰기\nAI 비서 일부 기능이 제한될 수 있음", BtnGray);
+            nodeSkipBtn.GetComponent<LayoutElement>().preferredHeight = 80;
+
+            // InstallingNodePanel 내부 — VLG + 큰 진행바
+            AddPanelLayout(installingNodePanel);
+            var installSlider = CreateSlider(installingNodePanel, "InstallProgress");
+            installSlider.GetComponent<LayoutElement>().preferredHeight = 14;
+            var installStatus = CreateTMP(installingNodePanel, "InstallStatus", "", 20,
+                TextAlignmentOptions.Center, TextGray);
 
             // Wsl2Panel 내부
-            CreateTMP(wsl2Panel, "TitleText", "WSL2 확인", 18);
-            CreateTMP(wsl2Panel, "StatusText", "WSL2 상태를 확인하고 있습니다...", 14, color: TextGray);
+            AddPanelLayout(wsl2Panel);
+            var rebootNowBtn   = CreateButton(wsl2Panel, "RebootNowButton", "지금 재시작", BtnBlue);
+            rebootNowBtn.GetComponent<LayoutElement>().preferredWidth = 400;
+            rebootNowBtn.GetComponent<LayoutElement>().preferredHeight = 100;
+            rebootNowBtn.SetActive(false);
+            var rebootLaterBtn = CreateButton(wsl2Panel, "RebootLaterButton", "나중에 할게요", BtnGray);
+            rebootLaterBtn.GetComponent<LayoutElement>().preferredWidth = 400;
+            rebootLaterBtn.GetComponent<LayoutElement>().preferredHeight = 100;
+            rebootLaterBtn.SetActive(false);
 
             // DetectingPanel 내부
-            CreateTMP(detectingPanel, "TitleText", "OpenClaw 감지 중...", 18);
-            CreateTMP(detectingPanel, "StatusText", "설치된 OpenClaw를 찾고 있습니다...", 14, color: TextGray);
+            AddPanelLayout(detectingPanel);
 
             // InstallingClawPanel 내부
-            CreateTMP(installingClawPanel, "TitleText", "OpenClaw 설치 중...", 18);
-            var clawSlider = CreateSlider(installingClawPanel, "ClawInstallProgress");
-            var clawStatus = CreateTMP(installingClawPanel, "ClawInstallStatus", "환경 확인 중...", 14, color: TextGray);
+            AddPanelLayout(installingClawPanel);
 
             // GatewayPanel 내부
             BuildGatewayPanel(gatewayPanel);
 
             // AgentsPanel 내부
-            CreateTMP(agentsPanel, "TitleText", "에이전트 감지 완료", 18);
-            var agentScroll = CreateScrollView(agentsPanel, "AgentListScroll", 200);
-            CreateTMP(agentsPanel, "StatusText", "", 13, color: TextGray);
+            AddPanelLayout(agentsPanel);
 
             // WorkspacePanel 내부
             BuildWorkspacePanel(workspacePanel);
@@ -119,25 +169,150 @@ namespace OpenDesk.Editor
             BuildCompletePanel(completePanel);
 
             // ErrorPanel 내부
-            CreateTMP(errorPanel, "TitleText", "오류 발생", 22, color: BtnRed);
-            var errorText = CreateTMP(errorPanel, "ErrorText", "오류 내용이 여기에 표시됩니다.", 14, color: new Color(0.988f, 0.647f, 0.647f));
-            CreateTMP(errorPanel, "HelpText", "하단의 '재시도' 버튼을 눌러 다시 시도하세요.", 12, color: TextDimGray);
+            AddPanelLayout(errorPanel);
+            var errorTextObj = CreateTMP(errorPanel, "ErrorText", "", 14, color: new Color(0.988f, 0.647f, 0.647f));
+            var errorDetailToggle = CreateButton(errorPanel, "ErrorDetailToggle", "상세 보기", BtnGray);
+            errorDetailToggle.GetComponent<LayoutElement>().preferredWidth = 300;
+            errorDetailToggle.GetComponent<LayoutElement>().preferredHeight = 100;
+            var errorDetailPanel = new GameObject("ErrorDetailPanel");
+            errorDetailPanel.transform.SetParent(errorPanel.transform, false);
+            errorDetailPanel.AddComponent<RectTransform>();
+            errorDetailPanel.AddComponent<LayoutElement>().preferredHeight = 100;
+            errorDetailPanel.SetActive(false);
 
-            // ── Footer Buttons ──────────────────────────
+            // ── 공통 설명 영역 (하단 고정) ──
+            var descArea = CreateEmpty(wizard.gameObject, "DescriptionArea");
+            descArea.anchorMin = new Vector2(0, 0);
+            descArea.anchorMax = new Vector2(1, 0);
+            descArea.offsetMin = new Vector2(30, 80);
+            descArea.offsetMax = new Vector2(-30, 280);
+            var descVlg = descArea.gameObject.AddComponent<VerticalLayoutGroup>();
+            descVlg.spacing = 10;
+            descVlg.childAlignment = TextAnchor.UpperCenter;
+            descVlg.childForceExpandWidth = true;
+            descVlg.childForceExpandHeight = false;
+
+            var descText     = CreateTMP(descArea.gameObject, "DescriptionText", "", 22,
+                TextAlignmentOptions.Center, new Color(0.85f, 0.85f, 0.9f));
+            descText.GetComponent<LayoutElement>().preferredHeight = 80;
+            var estTimeText  = CreateTMP(descArea.gameObject, "EstimatedTimeText", "", 18,
+                TextAlignmentOptions.Center, TextGray);
+            var whyToggleBtn = CreateButton(descArea.gameObject, "WhyNeededToggle",
+                "왜 필요한가요?", new Color(0.2f, 0.2f, 0.3f));
+            whyToggleBtn.GetComponent<LayoutElement>().preferredWidth = 440;
+            whyToggleBtn.GetComponent<LayoutElement>().preferredHeight = 80;
+            // 토글 버튼 텍스트 크기 키움
+            var whyBtnText = whyToggleBtn.GetComponentInChildren<TextMeshProUGUI>();
+            if (whyBtnText != null) whyBtnText.fontSize = 16;
+
+            var whyPanel = new GameObject("WhyNeededPanel");
+            whyPanel.transform.SetParent(descArea.gameObject.transform, false);
+            whyPanel.AddComponent<RectTransform>();
+            var whyPanelImg = whyPanel.AddComponent<Image>();
+            whyPanelImg.color = new Color(0.12f, 0.12f, 0.18f);
+            whyPanel.AddComponent<LayoutElement>().flexibleHeight = 0;
+            var whyPanelVlg = whyPanel.AddComponent<VerticalLayoutGroup>();
+            whyPanelVlg.padding = new RectOffset(16, 16, 12, 12);
+            var whyText = CreateTMP(whyPanel, "WhyNeededText", "", 17, color: new Color(0.7f, 0.7f, 0.8f));
+            whyPanel.SetActive(false);
+
+            // ── Footer Buttons (하단 고정, 큰 버튼) ────
             var footer = CreateEmpty(wizard.gameObject, "FooterButtons");
-            SetBottomStretch(footer, 50, 0);
+            SetBottomStretch(footer, 120, 10);
             var footerHlg = footer.gameObject.AddComponent<HorizontalLayoutGroup>();
-            footerHlg.spacing = 10;
+            footerHlg.spacing = 20;
+            footerHlg.padding = new RectOffset(30, 30, 0, 0);
             footerHlg.childAlignment = TextAnchor.MiddleCenter;
-            footerHlg.childForceExpandWidth = true;
+            footerHlg.childForceExpandWidth = false;
 
-            var retryBtn   = CreateButton(footer.gameObject, "RetryButton", "재시도", BtnBlue);
-            var offlineBtn = CreateButton(footer.gameObject, "OfflineButton", "오프라인 모드", BtnGray);
-            var skipBtn    = CreateButton(footer.gameObject, "SkipButton", "건너뛰기", BtnGray);
+            var retryBtn   = CreateButton(footer.gameObject, "RetryButton", "다시 시도", BtnBlue);
+            retryBtn.GetComponent<LayoutElement>().preferredWidth = 500;
+            retryBtn.GetComponent<LayoutElement>().preferredHeight = 100;
 
-            // ── OnboardingUIController ──────────────────
-            var uiCtrl = canvas.AddComponent<OnboardingUIControllerSetup>();
-            // 직접 연결을 위한 셋업 컴포넌트 — 아래에서 삭제하고 실제 컨트롤러로 교체 필요
+            var offlineBtn = CreateButton(footer.gameObject, "OfflineButton", "인터넷 없이 시작하기", BtnGray);
+            offlineBtn.GetComponent<LayoutElement>().preferredWidth = 560;
+            offlineBtn.GetComponent<LayoutElement>().preferredHeight = 100;
+
+            // ── OnboardingUIController 추가 + Inspector 자동 바인딩 ──
+            var ctrlType = System.Type.GetType(
+                "OpenDesk.Presentation.UI.Onboarding.OnboardingUIController, Assembly-CSharp");
+
+            if (ctrlType != null)
+            {
+                var ctrl = canvas.AddComponent(ctrlType);
+                var so = new SerializedObject(ctrl);
+
+                // 전체 진행률
+                so.FindProperty("_progressBar").objectReferenceValue       = progressSlider.GetComponent<Slider>();
+                so.FindProperty("_stepTitle").objectReferenceValue          = stepTitle;
+                so.FindProperty("_stepCountText").objectReferenceValue      = stepCountText;
+
+                // 단계 설명
+                so.FindProperty("_descriptionText").objectReferenceValue    = descText;
+                so.FindProperty("_estimatedTimeText").objectReferenceValue  = estTimeText;
+                so.FindProperty("_whyNeededToggle").objectReferenceValue    = whyToggleBtn.GetComponent<Button>();
+                so.FindProperty("_whyNeededPanel").objectReferenceValue     = whyPanel;
+                so.FindProperty("_whyNeededText").objectReferenceValue      = whyText;
+
+                // Node.js 버전 충돌
+                so.FindProperty("_nodeUpgradePanel").objectReferenceValue      = nodeUpgradePanel;
+                so.FindProperty("_nodeVersionText").objectReferenceValue       = nodeVerText;
+                so.FindProperty("_nodeProjectListText").objectReferenceValue   = nodeProjectList;
+                so.FindProperty("_nodeSafeInstallButton").objectReferenceValue = nodeSafeBtn.GetComponent<Button>();
+                so.FindProperty("_nodeOverwriteButton").objectReferenceValue   = nodeOverBtn.GetComponent<Button>();
+                so.FindProperty("_nodeSkipButton").objectReferenceValue        = nodeSkipBtn.GetComponent<Button>();
+
+                // 스텝 패널
+                so.FindProperty("_scanningPanel").objectReferenceValue       = scanningPanel;
+                so.FindProperty("_nodeUpgradePanel").objectReferenceValue    = nodeUpgradePanel;
+                so.FindProperty("_installingNodePanel").objectReferenceValue = installingNodePanel;
+                so.FindProperty("_wsl2Panel").objectReferenceValue           = wsl2Panel;
+                so.FindProperty("_detectingPanel").objectReferenceValue      = detectingPanel;
+                so.FindProperty("_installingClawPanel").objectReferenceValue = installingClawPanel;
+                so.FindProperty("_gatewayPanel").objectReferenceValue        = gatewayPanel;
+                so.FindProperty("_agentsPanel").objectReferenceValue         = agentsPanel;
+                so.FindProperty("_workspacePanel").objectReferenceValue      = workspacePanel;
+                so.FindProperty("_completePanel").objectReferenceValue       = completePanel;
+                so.FindProperty("_errorPanel").objectReferenceValue          = errorPanel;
+
+                // 공통 버튼
+                so.FindProperty("_retryButton").objectReferenceValue    = retryBtn.GetComponent<Button>();
+                so.FindProperty("_offlineButton").objectReferenceValue  = offlineBtn.GetComponent<Button>();
+
+                // Gateway 패널
+                so.FindProperty("_gatewayUrlInput").objectReferenceValue      = gatewayPanel.transform.Find("UrlInputField")?.GetComponent<TMP_InputField>();
+                so.FindProperty("_gatewayConnectButton").objectReferenceValue = gatewayPanel.transform.Find("ConnectButton")?.GetComponent<Button>();
+
+                // Workspace 패널
+                so.FindProperty("_workspacePathInput").objectReferenceValue     = workspacePanel.transform.Find("PathRow/PathInputField")?.GetComponent<TMP_InputField>();
+                so.FindProperty("_workspaceBrowseButton").objectReferenceValue  = workspacePanel.transform.Find("PathRow/BrowseButton")?.GetComponent<Button>();
+                so.FindProperty("_workspaceSkipButton").objectReferenceValue    = workspacePanel.transform.Find("WorkspaceSkipButton")?.GetComponent<Button>();
+                so.FindProperty("_workspaceConfirmButton").objectReferenceValue = workspacePanel.transform.Find("ConfirmButton")?.GetComponent<Button>();
+
+                // WSL2 재시작
+                so.FindProperty("_rebootNowButton").objectReferenceValue   = rebootNowBtn.GetComponent<Button>();
+                so.FindProperty("_rebootLaterButton").objectReferenceValue = rebootLaterBtn.GetComponent<Button>();
+
+                // 완료 패널
+                so.FindProperty("_enterOfficeButton").objectReferenceValue = completePanel.transform.Find("EnterButton")?.GetComponent<Button>();
+
+                // 에러
+                so.FindProperty("_errorText").objectReferenceValue          = errorTextObj;
+                so.FindProperty("_errorDetailToggle").objectReferenceValue  = errorDetailToggle.GetComponent<Button>();
+                so.FindProperty("_errorDetailPanel").objectReferenceValue   = errorDetailPanel;
+
+                // 설치 진행
+                so.FindProperty("_installProgressSlider").objectReferenceValue = installSlider.GetComponent<Slider>();
+                so.FindProperty("_installStatusText").objectReferenceValue     = installStatus;
+
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Debug.Log("[SceneGen] OnboardingUIController Inspector 바인딩 완료 (41개 필드)");
+            }
+            else
+            {
+                canvas.AddComponent<OnboardingUIControllerSetup>();
+                Debug.LogWarning("[SceneGen] OnboardingUIController 타입 미발견 — 컴파일 후 재생성 필요");
+            }
 
             // EventSystem 확인
             if (Object.FindObjectOfType<EventSystem>() == null)
@@ -151,7 +326,7 @@ namespace OpenDesk.Editor
             EnsureScenesFolder();
             EditorSceneManager.SaveScene(scene, "Assets/01.Scenes/OnboardingScene.unity");
             Debug.Log("[SceneGen] Onboarding Scene 생성 완료! Assets/01.Scenes/OnboardingScene.unity");
-            Debug.Log("[SceneGen] 수동 작업 필요: OnboardingInstaller의 Parent에 CoreInstaller 드래그, OnboardingUIController 컴포넌트 추가 후 Inspector 연결");
+            Debug.Log("[SceneGen] 수동 작업: OnboardingInstaller의 Parent에 CoreInstaller 드래그");
         }
 
         // ═══════════════════════════════════════════════════
@@ -256,7 +431,8 @@ namespace OpenDesk.Editor
 
             var input = CreateInputField(parent, "UrlInputField", "ws://localhost:18789/events");
             var btn = CreateButton(parent, "ConnectButton", "연결", BtnBlue);
-            btn.GetComponent<LayoutElement>().preferredWidth = 200;
+            btn.GetComponent<LayoutElement>().preferredWidth = 400;
+            btn.GetComponent<LayoutElement>().preferredHeight = 100;
 
             CreateTMP(parent, "StatusText", "", 14);
             CreateTMP(parent, "HelpText", "실패 시 '재시도' 또는 '오프라인 모드' 사용", 11, color: TextDimGray);
@@ -280,17 +456,23 @@ namespace OpenDesk.Editor
             pathInput.GetComponent<LayoutElement>().flexibleWidth = 1;
 
             var browseBtn = CreateButton(pathRow.gameObject, "BrowseButton", "찾아보기", BtnBlue);
-            browseBtn.GetComponent<LayoutElement>().preferredWidth = 100;
+            browseBtn.GetComponent<LayoutElement>().preferredWidth = 200;
+            browseBtn.GetComponent<LayoutElement>().preferredHeight = 80;
+
+            var confirmBtn = CreateButton(parent, "ConfirmButton", "이 폴더로 시작하기", BtnGreen);
+            confirmBtn.GetComponent<LayoutElement>().preferredWidth = 500;
+            confirmBtn.GetComponent<LayoutElement>().preferredHeight = 100;
 
             var skipBtn = CreateButton(parent, "WorkspaceSkipButton", "건너뛰기 (나중에 설정)", BtnGray);
-            skipBtn.GetComponent<LayoutElement>().preferredWidth = 250;
+            skipBtn.GetComponent<LayoutElement>().preferredWidth = 500;
+            skipBtn.GetComponent<LayoutElement>().preferredHeight = 100;
         }
 
         static void BuildCompletePanel(GameObject parent)
         {
             var vlg = parent.AddComponent<VerticalLayoutGroup>();
-            vlg.spacing = 20;
-            vlg.padding = new RectOffset(30, 30, 30, 30);
+            vlg.spacing = 30;
+            vlg.padding = new RectOffset(40, 40, 40, 40);
             vlg.childAlignment = TextAnchor.MiddleCenter;
 
             var icon = CreateImage(parent, "SuccessIcon", BtnGreen);
@@ -301,8 +483,8 @@ namespace OpenDesk.Editor
             CreateTMP(parent, "MessageText", "OpenDesk가 준비되었습니다.\nAI 에이전트와 함께 작업할 수 있습니다.", 15, color: new Color(0.87f, 0.87f, 0.87f));
 
             var enterBtn = CreateButton(parent, "EnterButton", "시작하기", BtnBlue);
-            enterBtn.GetComponent<LayoutElement>().preferredWidth = 250;
-            enterBtn.GetComponent<LayoutElement>().preferredHeight = 50;
+            enterBtn.GetComponent<LayoutElement>().preferredWidth = 500;
+            enterBtn.GetComponent<LayoutElement>().preferredHeight = 100;
             var enterTmp = enterBtn.GetComponentInChildren<TMP_Text>();
             if (enterTmp) { enterTmp.fontSize = 18; enterTmp.fontStyle = FontStyles.Bold; }
         }
@@ -918,7 +1100,7 @@ namespace OpenDesk.Editor
             colors.pressedColor = bgColor * 0.8f;
             btn.colors = colors;
 
-            go.AddComponent<LayoutElement>().preferredHeight = 30;
+            go.AddComponent<LayoutElement>().preferredHeight = 60;
 
             var textGo = new GameObject("Text");
             textGo.transform.SetParent(go.transform, false);
@@ -926,9 +1108,10 @@ namespace OpenDesk.Editor
             StretchFull(textRt);
             var tmp = textGo.AddComponent<TextMeshProUGUI>();
             tmp.text = label;
-            tmp.fontSize = 13;
+            tmp.fontSize = 52;
             tmp.color = TextWhite;
             tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontStyle = FontStyles.Bold;
             ApplyFont(tmp);
 
             return go;
@@ -971,7 +1154,7 @@ namespace OpenDesk.Editor
             var bg = go.AddComponent<Image>();
             bg.color = new Color(0.08f, 0.08f, 0.10f);
 
-            go.AddComponent<LayoutElement>().preferredHeight = 35;
+            go.AddComponent<LayoutElement>().preferredHeight = 70;
 
             // TMP_InputField는 Text Area, Text, Placeholder 자식이 필요
             var textArea = new GameObject("Text Area");
@@ -985,7 +1168,7 @@ namespace OpenDesk.Editor
             var tRt = textGo.AddComponent<RectTransform>();
             StretchFull(tRt);
             var textTmp = textGo.AddComponent<TextMeshProUGUI>();
-            textTmp.fontSize = 13;
+            textTmp.fontSize = 28;
             textTmp.color = TextWhite;
             ApplyFont(textTmp);
 
@@ -995,7 +1178,7 @@ namespace OpenDesk.Editor
             StretchFull(phRt);
             var phTmp = phGo.AddComponent<TextMeshProUGUI>();
             phTmp.text = placeholder;
-            phTmp.fontSize = 13;
+            phTmp.fontSize = 28;
             ApplyFont(phTmp);
             phTmp.color = TextDimGray;
             phTmp.fontStyle = FontStyles.Italic;
@@ -1075,6 +1258,18 @@ namespace OpenDesk.Editor
             rt.anchorMax = new Vector2(1, 0);
             rt.offsetMin = new Vector2(0, bottomOffset);
             rt.offsetMax = new Vector2(0, bottomOffset + height);
+        }
+
+        static void AddPanelLayout(GameObject panel)
+        {
+            if (panel.GetComponent<VerticalLayoutGroup>() == null)
+            {
+                var vlg = panel.AddComponent<VerticalLayoutGroup>();
+                vlg.spacing = 10;
+                vlg.padding = new RectOffset(10, 10, 10, 10);
+                vlg.childForceExpandWidth = true;
+                vlg.childForceExpandHeight = false;
+            }
         }
 
         static GameObject CreateStepPanel(GameObject parent, string name, RectOffset area, bool active)

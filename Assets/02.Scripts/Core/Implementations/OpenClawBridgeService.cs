@@ -48,6 +48,14 @@ namespace OpenDesk.Core.Implementations
 
         public async UniTask ConnectAsync(string gatewayUrl, CancellationToken ct = default)
         {
+            // Mock 모드에서는 실제 연결하지 않음
+            if (PlayerPrefs.GetInt("OpenDesk_MockMode", 0) == 1)
+            {
+                Debug.Log("[Bridge] ★ Mock 모드 — WebSocket 연결 건너뜀");
+                _lastGatewayUrl = gatewayUrl;
+                return;
+            }
+
             if (_socket != null)
                 await DisconnectInternalAsync(intentional: true);
 
@@ -153,6 +161,13 @@ namespace OpenDesk.Core.Implementations
         {
             if (_intentionalDisconnect || string.IsNullOrEmpty(_lastGatewayUrl))
                 return;
+
+            // Mock 모드에서는 재연결 시도하지 않음
+            if (PlayerPrefs.GetInt("OpenDesk_MockMode", 0) == 1)
+            {
+                Debug.Log("[Bridge] ★ Mock 모드 — 재연결 건너뜀");
+                return;
+            }
 
             for (int attempt = 0; attempt < MaxReconnectAttempts; attempt++)
             {

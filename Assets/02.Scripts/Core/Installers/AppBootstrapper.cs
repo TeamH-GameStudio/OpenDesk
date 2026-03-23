@@ -42,6 +42,8 @@ namespace OpenDesk.Core.Installers
             _costMonitor = costMonitor;
         }
 
+        private static bool IsMockMode => PlayerPrefs.GetInt("OpenDesk_MockMode", 0) == 1;
+
         public void Start()
         {
             var isFirstRun = PlayerPrefs.GetInt("OpenDesk_IsFirstRun", 1) == 1;
@@ -51,8 +53,42 @@ namespace OpenDesk.Core.Installers
                 return;
             }
 
+            if (IsMockMode)
+            {
+                Debug.Log("[Boot] ★ Mock 모드 — Gateway 연결 건너뜀, UI만 테스트 가능");
+                MockBootAsync().Forget();
+                return;
+            }
+
             _cts = new CancellationTokenSource();
             BootAsync(_cts.Token).Forget();
+        }
+
+        private async UniTaskVoid MockBootAsync()
+        {
+            Debug.Log("[Boot] Mock 시작 — 더미 데이터로 UI 구동");
+
+            // 이벤트 구독은 연결하되, 실제 Gateway 연결은 하지 않음
+            _eventSubscription = _bridge.OnEventReceived.Subscribe(OnEventReceived);
+
+            // 비용 모니터링도 Mock으로 (CPU/RAM만 실제 측정)
+            _cts = new CancellationTokenSource();
+            _costMonitor.StartMonitoringAsync(_cts.Token).Forget();
+
+            // 더미 로그 몇 줄 추가
+            await UniTask.Delay(500);
+            _consoleLog.AddLog(new ConsoleLogEntry
+            {
+                Timestamp = DateTime.Now, Level = LogLevel.Info, Category = "System",
+                RawMessage = "Mock 모드로 실행 중입니다. Gateway 연결 없이 UI를 테스트합니다.",
+            });
+            _consoleLog.AddLog(new ConsoleLogEntry
+            {
+                Timestamp = DateTime.Now, Level = LogLevel.Info, Category = "System",
+                RawMessage = "실제 AI 에이전트 기능은 Mock 모드에서 사용할 수 없습니다.",
+            });
+
+            Debug.Log("[Boot] Mock 부팅 완료 — Office UI 사용 가능");
         }
 
         private async UniTaskVoid BootAsync(CancellationToken ct)
