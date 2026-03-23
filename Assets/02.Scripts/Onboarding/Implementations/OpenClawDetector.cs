@@ -184,20 +184,50 @@ namespace OpenDesk.Onboarding.Implementations
 
                     var json = File.ReadAllText(configPath);
 
-                    // "token": "..." 파싱
-                    var key = "\"token\"";
-                    var idx = json.IndexOf(key, StringComparison.OrdinalIgnoreCase);
-                    if (idx < 0) return null;
+                    // "auth" 섹션 안의 "token" 값만 추출
+                    // "auth": { "mode": "token", "token": "실제토큰값" }
+                    // → "mode" 뒤의 "token"이 아닌, 키가 "token"인 값을 찾아야 함
 
-                    var start = json.IndexOf('"', idx + key.Length + 1) + 1;
-                    var end   = json.IndexOf('"', start);
+                    // auth 섹션 찾기
+                    var authIdx = json.IndexOf("\"auth\"", StringComparison.OrdinalIgnoreCase);
+                    if (authIdx < 0) return null;
 
-                    if (start > 0 && end > start)
+                    // auth 섹션 이후에서 "token": "값" 패턴 찾기
+                    // "mode": "token" 을 건너뛰기 위해, "token" 키 뒤에 : 가 오는 것만 찾음
+                    var searchFrom = authIdx;
+                    while (searchFrom < json.Length)
                     {
-                        var token = json.Substring(start, end - start);
-                        Debug.Log($"[Detector] Gateway 토큰 발견 ({token.Length}자)");
-                        return token;
+                        var tokenKeyIdx = json.IndexOf("\"token\"", searchFrom, StringComparison.Ordinal);
+                        if (tokenKeyIdx < 0) break;
+
+                        // "token" 뒤에 : 가 오는지 확인 (키인지 값인지 구분)
+                        var afterKey = json.IndexOf(':', tokenKeyIdx + 7);
+                        if (afterKey < 0) break;
+
+                        // : 앞에 다른 문자가 없는지 (공백만 허용)
+                        var between = json.Substring(tokenKeyIdx + 7, afterKey - tokenKeyIdx - 7).Trim();
+                        if (between.Length == 0)
+                        {
+                            // 이것이 "token": "값" 패턴 — 값 추출
+                            var valStart = json.IndexOf('"', afterKey + 1) + 1;
+                            var valEnd   = json.IndexOf('"', valStart);
+
+                            if (valStart > 0 && valEnd > valStart)
+                            {
+                                var token = json.Substring(valStart, valEnd - valStart);
+                                // "token" 모드 값(5자)이 아닌 실제 토큰(20자+)만 반환
+                                if (token.Length > 10)
+                                {
+                                    Debug.Log($"[Detector] Gateway 토큰 발견 ({token.Length}자)");
+                                    return token;
+                                }
+                            }
+                        }
+
+                        searchFrom = tokenKeyIdx + 7;
                     }
+
+                    Debug.Log("[Detector] Gateway 토큰 없음 (auth 섹션에 유효한 토큰 미발견)");
                     return null;
                 }
                 catch (Exception ex)
