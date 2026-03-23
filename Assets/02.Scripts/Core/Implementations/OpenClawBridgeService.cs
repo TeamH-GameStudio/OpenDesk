@@ -67,23 +67,22 @@ namespace OpenDesk.Core.Implementations
             if (_socket != null)
                 await DisconnectInternalAsync(intentional: true);
 
-            _lastGatewayUrl = gatewayUrl;
-            _lastToken = _pendingToken;  // OnboardingService에서 설정한 토큰
+            _lastToken = _pendingToken;
             _intentionalDisconnect = false;
             _loopCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-            // 토큰이 있으면 헤더에 포함
-            Dictionary<string, string> headers = null;
+            // 토큰이 있으면 URL 쿼리 파라미터로 전달 (OpenClaw 방식: connect.params.auth.token)
+            var connectUrl = gatewayUrl;
             if (!string.IsNullOrEmpty(_lastToken))
             {
-                headers = new Dictionary<string, string>
-                {
-                    { "Authorization", $"Bearer {_lastToken}" },
-                };
-                Debug.Log("[Bridge] 토큰 인증 헤더 포함");
+                var separator = gatewayUrl.Contains("?") ? "&" : "?";
+                connectUrl = $"{gatewayUrl}{separator}token={_lastToken}";
+                Debug.Log("[Bridge] 토큰 인증 쿼리 파라미터 포함");
             }
 
-            _socket = new WebSocket(gatewayUrl, headers);
+            _lastGatewayUrl = connectUrl;
+
+            _socket = new WebSocket(connectUrl);
 
             _socket.OnOpen    += OnOpen;
             _socket.OnMessage += OnMessage;
@@ -203,13 +202,8 @@ namespace OpenDesk.Core.Implementations
                 {
                     _loopCts = new CancellationTokenSource();
 
-                    // 재연결 시에도 토큰 포함
-                    Dictionary<string, string> reHeaders = null;
-                    if (!string.IsNullOrEmpty(_lastToken))
-                        reHeaders = new Dictionary<string, string>
-                            { { "Authorization", $"Bearer {_lastToken}" } };
-
-                    _socket = new WebSocket(_lastGatewayUrl, reHeaders);
+                    // _lastGatewayUrl에 이미 토큰 쿼리 파라미터 포함됨
+                    _socket = new WebSocket(_lastGatewayUrl);
                     _socket.OnOpen    += OnOpen;
                     _socket.OnMessage += OnMessage;
                     _socket.OnError   += OnError;
