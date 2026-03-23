@@ -36,7 +36,7 @@ namespace OpenDesk.Presentation.UI.Panels
         {
             // Gateway URL
             if (_gatewayUrlInput != null)
-                _gatewayUrlInput.text = PlayerPrefs.GetString("OpenDesk_GatewayUrl", "ws://localhost:18789/events");
+                _gatewayUrlInput.text = PlayerPrefs.GetString("OpenDesk_GatewayUrl", "ws://127.0.0.1:18789");
 
             _gatewaySaveButton?.onClick.AddListener(OnGatewaySave);
 

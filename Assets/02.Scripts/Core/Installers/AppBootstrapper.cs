@@ -26,7 +26,7 @@ namespace OpenDesk.Core.Installers
         private IDisposable _eventSubscription;
         private CancellationTokenSource _cts;
 
-        private const string DefaultGatewayUrl = "ws://localhost:18789/events";
+        private const string DefaultGatewayUrl = "ws://127.0.0.1:18789";
 
         public AppBootstrapper(
             IOpenClawBridgeService bridge,

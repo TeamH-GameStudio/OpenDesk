@@ -60,7 +60,7 @@ namespace OpenDesk.Onboarding.Tests
         private class MockSettings : IOnboardingSettings
         {
             public bool   IsFirstRun       { get; set; } = true;
-            public string SavedGatewayUrl  { get; set; } = "ws://localhost:18789/events";
+            public string SavedGatewayUrl  { get; set; } = "ws://127.0.0.1:18789";
             public string SavedLocalPath   { get; set; } = "";
             public int    AppVersion       { get; set; } = 0;
             public string CompletedGateway { get; private set; }
