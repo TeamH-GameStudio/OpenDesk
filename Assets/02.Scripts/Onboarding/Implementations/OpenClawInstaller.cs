@@ -112,6 +112,29 @@ namespace OpenDesk.Onboarding.Implementations
                     return false;
                 }
 
+                // ── Step 3.5: 설치 검증 ─────────────────────────────────
+
+                SetProgress(0.55f, "설치 확인 중...");
+                await UniTask.Delay(1000, cancellationToken: ct);
+
+                var verifyCmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? "openclaw.cmd" : "openclaw";
+                var verified = await RunCommandAsync(verifyCmd, "--version", ct);
+                if (!verified)
+                {
+                    Debug.LogWarning("[Installer] openclaw --version 실패 — PATH 갱신 대기 후 재시도");
+                    await UniTask.Delay(3000, cancellationToken: ct);
+                    verified = await RunCommandAsync(verifyCmd, "--version", ct);
+                }
+
+                if (!verified)
+                {
+                    SetProgress(0f, "OpenClaw 설치는 완료됐으나 실행 확인에 실패했습니다.");
+                    return false;
+                }
+
+                Debug.Log("[Installer] OpenClaw 설치 검증 완료");
+
                 // ── Step 4: 데몬 등록 ────────────────────────────────────
 
                 SetProgress(0.7f, "AI 에이전트 데몬 등록 중...");
@@ -119,13 +142,34 @@ namespace OpenDesk.Onboarding.Implementations
                 if (!daemonSuccess)
                 {
                     Debug.LogWarning("[Installer] 데몬 등록 실패 — 수동 시작 필요할 수 있음");
-                    // 데몬 등록 실패는 치명적이지 않음 — 계속 진행
                 }
 
-                // ── Step 5: Gateway 시작 대기 ────────────────────────────
+                // ── Step 5: Gateway 시작 대기 + 포트 검증 ────────────────
 
                 SetProgress(0.85f, "Gateway 시작 대기 중...");
                 await UniTask.Delay(2000, cancellationToken: ct);
+
+                // Gateway 포트 열림 확인 (최대 3회)
+                bool gatewayReady = false;
+                for (int i = 0; i < 3; i++)
+                {
+                    try
+                    {
+                        using var tcp = new System.Net.Sockets.TcpClient();
+                        var connectTask = tcp.ConnectAsync("127.0.0.1", 18789);
+                        connectTask.Wait(1000);
+                        if (tcp.Connected)
+                        {
+                            gatewayReady = true;
+                            break;
+                        }
+                    }
+                    catch { /* 재시도 */ }
+                    await UniTask.Delay(2000, cancellationToken: ct);
+                }
+
+                if (!gatewayReady)
+                    Debug.LogWarning("[Installer] Gateway 포트(18789) 응답 없음 — 연결 단계에서 재시도 예정");
 
                 // ── Step 6: 관리자 권한 강등 ─────────────────────────────
 
