@@ -324,11 +324,11 @@ namespace OpenDesk.Presentation.UI.Onboarding
                 OnboardingState.NodeUpgradeChoice => new StateInfo
                 {
                     Progress      = 0.15f,
-                    Title         = "기존 도구 버전 확인",
+                    Title         = "기존 도구 업그레이드 필요",
                     StepCount     = "Step 1 / 5",
-                    Description   = "이 컴퓨터에 이미 설치된 도구의 버전이 낮아요.\n아래에서 업그레이드 방법을 선택해주세요.",
-                    EstimatedTime = "",
-                    WhyNeeded     = "Node.js는 AI 프로그램의 기반 도구예요. 현재 설치된 버전이 오래되어\nAI 비서가 제대로 작동하지 않을 수 있어요.\n\n다른 프로그램에서도 이 도구를 사용하고 있을 수 있어서,\n안전하게 업그레이드하는 방법을 안내해 드립니다.\n\n'안전하게 설치'를 선택하면 기존 프로그램에 전혀 영향을 주지 않아요.",
+                    Description   = "이 컴퓨터에 이미 설치된 도구의 버전이 낮아요.\nAI 비서를 사용하려면 최신 버전이 필요합니다.",
+                    EstimatedTime = "약 2~3분",
+                    WhyNeeded     = "Node.js는 AI 프로그램의 기반 도구예요.\n현재 설치된 버전이 오래되어 AI 비서가 제대로 작동하지 않을 수 있어요.\n\n'업그레이드'를 누르면 최신 버전으로 자동 교체됩니다.\n보안 확인 창이 뜨면 '예'를 눌러주세요.",
                     Panel         = _nodeUpgradePanel,
                 },
 
