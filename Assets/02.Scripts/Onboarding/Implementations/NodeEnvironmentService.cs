@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -286,6 +287,181 @@ namespace OpenDesk.Onboarding.Implementations
                 if (va != vb) return va - vb;
             }
             return 0;
+        }
+
+        // ── 기존 Node.js 프로젝트 스캔 ──────────────────────────────────
+
+        public async UniTask<IReadOnlyList<string>> ScanExistingProjectsAsync(CancellationToken ct = default)
+        {
+            return await UniTask.RunOnThreadPool(() =>
+            {
+                var results = new System.Collections.Generic.List<string>();
+                try
+                {
+                    // 사용자 주요 폴더에서 package.json 검색 (깊이 2단계까지)
+                    var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    string[] scanRoots =
+                    {
+                        Path.Combine(userProfile, "Documents"),
+                        Path.Combine(userProfile, "Desktop"),
+                        Path.Combine(userProfile, "Downloads"),
+                        Path.Combine(userProfile, "source"),         // Visual Studio 기본
+                        Path.Combine(userProfile, "projects"),
+                        Path.Combine(userProfile, "dev"),
+                    };
+
+                    foreach (var root in scanRoots)
+                    {
+                        if (!Directory.Exists(root)) continue;
+                        ScanForPackageJson(root, results, 0, maxDepth: 2);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[NodeEnv] 프로젝트 스캔 중 오류: {ex.Message}");
+                }
+                return (IReadOnlyList<string>)results;
+            }, cancellationToken: ct);
+        }
+
+        private static void ScanForPackageJson(string dir, System.Collections.Generic.List<string> results,
+            int depth, int maxDepth)
+        {
+            if (depth > maxDepth) return;
+            try
+            {
+                var packageJson = Path.Combine(dir, "package.json");
+                if (File.Exists(packageJson))
+                {
+                    // node_modules가 있으면 활성 프로젝트
+                    var nodeModules = Path.Combine(dir, "node_modules");
+                    var marker = File.Exists(Path.Combine(dir, "package-lock.json")) ||
+                                 File.Exists(Path.Combine(dir, "yarn.lock")) ||
+                                 Directory.Exists(nodeModules);
+                    if (marker)
+                        results.Add(dir);
+                    return; // 이 폴더는 프로젝트이므로 하위 탐색 불필요
+                }
+
+                foreach (var subDir in Directory.GetDirectories(dir))
+                {
+                    var name = Path.GetFileName(subDir);
+                    // 숨김 폴더, node_modules, .git 등 제외
+                    if (name.StartsWith(".") || name == "node_modules" || name == "__pycache__")
+                        continue;
+                    ScanForPackageJson(subDir, results, depth + 1, maxDepth);
+                }
+            }
+            catch { /* 접근 권한 없는 폴더 무시 */ }
+        }
+
+        // ── nvm을 통한 안전 설치 (기존 버전과 공존) ────────────────────
+
+        public async UniTask<bool> InstallViaNvmAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                SetProgress(0.05f, "버전 관리 도구 확인 중...");
+
+                // nvm-windows 설치 여부 확인
+                var hasNvm = await RunCommandAsync(
+                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nvm.exe" : "nvm",
+                    "version", ct);
+
+                if (!hasNvm)
+                {
+                    // nvm-windows 다운로드 및 설치
+                    SetProgress(0.1f, "버전 관리 도구를 설치하고 있어요...");
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        var nvmUrl = "https://github.com/coreybutler/nvm-windows/releases/latest/download/nvm-setup.exe";
+                        var nvmPath = Path.Combine(Path.GetTempPath(), "nvm-setup.exe");
+
+                        var downloaded = await DownloadFileAsync(nvmUrl, nvmPath, ct);
+                        if (!downloaded)
+                        {
+                            SetProgress(0f, "버전 관리 도구 다운로드 실패");
+                            return false;
+                        }
+
+                        SetProgress(0.25f, "버전 관리 도구 설치 중... (설치 창이 뜨면 '다음'을 계속 눌러주세요)");
+                        // nvm-setup.exe는 사일런트 설치 미지원 → 사용자가 Next 클릭 필요
+                        var installOk = await UniTask.RunOnThreadPool(() =>
+                        {
+                            try
+                            {
+                                var psi = new ProcessStartInfo
+                                {
+                                    FileName        = nvmPath,
+                                    UseShellExecute = true,  // GUI 설치창 표시
+                                };
+                                using var process = Process.Start(psi);
+                                process?.WaitForExit(300_000); // 5분 대기
+                                return process?.ExitCode == 0;
+                            }
+                            catch { return false; }
+                        }, cancellationToken: ct);
+
+                        try { File.Delete(nvmPath); } catch { }
+
+                        if (!installOk)
+                        {
+                            SetProgress(0f, "버전 관리 도구 설치가 취소되었어요.");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        // macOS/Linux: curl로 nvm 설치
+                        var ok = await RunCommandAsync("bash",
+                            "-c \"curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash\"",
+                            ct);
+                        if (!ok)
+                        {
+                            SetProgress(0f, "버전 관리 도구 설치 실패");
+                            return false;
+                        }
+                    }
+                }
+
+                // nvm으로 Node.js 24 설치
+                SetProgress(0.5f, $"Node.js {TargetVersion} 설치 중... (기존 버전은 유지돼요)");
+                var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nvm.exe" : "nvm";
+
+                var installNode = await RunCommandAsync(cmd, $"install {TargetVersion}", ct);
+                if (!installNode)
+                {
+                    SetProgress(0f, "Node.js 설치에 실패했어요.");
+                    return false;
+                }
+
+                // 새 버전을 기본으로 설정
+                SetProgress(0.8f, "새 버전을 활성화하고 있어요...");
+                await RunCommandAsync(cmd, $"use {TargetVersion}", ct);
+
+                // 확인
+                SetProgress(0.9f, "설치 확인 중...");
+                await UniTask.Delay(2000, cancellationToken: ct);
+
+                var installed = await MeetsMinVersionAsync(MinVersion, ct);
+                SetProgress(installed ? 1f : 0f,
+                    installed
+                        ? $"Node.js {TargetVersion} 안전 설치 완료! (기존 버전도 유지됨)"
+                        : "설치 확인 실패");
+                return installed;
+            }
+            catch (OperationCanceledException)
+            {
+                SetProgress(0f, "설치가 취소되었습니다.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                SetProgress(0f, $"설치 실패: {ex.Message}");
+                Debug.LogError($"[NodeEnv] nvm 설치 실패: {ex}");
+                return false;
+            }
         }
 
         private void SetProgress(float value, string text)

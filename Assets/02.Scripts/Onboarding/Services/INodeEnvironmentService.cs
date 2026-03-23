@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using R3;
@@ -24,5 +25,17 @@ namespace OpenDesk.Onboarding.Services
 
         /// <summary>Node.js 자동 설치 (Windows: MSI 사일런트, macOS: pkg/brew)</summary>
         UniTask<bool> InstallAsync(CancellationToken ct = default);
+
+        /// <summary>
+        /// 컴퓨터에서 Node.js를 사용 중인 프로젝트 폴더 목록을 스캔합니다.
+        /// (package.json이 있는 폴더를 찾음)
+        /// </summary>
+        UniTask<IReadOnlyList<string>> ScanExistingProjectsAsync(CancellationToken ct = default);
+
+        /// <summary>
+        /// nvm(Node Version Manager)을 사용해 기존 버전과 공존하도록 설치합니다.
+        /// 기존 Node.js에 영향을 주지 않습니다.
+        /// </summary>
+        UniTask<bool> InstallViaNvmAsync(CancellationToken ct = default);
     }
 }

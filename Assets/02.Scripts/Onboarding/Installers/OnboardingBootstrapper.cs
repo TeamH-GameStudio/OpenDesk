@@ -16,7 +16,7 @@ namespace OpenDesk.Onboarding.Installers
     {
         private readonly IOnboardingService _onboarding;
 
-        private const string OfficSceneName = "Office";
+        private const string OfficSceneName = "OfficeScene";
 
         public OnboardingBootstrapper(IOnboardingService onboarding)
         {
@@ -25,10 +25,13 @@ namespace OpenDesk.Onboarding.Installers
 
         public void Start()
         {
+            Debug.Log("[Bootstrapper] OnboardingBootstrapper.Start() 진입");
+
             // 상태 변화 구독 — ReadyToEnter 되면 씬 전환
             _onboarding.StateChanged.Subscribe(state => OnStateChanged(state));
 
             // 온보딩 시작
+            Debug.Log("[Bootstrapper] OnboardingService.StartAsync() 호출");
             _onboarding.StartAsync().Forget();
         }
 

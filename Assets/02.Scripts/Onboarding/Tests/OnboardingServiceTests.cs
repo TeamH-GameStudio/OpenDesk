@@ -127,6 +127,9 @@ namespace OpenDesk.Onboarding.Tests
             public UniTask<string> GetVersionAsync(System.Threading.CancellationToken ct)    => UniTask.FromResult(Version);
             public UniTask<bool>   MeetsMinVersionAsync(string v, System.Threading.CancellationToken ct) => UniTask.FromResult(MeetsMin);
             public UniTask<bool>   InstallAsync(System.Threading.CancellationToken ct)       => UniTask.FromResult(InstallOk);
+            public UniTask<System.Collections.Generic.IReadOnlyList<string>> ScanExistingProjectsAsync(System.Threading.CancellationToken ct)
+                => UniTask.FromResult<System.Collections.Generic.IReadOnlyList<string>>(new List<string>());
+            public UniTask<bool> InstallViaNvmAsync(System.Threading.CancellationToken ct)   => UniTask.FromResult(InstallOk);
         }
 
         private class MockAdmin : IAdminPrivilegeService
@@ -136,6 +139,17 @@ namespace OpenDesk.Onboarding.Tests
             public UniTask<ProcessOutput> RunElevatedAsync(string c, string a, System.Threading.CancellationToken ct)
                 => UniTask.FromResult(new ProcessOutput { ExitCode = 0 });
             public UniTask DropPrivilegesAndRestartAsync(System.Threading.CancellationToken ct) => UniTask.CompletedTask;
+        }
+
+        private class MockRollback : IRollbackService
+        {
+            public List<InstalledItem> Recorded = new();
+            public void RecordInstall(InstalledItem item) => Recorded.Add(item);
+            public System.Collections.Generic.IReadOnlyList<InstalledItem> GetInstalledItems() => Recorded;
+            public UniTask<bool> RollbackItemAsync(string id, System.Threading.CancellationToken ct) => UniTask.FromResult(true);
+            public UniTask<bool> RollbackAllAsync(System.Threading.CancellationToken ct) => UniTask.FromResult(true);
+            public void LoadRecord() { }
+            public void SaveRecord() { }
         }
 
         // ── 테스트 ───────────────────────────────────────────────────────────
@@ -159,6 +173,7 @@ namespace OpenDesk.Onboarding.Tests
                 workspace ?? new MockWorkspace(),
                 nodeEnv   ?? new MockNodeEnv(),
                 admin     ?? new MockAdmin(),
+                rollback  : new MockRollback(),
                 wsl2: null  // 테스트에서는 WSL2 미사용
             );
         }
@@ -185,27 +200,42 @@ namespace OpenDesk.Onboarding.Tests
         }
 
         [Test]
-        public async Task Start_OpenClaw미설치_NotFound상태()
-        {
-            var detector = new MockDetector { Installed = false };
-            var svc      = CreateService(detector: detector);
-
-            await svc.StartAsync();
-
-            Assert.AreEqual(OnboardingState.OpenClawNotFound, svc.CurrentState);
-        }
-
-        [Test]
-        public async Task Retry_설치성공_WorkspaceSetup로이동()
+        public async Task Start_OpenClaw미설치_자동설치성공_WorkspaceSetup()
         {
             var detector  = new MockDetector  { Installed = false };
             var installer = new MockInstaller { ShouldSucceed = true };
             var svc       = CreateService(detector: detector, installer: installer);
 
             await svc.StartAsync();
-            Assert.AreEqual(OnboardingState.OpenClawNotFound, svc.CurrentState);
 
-            // 설치 후 Detector가 설치된 것으로 응답하도록 변경
+            // 자동 설치 → Gateway 연결 → 에이전트 파싱 → WorkspaceSetup
+            Assert.AreEqual(OnboardingState.WorkspaceSetup, svc.CurrentState);
+        }
+
+        [Test]
+        public async Task Start_OpenClaw미설치_자동설치실패_InstallFailed()
+        {
+            var detector  = new MockDetector  { Installed = false };
+            var installer = new MockInstaller { ShouldSucceed = false };
+            var svc       = CreateService(detector: detector, installer: installer);
+
+            await svc.StartAsync();
+
+            Assert.AreEqual(OnboardingState.InstallFailed, svc.CurrentState);
+        }
+
+        [Test]
+        public async Task Retry_InstallFailed에서_재시도성공_WorkspaceSetup으로이동()
+        {
+            var detector  = new MockDetector  { Installed = false };
+            var installer = new MockInstaller { ShouldSucceed = false };
+            var svc       = CreateService(detector: detector, installer: installer);
+
+            await svc.StartAsync();
+            Assert.AreEqual(OnboardingState.InstallFailed, svc.CurrentState);
+
+            // 재시도 시 성공하도록 변경
+            installer.ShouldSucceed = true;
             detector.Installed = true;
             await svc.RetryCurrentStepAsync();
 
@@ -291,15 +321,27 @@ namespace OpenDesk.Onboarding.Tests
         }
 
         [Test]
-        public async Task Start_NodeJs버전낮음_NodeJsFailed()
+        public async Task Start_NodeJs버전낮음_자동업그레이드실패_NodeJsFailed()
         {
-            var nodeEnv = new MockNodeEnv { Installed = true, MeetsMin = false, Version = "16.0.0" };
+            // 버전 부족 + 자동 업그레이드도 실패하는 경우
+            var nodeEnv = new MockNodeEnv { Installed = true, MeetsMin = false, InstallOk = false, Version = "16.0.0" };
             var svc = CreateService(nodeEnv: nodeEnv);
 
             await svc.StartAsync();
 
             Assert.AreEqual(OnboardingState.NodeJsFailed, svc.CurrentState);
-            Assert.IsTrue(svc.Context.LastErrorMessage.Contains("22.16"));
+        }
+
+        [Test]
+        public async Task Start_NodeJs버전낮음_자동업그레이드성공_계속진행()
+        {
+            // 버전 부족하지만 자동 업그레이드 성공
+            var nodeEnv = new MockNodeEnv { Installed = true, MeetsMin = false, InstallOk = true, Version = "16.0.0" };
+            var svc = CreateService(nodeEnv: nodeEnv);
+
+            await svc.StartAsync();
+
+            Assert.AreNotEqual(OnboardingState.NodeJsFailed, svc.CurrentState);
         }
 
         [Test]

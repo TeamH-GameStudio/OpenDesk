@@ -26,6 +26,11 @@ namespace OpenDesk.Onboarding.Models
         public string LocalWorkspacePath  { get; set; } = "";
         public bool   WorkspaceSkipped    { get; set; }
 
+        // Node.js 버전 충돌
+        public string ExistingNodeVersion        { get; set; } = "";
+        public List<string> NodeProjectPaths     { get; set; } = new();
+        public bool   NodeUpgradeSkipped         { get; set; }
+
         // 에러
         public string LastErrorMessage    { get; set; } = "";
     }

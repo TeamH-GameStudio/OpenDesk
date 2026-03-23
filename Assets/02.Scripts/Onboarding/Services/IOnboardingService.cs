@@ -25,5 +25,16 @@ namespace OpenDesk.Onboarding.Services
         UniTask SkipWorkspaceSetupAsync();
         UniTask ConfirmWorkspacePathAsync(string path, CancellationToken ct = default);
         UniTask EnterOfflineMode();
+
+        // Node.js 버전 충돌 시 사용자 선택
+        /// <summary>nvm으로 기존 버전과 공존하도록 안전 설치</summary>
+        UniTask HandleNodeUpgrade_SafeInstall(CancellationToken ct = default);
+        /// <summary>기존 버전을 새 버전으로 덮어쓰기</summary>
+        UniTask HandleNodeUpgrade_Overwrite(CancellationToken ct = default);
+        /// <summary>Node.js 업그레이드 건너뛰기 (일부 기능 제한)</summary>
+        UniTask HandleNodeUpgrade_Skip(CancellationToken ct = default);
+
+        // WSL2 설치 후 재부팅 요청
+        void RequestReboot();
     }
 }

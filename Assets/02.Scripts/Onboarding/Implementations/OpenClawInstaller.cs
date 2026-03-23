@@ -71,13 +71,17 @@ namespace OpenDesk.Onboarding.Implementations
                 }
                 else
                 {
-                    // 버전 체크
+                    // 버전 체크 → 부족 시 자동 업그레이드
                     var meetsMin = await _nodeEnv.MeetsMinVersionAsync("22.16.0", ct);
                     if (!meetsMin)
                     {
-                        var ver = await _nodeEnv.GetVersionAsync(ct);
-                        SetProgress(0f, $"Node.js {ver} → 22.16 이상 필요합니다. 업데이트 후 다시 시도해주세요.");
-                        return false;
+                        SetProgress(0.08f, "필수 도구를 최신 버전으로 업데이트하고 있어요...");
+                        var upgraded = await _nodeEnv.InstallAsync(ct);
+                        if (!upgraded)
+                        {
+                            SetProgress(0f, "필수 도구 업데이트에 실패했습니다. 인터넷 연결을 확인해주세요.");
+                            return false;
+                        }
                     }
                 }
 
