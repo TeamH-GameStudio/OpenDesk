@@ -17,21 +17,38 @@ namespace OpenDesk.Onboarding.Implementations
     public class OpenClawDetector : IOpenClawDetector
     {
         // 플랫폼별 기본 설치 경로
+        // OpenClaw 설정 파일 경로 후보 (여러 곳 탐색)
+        private static readonly string[] ConfigCandidates = GetConfigCandidates();
+
+        private static string[] GetConfigCandidates()
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return new[]
+                {
+                    Path.Combine(home, ".openclaw", "openclaw.json"),         // 실제 OpenClaw 기본 경로
+                    Path.Combine(appData, "openclaw", "openclaw.json"),       // 레거시/대체 경로
+                };
+
+            // macOS / Linux
+            return new[]
+            {
+                Path.Combine(home, ".openclaw", "openclaw.json"),
+            };
+        }
+
         private static string DefaultConfigPath
         {
             get
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    return Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        "openclaw", "openclaw.json"
-                    );
+                // 후보 중 실제 존재하는 파일 반환
+                foreach (var path in ConfigCandidates)
+                    if (File.Exists(path)) return path;
 
-                // macOS / Linux
-                return Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".openclaw", "openclaw.json"
-                );
+                // 없으면 첫 번째 후보 반환 (생성 시 사용)
+                return ConfigCandidates[0];
             }
         }
 
@@ -39,16 +56,9 @@ namespace OpenDesk.Onboarding.Implementations
         {
             get
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    return Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        "openclaw", "workspace"
-                    );
-
-                return Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".openclaw", "workspace"
-                );
+                // 설정 파일과 같은 폴더의 workspace
+                var configDir = Path.GetDirectoryName(DefaultConfigPath) ?? "";
+                return Path.Combine(configDir, "workspace");
             }
         }
 
