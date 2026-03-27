@@ -55,6 +55,7 @@ namespace OpenDesk.Presentation.UI.Panels
             if (_loadingIndicator != null) _loadingIndicator.SetActive(true);
 
             // 기존 카드 제거
+            if (_skillContainer == null) { if (_loadingIndicator != null) _loadingIndicator.SetActive(false); return; }
             foreach (Transform child in _skillContainer)
                 Destroy(child.gameObject);
 
@@ -82,7 +83,7 @@ namespace OpenDesk.Presentation.UI.Panels
             SetChildText(obj, "AuthorText", $"by {skill.Author}");
             SetChildText(obj, "DescriptionText", skill.Description);
             SetChildText(obj, "CategoryText", skill.Category);
-            SetChildText(obj, "RatingText", $"{skill.Rating:F1}★");
+            SetChildText(obj, "RatingText", $"{skill.Rating:F1}*");
             SetChildText(obj, "DownloadsText", $"{skill.Downloads:N0}");
 
             // 설치/삭제 버튼

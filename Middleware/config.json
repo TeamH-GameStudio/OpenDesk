@@ -1,0 +1,14 @@
+{
+  "port": 8765,
+  "host": "localhost",
+  "claude": {
+    "systemPrompt": "당신은 친절한 AI 어시스턴트입니다. 한국어로 대답합니다.",
+    "maxTurns": 50,
+    "timeoutSeconds": 120,
+    "cliPath": "claude"
+  },
+  "formatting": {
+    "markdownToTmp": true,
+    "maxResponseLength": 10000
+  }
+}

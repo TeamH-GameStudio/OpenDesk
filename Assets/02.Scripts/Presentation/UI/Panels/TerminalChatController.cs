@@ -40,8 +40,7 @@ namespace OpenDesk.Presentation.UI.Panels
         [SerializeField] private Button         _clearButton;
 
         [Header("상태 표시")]
-        [SerializeField] private GameObject _typingIndicator;
-        [SerializeField] private TMP_Text   _typingText;           // "에이전트가 사고 중..."
+        [SerializeField] private TMP_Text   _typingText;           // 에이전트 상태: "대기 중" / "💭 사고 중..." 등
         [SerializeField] private Button     _scrollToBottomButton; // 위로 스크롤 시 표시
 
         [Header("설정")]
@@ -56,6 +55,9 @@ namespace OpenDesk.Presentation.UI.Panels
         private readonly List<GameObject> _activeMessageObjects = new();
         private bool _isUserScrolling;
 
+        // 스트리밍 응답 추적: runId → (GameObject, 누적 텍스트)
+        private readonly Dictionary<string, (GameObject obj, string text, ChatMessage msg)> _streamingBubbles = new();
+
         private void Start()
         {
             // 세션 드롭다운
@@ -67,15 +69,19 @@ namespace OpenDesk.Presentation.UI.Panels
             }
 
             // 전송 버튼
+            Debug.Log($"[Terminal] _sendButton={(_sendButton != null ? "OK" : "NULL")}, _chatInputField={(_chatInputField != null ? "OK" : "NULL")}, _bridge={(_bridge != null ? "OK" : "NULL")}");
             if (_sendButton != null)
                 _sendButton.onClick.AddListener(OnSendClicked);
+
+            // Enter 키 → 전송 (Input System 호환)
+            if (_chatInputField != null)
+                _chatInputField.onSubmit.AddListener(_ => OnSendClicked());
 
             // 초기화 버튼
             if (_clearButton != null)
                 _clearButton.onClick.AddListener(OnClearClicked);
 
-            // 타이핑/스크롤 초기 숨김
-            if (_typingIndicator != null) _typingIndicator.SetActive(false);
+            // 스크롤 버튼 초기 숨김 (타이핑 인디케이터는 항상 표시)
             if (_scrollToBottomButton != null)
             {
                 _scrollToBottomButton.gameObject.SetActive(false);
@@ -98,26 +104,29 @@ namespace OpenDesk.Presentation.UI.Panels
             {
                 _bridge.OnEventReceived.Subscribe(OnEventReceived).AddTo(this);
 
-                // 연결/해제 이벤트를 시스템 메시지로 표시
+                // 연결/해제 이벤트
                 _bridge.ConnectionState.Subscribe(connected =>
                 {
-                    var msg = connected ? "✓ Gateway 연결됨" : "✗ Gateway 연결 끊김 — 자동 재연결 대기 중";
-                    AddSystemMessage(msg);
+                    var sysMsg = connected ? "[연결] Gateway 연결됨" : "[끊김] Gateway 연결 끊김 - 자동 재연결 대기 중";
+                    AddSystemMessage(sysMsg);
+
+                    // 상태 텍스트도 갱신
+                    if (_typingText != null)
+                        _typingText.text = connected ? "대기 중" : "연결 끊김";
                 }).AddTo(this);
             }
 
-            // 에이전트 상태 변경 → 타이핑 인디케이터
+            // 에이전트 상태 변경 → StatusText 항상 표시
+            if (_typingText != null)
+                _typingText.text = "대기 중";
+
             if (_agentState != null)
             {
                 _agentState.OnStateChanged.Subscribe(e =>
                 {
                     if (e.SessionId != _currentSessionId) return;
-
-                    var (isWorking, statusText) = GetWorkingStatus(e.State);
-
-                    if (_typingIndicator != null)
-                        _typingIndicator.SetActive(isWorking);
-                    if (_typingText != null && isWorking)
+                    var statusText = GetStatusText(e.State);
+                    if (_typingText != null)
                         _typingText.text = statusText;
                 }).AddTo(this);
             }
@@ -141,29 +150,19 @@ namespace OpenDesk.Presentation.UI.Panels
 
         private void Update()
         {
-            // Shift+Enter=줄바꿈, Enter만=전송
-            if (_chatInputField != null && _chatInputField.isFocused)
-            {
-                if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-                {
-                    if (!Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.RightShift))
-                    {
-                        // Enter만 누른 경우 → 전송 (기본 onSubmit 외에도 처리)
-                        OnSendClicked();
-                    }
-                    // Shift+Enter는 TMP_InputField가 자동으로 줄바꿈 처리
-                }
-            }
+            // Enter 키 처리: TMP_InputField의 onSubmit 이벤트로 대체 (Input System 호환)
+            // Update에서의 Input.GetKeyDown은 새 Input System과 충돌하므로 제거
         }
 
         // ── 전송 ────────────────────────────────────────────────────────
 
         private async void OnSendClicked()
         {
-            if (_chatInputField == null) return;
+            Debug.Log("[Terminal] OnSendClicked 호출됨");
+            if (_chatInputField == null) { Debug.LogWarning("[Terminal] _chatInputField NULL"); return; }
 
             var text = _chatInputField.text.Trim();
-            if (string.IsNullOrEmpty(text)) return;
+            if (string.IsNullOrEmpty(text)) { Debug.Log("[Terminal] 빈 텍스트 — 무시"); return; }
 
             // UI에 사용자 메시지 즉시 표시
             AddChatMessage(_currentSessionId, "나", text, MessageType.User);
@@ -175,7 +174,7 @@ namespace OpenDesk.Presentation.UI.Panels
             // Gateway로 전송
             if (_bridge == null || !_bridge.IsConnected)
             {
-                AddSystemMessage("⚠ Gateway에 연결되지 않았습니다. 메시지가 버퍼에 저장됩니다.");
+                AddSystemMessage("[!] Gateway에 연결되지 않았습니다. 메시지가 버퍼에 저장됩니다.");
             }
 
             try
@@ -185,7 +184,7 @@ namespace OpenDesk.Presentation.UI.Panels
             }
             catch (Exception ex)
             {
-                AddSystemMessage($"⚠ 전송 실패: {ex.Message}");
+                AddSystemMessage($"[!] 전송 실패: {ex.Message}");
             }
         }
 
@@ -195,10 +194,121 @@ namespace OpenDesk.Presentation.UI.Panels
         {
             var sessionId = string.IsNullOrEmpty(e.SessionId) ? "main" : e.SessionId;
 
-            var (senderName, message) = FormatEventMessage(e);
-            if (string.IsNullOrEmpty(message)) return;
+            // StatusText 갱신
+            UpdateStatusText(e.ActionType);
 
-            AddChatMessage(sessionId, senderName, message, MessageType.Agent);
+            // AI 채팅 스트리밍 응답 처리
+            if (e.ActionType == AgentActionType.ChatDelta)
+            {
+                HandleChatDelta(sessionId, e);
+                return;
+            }
+
+            if (e.ActionType == AgentActionType.ChatFinal)
+            {
+                HandleChatFinal(sessionId, e);
+                return;
+            }
+        }
+
+        /// <summary>
+        /// ChatDelta: 같은 runId의 말풍선에 텍스트를 누적 append
+        /// 첫 delta면 새 말풍선 생성
+        /// </summary>
+        private void HandleChatDelta(string sessionId, AgentEvent e)
+        {
+            if (string.IsNullOrEmpty(e.Message)) return;
+
+            var runId = e.RunId;
+            if (string.IsNullOrEmpty(runId))
+                runId = "_no_run_id";
+
+            if (_streamingBubbles.TryGetValue(runId, out var existing))
+            {
+                // 기존 말풍선에 텍스트 append
+                var newText = existing.text + e.Message;
+                _streamingBubbles[runId] = (existing.obj, newText, existing.msg);
+
+                // UI 업데이트
+                if (existing.obj != null)
+                {
+                    var tmp = existing.obj.GetComponentInChildren<TMP_Text>();
+                    if (tmp != null)
+                    {
+                        var time = existing.msg.Timestamp.ToString("HH:mm");
+                        tmp.text = $"[{time}] AI\n{newText}";
+                    }
+                }
+
+                // 히스토리에도 반영
+                existing.msg.Text = newText;
+            }
+            else
+            {
+                // 첫 delta — 새 말풍선 생성
+                var msg = new ChatMessage
+                {
+                    SessionId = sessionId,
+                    Sender    = "AI",
+                    Text      = e.Message,
+                    Type      = MessageType.Agent,
+                    Timestamp = DateTime.Now,
+                };
+
+                // 기록에 저장
+                if (!_chatHistory.ContainsKey(sessionId))
+                    _chatHistory[sessionId] = new List<ChatMessage>();
+                _chatHistory[sessionId].Add(msg);
+
+                // UI 생성
+                var obj = InstantiateMessageUIAndReturn(msg);
+                if (obj != null)
+                    _streamingBubbles[runId] = (obj, e.Message, msg);
+            }
+
+            // 자동 스크롤
+            if (!_isUserScrolling)
+                ScrollToBottom();
+        }
+
+        /// <summary>
+        /// ChatFinal: 스트리밍 말풍선의 텍스트를 최종 응답으로 교체하고 스트리밍 추적 해제
+        /// </summary>
+        private void HandleChatFinal(string sessionId, AgentEvent e)
+        {
+            var runId = e.RunId;
+            if (string.IsNullOrEmpty(runId))
+                runId = "_no_run_id";
+
+            var finalText = !string.IsNullOrEmpty(e.Message) ? e.Message : null;
+
+            if (_streamingBubbles.TryGetValue(runId, out var existing))
+            {
+                // 최종 텍스트가 있으면 교체, 없으면 delta 누적 결과 유지
+                if (finalText != null)
+                {
+                    existing.msg.Text = finalText;
+
+                    if (existing.obj != null)
+                    {
+                        var tmp = existing.obj.GetComponentInChildren<TMP_Text>();
+                        if (tmp != null)
+                        {
+                            var time = existing.msg.Timestamp.ToString("HH:mm");
+                            tmp.text = $"[{time}] AI\n{finalText}";
+                        }
+                    }
+                }
+
+                _streamingBubbles.Remove(runId);
+            }
+            else if (finalText != null)
+            {
+                // delta 없이 final만 온 경우 — 새 말풍선 생성
+                AddChatMessage(sessionId, "AI", finalText, MessageType.Agent);
+            }
+
+            // 응답 완료 — StatusText는 OnEventReceived에서 이미 갱신됨
         }
 
         // ── 세션 전환 ───────────────────────────────────────────────────
@@ -275,7 +385,15 @@ namespace OpenDesk.Presentation.UI.Panels
 
         private void InstantiateMessageUI(ChatMessage msg)
         {
-            if (_chatContent == null) return;
+            InstantiateMessageUIAndReturn(msg);
+        }
+
+        /// <summary>
+        /// 메시지 UI를 생성하고 GameObject를 반환 (스트리밍 업데이트용)
+        /// </summary>
+        private GameObject InstantiateMessageUIAndReturn(ChatMessage msg)
+        {
+            if (_chatContent == null) return null;
 
             var prefab = msg.Type switch
             {
@@ -286,7 +404,7 @@ namespace OpenDesk.Presentation.UI.Panels
                 _                   => _systemMessagePrefab,
             };
 
-            if (prefab == null) return;
+            if (prefab == null) return null;
 
             var obj = Instantiate(prefab, _chatContent);
 
@@ -315,6 +433,8 @@ namespace OpenDesk.Presentation.UI.Panels
             // 자동 스크롤 (사용자가 위로 스크롤 중이면 건너뜀)
             if (!_isUserScrolling)
                 ScrollToBottom();
+
+            return obj;
         }
 
         private void RebuildChatDisplay()
@@ -350,39 +470,34 @@ namespace OpenDesk.Presentation.UI.Panels
 
         // ── 이벤트 포맷팅 ───────────────────────────────────────────────
 
-        private static (string sender, string message) FormatEventMessage(AgentEvent e)
+        private void UpdateStatusText(AgentActionType actionType)
         {
-            var sender = string.IsNullOrEmpty(e.SessionId) ? "에이전트" : e.SessionId;
-
-            var message = e.ActionType switch
-            {
-                AgentActionType.TaskStarted    => $"▶ 작업 시작: {e.TaskName}",
-                AgentActionType.TaskCompleted   => $"✓ 작업 완료: {e.TaskName}",
-                AgentActionType.TaskFailed      => $"✗ 작업 실패: {e.TaskName}",
-                AgentActionType.Thinking        => "💭 사고 중...",
-                AgentActionType.Planning        => $"📋 계획 수립 중: {e.TaskName}",
-                AgentActionType.Executing       => $"⚙ 실행 중: {e.TaskName}",
-                AgentActionType.Reviewing       => "🔍 결과 검토 중...",
-                AgentActionType.ToolUsing       => $"🔧 도구 호출: {e.TaskName}",
-                AgentActionType.ToolResult      => "📎 도구 결과 수신",
-                AgentActionType.SubAgentSpawned => $"👥 서브에이전트 생성: {e.SubAgentId}",
-                AgentActionType.SubAgentCompleted => $"✓ 서브에이전트 완료: {e.SubAgentId}",
-                AgentActionType.SubAgentFailed  => $"✗ 서브에이전트 실패: {e.SubAgentId}",
-                _                               => null,
-            };
-
-            return (sender, message);
+            if (_typingText != null)
+                _typingText.text = GetStatusText(actionType);
         }
 
-        private static (bool isWorking, string statusText) GetWorkingStatus(AgentActionType state)
+        private static string GetStatusText(AgentActionType state)
         {
             return state switch
             {
-                AgentActionType.Thinking  => (true, "에이전트가 사고 중..."),
-                AgentActionType.Planning  => (true, "에이전트가 계획 수립 중..."),
-                AgentActionType.Executing => (true, "에이전트가 실행 중..."),
-                AgentActionType.Reviewing => (true, "에이전트가 검토 중..."),
-                _                         => (false, ""),
+                AgentActionType.TaskStarted       => "▶ 작업 시작",
+                AgentActionType.Thinking          => "💭 사고 중...",
+                AgentActionType.Planning          => "📋 계획 수립 중...",
+                AgentActionType.Executing         => "⚙ 실행 중...",
+                AgentActionType.Reviewing         => "🔍 결과 검토 중...",
+                AgentActionType.ToolUsing         => "🔧 도구 호출 중...",
+                AgentActionType.ToolResult        => "📎 도구 결과 수신",
+                AgentActionType.SubAgentSpawned   => "👥 서브에이전트 생성",
+                AgentActionType.SubAgentCompleted => "✅ 서브에이전트 완료",
+                AgentActionType.SubAgentFailed    => "❌ 서브에이전트 실패",
+                AgentActionType.TaskCompleted     => "✅ 작업 완료",
+                AgentActionType.TaskFailed        => "❌ 작업 실패",
+                AgentActionType.ChatDelta         => "💬 응답 중...",
+                AgentActionType.ChatFinal         => "대기 중",
+                AgentActionType.Connected         => "대기 중",
+                AgentActionType.Disconnected      => "연결 끊김",
+                AgentActionType.AgentLifecycle    => "에이전트 작업 중...",
+                _                                 => "대기 중",
             };
         }
     }

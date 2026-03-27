@@ -29,7 +29,7 @@ namespace OpenDesk.Presentation.UI.Panels
             var canRunFree = await _vault.CanRunWithoutApiKeyAsync();
             if (_ollamaStatusText != null)
                 _ollamaStatusText.text = canRunFree
-                    ? "✓ Ollama 감지됨 — Free 모드 사용 가능 (API 키 없이 무료)"
+                    ? "[OK] Ollama 감지됨 — Free 모드 사용 가능 (API 키 없이 무료)"
                     : "Ollama 미감지 — API 키를 입력하거나 Ollama를 설치하세요";
 
             // 제공업체 카드 생성
@@ -98,8 +98,8 @@ namespace OpenDesk.Presentation.UI.Panels
         {
             var (text, color) = status switch
             {
-                ApiKeyStatus.Valid      => ("✓ 유효", Color.green),
-                ApiKeyStatus.Invalid    => ("✗ 유효하지 않음", Color.red),
+                ApiKeyStatus.Valid      => ("[OK] 유효", Color.green),
+                ApiKeyStatus.Invalid    => ("[X] 유효하지 않음", Color.red),
                 ApiKeyStatus.Validating => ("검증 중...", Color.yellow),
                 ApiKeyStatus.Error      => ("오류", Color.red),
                 _                       => ("미설정", Color.gray),

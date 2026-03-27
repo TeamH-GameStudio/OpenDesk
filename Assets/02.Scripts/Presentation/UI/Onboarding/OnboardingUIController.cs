@@ -62,6 +62,7 @@ namespace OpenDesk.Presentation.UI.Onboarding
         [Header("공통 버튼")]
         [SerializeField] private Button _retryButton;
         [SerializeField] private Button _offlineButton;
+        [SerializeField] private Button _restartButton;  // "처음부터 다시" 버튼
 
         // ── Gateway 패널 ──────────────────────────────────────────────
         [Header("Gateway 패널")]
@@ -159,6 +160,8 @@ namespace OpenDesk.Presentation.UI.Onboarding
                 _onboarding.HandleNodeInstall_Direct().Forget());
             _nodeInstallSkipButton?.onClick.AddListener(() =>
                 _onboarding.HandleNodeInstall_Skip().Forget());
+            _restartButton?.onClick.AddListener(() =>
+                _onboarding.RestartAsync().Forget());
 
             // Node.js 버전 충돌 선택 버튼
             _nodeSafeInstallButton?.onClick.AddListener(() =>
@@ -283,6 +286,13 @@ namespace OpenDesk.Presentation.UI.Onboarding
 
             _retryButton?.gameObject.SetActive(canRetry);
             _offlineButton?.gameObject.SetActive(state == OnboardingState.GatewayFailed);
+
+            // "처음부터 다시" 버튼: 실패 상태 + FatalError에서 표시
+            var canRestart = state is OnboardingState.InstallFailed
+                or OnboardingState.NodeJsFailed
+                or OnboardingState.GatewayFailed
+                or OnboardingState.FatalError;
+            _restartButton?.gameObject.SetActive(canRestart);
 
             // 설치 진행바 표시 (설치 중인 상태에서만)
             var showInstallProgress = state is OnboardingState.InstallingNodeJs
@@ -651,6 +661,17 @@ namespace OpenDesk.Presentation.UI.Onboarding
             {
                 if (panel != null) panel.SetActive(false);
             }
+        }
+
+        /// <summary>에디터 디버그 창에서 호출 — 플레이 모드 유지하면서 온보딩 처음부터 재시작</summary>
+        public void DebugRestart()
+        {
+            if (_onboarding == null)
+            {
+                Debug.LogError("[UI] _onboarding이 NULL — 재시작 불가");
+                return;
+            }
+            _onboarding.RestartAsync().Forget();
         }
     }
 }

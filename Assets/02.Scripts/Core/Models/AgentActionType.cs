@@ -22,6 +22,11 @@ namespace OpenDesk.Core.Models
         SubAgentCompleted,
         SubAgentFailed,
 
+        // AI 채팅 응답
+        ChatDelta,          // 스트리밍 부분 응답 (state: "delta")
+        ChatFinal,          // 최종 완성 응답 (state: "final")
+        AgentLifecycle,     // 에이전트 라이프사이클 이벤트 (event: "agent")
+
         // 연결
         Connected,
         Disconnected

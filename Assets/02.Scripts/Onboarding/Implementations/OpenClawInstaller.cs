@@ -222,6 +222,13 @@ namespace OpenDesk.Onboarding.Implementations
                 "powershell.exe",
                 "-NoProfile -ExecutionPolicy Bypass -Command \"iwr -useb https://openclaw.ai/install.ps1 | iex\"",
                 ct);
+
+            if (result.StdErr == "UAC_DENIED")
+            {
+                SetProgress(_progress.Value, "보안 확인 창에서 '예'를 눌러주세요.\n거부하면 설치를 진행할 수 없어요.");
+                Debug.LogWarning("[Installer] UAC 거부됨 — 사용자 안내 표시");
+            }
+
             return result.ExitCode == 0;
         }
 
@@ -267,6 +274,13 @@ namespace OpenDesk.Onboarding.Implementations
 
             // npm global install도 관리자 권한 필요
             var result = await _admin.RunElevatedAsync(cmd, "install -g openclaw", ct);
+
+            if (result.StdErr == "UAC_DENIED")
+            {
+                SetProgress(_progress.Value, "보안 확인 창에서 '예'를 눌러주세요.\n거부하면 설치를 진행할 수 없어요.");
+                Debug.LogWarning("[Installer] UAC 거부됨 (npm fallback)");
+            }
+
             return result.ExitCode == 0;
         }
 

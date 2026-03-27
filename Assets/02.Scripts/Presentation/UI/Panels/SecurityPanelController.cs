@@ -95,8 +95,8 @@ namespace OpenDesk.Presentation.UI.Panels
             // 상태 텍스트
             if (_statusText != null)
                 _statusText.text = report.IsClean
-                    ? "✓ 안전 — 취약점 없음"
-                    : $"⚠ {report.CriticalCount} 치명적, {report.WarnCount} 경고";
+                    ? "[OK] 안전 — 취약점 없음"
+                    : $"[!] {report.CriticalCount} 치명적, {report.WarnCount} 경고";
 
             // 자동 수정 버튼 표시
             var hasFixable = report.Items.Exists(i => i.CanAutoFix && !i.IsFixed && i.Severity != AuditSeverity.Pass);

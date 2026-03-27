@@ -188,10 +188,10 @@ namespace OpenDesk.Onboarding.Implementations
             var npmCmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "npm.cmd" : "npm";
             var ok = await RunCommandAsync(npmCmd, "uninstall -g openclaw", ct);
 
-            // 설정 폴더도 제거
+            // 설정 폴더도 제거 (~/.openclaw/)
             var configDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "openclaw");
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".openclaw");
             if (Directory.Exists(configDir))
             {
                 try
@@ -212,8 +212,14 @@ namespace OpenDesk.Onboarding.Implementations
         {
             var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "openclaw.cmd" : "openclaw";
 
-            // 데몬 중지 + 등록 해제
+            // Gateway 중지 (데몬 + 포그라운드 프로세스 모두)
+            await RunCommandAsync(cmd, "gateway stop", ct);
             await RunCommandAsync(cmd, "daemon stop", ct);
+
+            // 포그라운드 gateway run 프로세스가 남아있으면 킬
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                await RunCommandAsync("taskkill", "/F /IM node.exe /FI \"WINDOWTITLE eq openclaw*\"", ct);
+
             return await RunCommandAsync(cmd, "daemon uninstall", ct);
         }
 

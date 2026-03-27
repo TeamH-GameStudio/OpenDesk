@@ -1,6 +1,5 @@
 using OpenDesk.Core.Implementations;
 using OpenDesk.Core.Services;
-using OpenDesk.Presentation.UI.OfficeWizard;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -69,14 +68,6 @@ namespace OpenDesk.Core.Installers
 
             builder.Register<SecurityAuditService>(Lifetime.Singleton)
                    .As<ISecurityAuditService>();
-
-            // ── Office 환영 마법사 (씬에 있을 때만) ────────
-            var wizard = FindObjectOfType<OfficeWizardController>();
-            if (wizard != null)
-            {
-                builder.RegisterComponent(wizard);
-                Debug.Log("[CoreInstaller] OfficeWizardController 등록");
-            }
 
             // ── 앱 부트스트래퍼 ──────────────────────────
             builder.RegisterEntryPoint<AppBootstrapper>();
