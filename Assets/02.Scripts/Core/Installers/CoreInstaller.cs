@@ -30,6 +30,9 @@ namespace OpenDesk.Core.Installers
 #if GOOGLE_DRIVE_ENABLED
             builder.Register<GoogleDriveService>(Lifetime.Singleton)
                    .As<IGoogleDriveService>();
+#else
+            builder.Register<NullGoogleDriveService>(Lifetime.Singleton)
+                   .As<IGoogleDriveService>();
 #endif
 
             builder.Register<WorkspaceService>(Lifetime.Singleton)

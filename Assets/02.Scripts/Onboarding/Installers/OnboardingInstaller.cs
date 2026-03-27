@@ -14,12 +14,14 @@ namespace OpenDesk.Onboarding.Installers
     /// </summary>
     public class OnboardingInstaller : LifetimeScope
     {
+        [SerializeField] private OnboardingUIController _uiController;
+
         protected override void Configure(IContainerBuilder builder)
         {
             Debug.Log("[VContainer] OnboardingInstaller.Configure() 시작");
 
             // ── UI 컨트롤러 (씬 내 MonoBehaviour에 [Inject] 주입) ────
-            builder.RegisterComponentInHierarchy<OnboardingUIController>();
+            builder.RegisterComponent(_uiController);
             Debug.Log("[VContainer] OnboardingUIController 등록 완료");
 
             // ── M1: 환경 서비스 (Node.js / 관리자 권한 / WSL2) ──────────
@@ -32,6 +34,9 @@ namespace OpenDesk.Onboarding.Installers
 
             #if UNITY_STANDALONE_WIN
             builder.Register<Wsl2Service>(Lifetime.Singleton)
+                   .As<IWsl2Service>();
+            #else
+            builder.Register<NullWsl2Service>(Lifetime.Singleton)
                    .As<IWsl2Service>();
             #endif
 

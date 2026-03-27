@@ -26,6 +26,14 @@ namespace OpenDesk.Onboarding.Services
         UniTask ConfirmWorkspacePathAsync(string path, CancellationToken ct = default);
         UniTask EnterOfflineMode();
 
+        // Node.js 미설치 시 설치 방법 선택
+        /// <summary>NVM으로 설치 (권장, 관리자 권한 불필요)</summary>
+        UniTask HandleNodeInstall_Nvm(CancellationToken ct = default);
+        /// <summary>직접 설치 (pkg/msi, 관리자 권한 필요)</summary>
+        UniTask HandleNodeInstall_Direct(CancellationToken ct = default);
+        /// <summary>Node.js 설치 건너뛰기 (일부 기능 제한)</summary>
+        UniTask HandleNodeInstall_Skip(CancellationToken ct = default);
+
         // Node.js 버전 충돌 시 사용자 선택
         /// <summary>nvm으로 기존 버전과 공존하도록 안전 설치</summary>
         UniTask HandleNodeUpgrade_SafeInstall(CancellationToken ct = default);

@@ -17,6 +17,12 @@ namespace OpenDesk.Onboarding.Services
         /// <summary>Node.js가 PATH에 존재하는지 확인</summary>
         UniTask<bool> IsInstalledAsync(CancellationToken ct = default);
 
+        /// <summary>
+        /// 확인된 node 바이너리가 있는 디렉토리 반환 (예: ~/.nvm/.../bin)
+        /// npm 등 같은 bin 디렉토리의 도구를 찾을 때 사용
+        /// </summary>
+        string GetNodeBinDirectory();
+
         /// <summary>설치된 Node.js 버전 반환 (예: "24.1.0"), 미설치 시 null</summary>
         UniTask<string> GetVersionAsync(CancellationToken ct = default);
 

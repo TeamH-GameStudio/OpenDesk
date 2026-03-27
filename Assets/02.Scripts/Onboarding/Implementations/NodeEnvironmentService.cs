@@ -37,16 +37,110 @@ namespace OpenDesk.Onboarding.Implementations
             return version != null;
         }
 
+        // 한 번 찾으면 캐싱
+        private static string _resolvedNodePath;
+
+        /// <summary>
+        /// Unity 프로세스는 GUI 앱이므로 셸 PATH(NVM/fnm/volta 등)를 상속받지 못함.
+        /// 로그인 셸로 which 조회 → 일반적인 경로 직접 탐색 순으로 node 절대 경로를 찾음.
+        /// </summary>
+        public static string ResolveNodePath()
+        {
+            if (_resolvedNodePath != null) return _resolvedNodePath;
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                _resolvedNodePath = "node.exe";
+                return _resolvedNodePath;
+            }
+
+            // ── 1. 로그인 셸로 which node 실행 (NVM/fnm/volta 등 모두 커버) ──
+            foreach (var shell in new[] { "/bin/zsh", "/bin/bash" })
+            {
+                if (!File.Exists(shell)) continue;
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName               = shell,
+                        Arguments              = "-l -c \"which node 2>/dev/null\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError  = true,
+                        UseShellExecute        = false,
+                        CreateNoWindow         = true,
+                    };
+                    using var p = Process.Start(psi);
+                    if (p == null) continue;
+                    var path = p.StandardOutput.ReadToEnd().Trim();
+                    p.WaitForExit(5_000);
+                    if (p.ExitCode == 0 && !string.IsNullOrEmpty(path) && File.Exists(path))
+                    {
+                        _resolvedNodePath = path;
+                        return _resolvedNodePath;
+                    }
+                }
+                catch { /* 다음 방법으로 */ }
+            }
+
+            // ── 2. 공통 경로 직접 탐색 ────────────────────────────────────
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var candidates = new List<string>
+            {
+                "/usr/local/bin/node",
+                "/opt/homebrew/bin/node",       // Homebrew (Apple Silicon)
+                "/usr/bin/node",
+            };
+
+            // NVM
+            var nvmDir = Path.Combine(home, ".nvm", "versions", "node");
+            if (Directory.Exists(nvmDir))
+            {
+                foreach (var dir in Directory.GetDirectories(nvmDir))
+                    candidates.Add(Path.Combine(dir, "bin", "node"));
+            }
+
+            // fnm
+            var fnmDir = Path.Combine(home, ".fnm", "node-versions");
+            if (Directory.Exists(fnmDir))
+            {
+                foreach (var dir in Directory.GetDirectories(fnmDir))
+                    candidates.Add(Path.Combine(dir, "installation", "bin", "node"));
+            }
+
+            // volta
+            candidates.Add(Path.Combine(home, ".volta", "bin", "node"));
+
+            // asdf
+            var asdfDir = Path.Combine(home, ".asdf", "installs", "nodejs");
+            if (Directory.Exists(asdfDir))
+            {
+                foreach (var dir in Directory.GetDirectories(asdfDir))
+                    candidates.Add(Path.Combine(dir, "bin", "node"));
+            }
+
+            foreach (var c in candidates)
+            {
+                if (File.Exists(c))
+                {
+                    _resolvedNodePath = c;
+                    return _resolvedNodePath;
+                }
+            }
+
+            // ── 3. 최후 수단: 그냥 "node" (시스템 PATH 기대) ─────────────
+            _resolvedNodePath = "node";
+            return _resolvedNodePath;
+        }
+
         public async UniTask<string> GetVersionAsync(CancellationToken ct = default)
         {
             return await UniTask.RunOnThreadPool(() =>
             {
                 try
                 {
-                    var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
                     var psi = new ProcessStartInfo
                     {
-                        FileName               = cmd,
+                        FileName               = ResolveNodePath(),
                         Arguments              = "--version",
                         RedirectStandardOutput = true,
                         RedirectStandardError  = true,
@@ -365,8 +459,9 @@ namespace OpenDesk.Onboarding.Implementations
 
                 // nvm-windows 설치 여부 확인
                 var hasNvm = await RunCommandAsync(
-                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nvm.exe" : "nvm",
-                    "version", ct);
+                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nvm.exe" : ResolveShell(),
+                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "version" : "-l -c \"nvm --version 2>/dev/null\"",
+                    ct);
 
                 if (!hasNvm)
                 {
@@ -427,9 +522,19 @@ namespace OpenDesk.Onboarding.Implementations
 
                 // nvm으로 Node.js 24 설치
                 SetProgress(0.5f, $"Node.js {TargetVersion} 설치 중... (기존 버전은 유지돼요)");
-                var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nvm.exe" : "nvm";
+                bool installNode;
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    installNode = await RunCommandAsync("nvm.exe", $"install {TargetVersion}", ct);
+                    if (installNode) await RunCommandAsync("nvm.exe", $"use {TargetVersion}", ct);
+                }
+                else
+                {
+                    var shell = ResolveShell();
+                    installNode = await RunCommandAsync(shell,
+                        $"-l -c \"nvm install {TargetVersion} && nvm use {TargetVersion} && nvm alias default {TargetVersion}\"", ct);
+                }
 
-                var installNode = await RunCommandAsync(cmd, $"install {TargetVersion}", ct);
                 if (!installNode)
                 {
                     SetProgress(0f, "Node.js 설치에 실패했어요.");
@@ -438,7 +543,6 @@ namespace OpenDesk.Onboarding.Implementations
 
                 // 새 버전을 기본으로 설정
                 SetProgress(0.8f, "새 버전을 활성화하고 있어요...");
-                await RunCommandAsync(cmd, $"use {TargetVersion}", ct);
 
                 // 확인
                 SetProgress(0.9f, "설치 확인 중...");
@@ -462,6 +566,20 @@ namespace OpenDesk.Onboarding.Implementations
                 Debug.LogError($"[NodeEnv] nvm 설치 실패: {ex}");
                 return false;
             }
+        }
+
+        public string GetNodeBinDirectory()
+        {
+            var nodePath = ResolveNodePath();
+            if (nodePath == "node" || nodePath == "node.exe") return null;
+            return System.IO.Path.GetDirectoryName(nodePath);
+        }
+
+        private static string ResolveShell()
+        {
+            if (File.Exists("/bin/zsh"))  return "/bin/zsh";
+            if (File.Exists("/bin/bash")) return "/bin/bash";
+            return "/bin/sh";
         }
 
         private void SetProgress(float value, string text)

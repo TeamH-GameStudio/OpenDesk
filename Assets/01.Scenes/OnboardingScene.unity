@@ -152,6 +152,7 @@ MonoBehaviour:
     TypeName: OpenDesk.Core.Installers.CoreInstaller
   autoRun: 1
   autoInjectGameObjects: []
+  _uiController: {fileID: 2075699645}
 --- !u!4 &14799501
 Transform:
   m_ObjectHideFlags: 0
@@ -11005,6 +11006,10 @@ MonoBehaviour:
   _workspacePanel: {fileID: 1234618533}
   _completePanel: {fileID: 187530461}
   _errorPanel: {fileID: 1644883355}
+  _nodeInstallChoicePanel: {fileID: 0}
+  _nodeInstallNvmButton: {fileID: 0}
+  _nodeInstallDirectButton: {fileID: 0}
+  _nodeInstallSkipButton: {fileID: 0}
   _nodeUpgradePanel: {fileID: 1658048354}
   _nodeVersionText: {fileID: 1658048353}
   _nodeProjectListText: {fileID: 1658048352}

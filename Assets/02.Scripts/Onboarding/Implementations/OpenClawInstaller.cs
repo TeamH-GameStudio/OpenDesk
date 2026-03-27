@@ -166,37 +166,99 @@ namespace OpenDesk.Onboarding.Implementations
 
         // ── macOS / Linux: bash 스크립트 설치 ───────────────────────────
 
-        private async UniTask<bool> InstallViaScriptUnixAsync(CancellationToken ct)
+        private UniTask<bool> InstallViaScriptUnixAsync(CancellationToken ct)
         {
-            return await RunCommandAsync(
-                "bash",
-                "-c \"curl -fsSL https://openclaw.ai/install.sh | bash\"",
-                ct);
+            return RunShellAsync("curl -fsSL https://openclaw.ai/install.sh | bash", ct);
         }
 
         // ── npm fallback ────────────────────────────────────────────────
 
         private async UniTask<bool> InstallViaNpmAsync(CancellationToken ct)
         {
-            var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? "npm.cmd"
-                : "npm";
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                var ok = await RunCommandAsync("npm.cmd", "install -g openclaw", ct);
+                if (!ok) ok = await RunElevatedNpmAsync(ct);
+                return ok;
+            }
 
-            return await RunCommandAsync(cmd, "install -g openclaw", ct);
+            // node와 동일한 bin 디렉토리의 npm 우선 사용
+            // NVM node → 사용자 홈 디렉토리에 설치, 권한 문제 없음
+            var binDir = _nodeEnv.GetNodeBinDirectory();
+            if (!string.IsNullOrEmpty(binDir))
+            {
+                var npmPath = System.IO.Path.Combine(binDir, "npm");
+                if (System.IO.File.Exists(npmPath))
+                {
+                    var ok = await RunCommandAsync(npmPath, "install -g openclaw", ct);
+                    if (ok) return true;
+                    // EACCES면 시스템 npm → 권한 상승 시도
+                }
+            }
+
+            // 셸 npm으로 재시도, 실패 시 osascript로 권한 상승
+            var shellOk = await RunShellAsync("npm install -g openclaw", ct);
+            if (!shellOk)
+            {
+                Debug.Log("[Installer] npm 권한 오류 — 관리자 비밀번호 요청 (osascript)");
+                shellOk = await RunElevatedNpmAsync(ct);
+            }
+            return shellOk;
+        }
+
+        /// <summary>
+        /// macOS: osascript로 네이티브 비밀번호 창 표시 후 권한 상승 설치
+        /// Windows: AdminPrivilegeService UAC
+        /// </summary>
+        private UniTask<bool> RunElevatedNpmAsync(CancellationToken ct)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return UniTask.RunOnThreadPool(async () =>
+                {
+                    var result = await _admin.RunElevatedAsync("npm.cmd", "install -g openclaw", ct);
+                    return result.ExitCode == 0;
+                }, cancellationToken: ct);
+            }
+
+            // macOS/Linux: osascript가 네이티브 비밀번호 창을 띄움
+            var shell = System.IO.File.Exists("/bin/zsh") ? "/bin/zsh" : "/bin/bash";
+            var script = "do shell script \\\"npm install -g openclaw\\\" with administrator privileges";
+            return RunCommandAsync("osascript", $"-e '{script}'", ct);
         }
 
         // ── 데몬 등록 ───────────────────────────────────────────────────
 
-        private async UniTask<bool> RegisterDaemonAsync(CancellationToken ct)
+        private UniTask<bool> RegisterDaemonAsync(CancellationToken ct)
         {
-            var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? "openclaw.cmd"
-                : "openclaw";
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return RunCommandAsync("openclaw.cmd", "onboard --install-daemon", ct);
 
-            return await RunCommandAsync(cmd, "onboard --install-daemon", ct);
+            // npm -g로 설치된 바이너리는 node bin 디렉토리에 위치
+            var binDir = _nodeEnv.GetNodeBinDirectory();
+            if (!string.IsNullOrEmpty(binDir))
+            {
+                var clawPath = System.IO.Path.Combine(binDir, "openclaw");
+                if (System.IO.File.Exists(clawPath))
+                    return RunCommandAsync(clawPath, "onboard --install-daemon", ct);
+            }
+
+            return RunShellAsync("openclaw onboard --install-daemon", ct);
         }
 
         // ── 프로세스 실행 유틸리티 ───────────────────────────────────────
+
+        /// <summary>
+        /// macOS/Linux: 로그인 셸(-l)로 명령 실행 → NVM/Homebrew 등 PATH 정상 상속
+        /// </summary>
+        private UniTask<bool> RunShellAsync(string shellCommand, CancellationToken ct)
+        {
+            var shell = System.IO.File.Exists("/bin/zsh")  ? "/bin/zsh"
+                      : System.IO.File.Exists("/bin/bash") ? "/bin/bash"
+                      : "/bin/sh";
+
+            return RunCommandAsync(shell, $"-l -c \"{shellCommand.Replace("\"", "\\\"")}\"", ct);
+        }
 
         private UniTask<bool> RunCommandAsync(string cmd, string args, CancellationToken ct)
         {

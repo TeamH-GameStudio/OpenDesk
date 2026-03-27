@@ -20,6 +20,8 @@ namespace OpenDesk.Editor
             "Init",
             "CheckingFirstRun",
             "ScanningEnvironment",
+            "NodeInstallChoice",
+            "NodeUpgradeChoice",
             "InstallingNodeJs",
             "NodeJsFailed",
             "CheckingWsl2",
@@ -141,23 +143,25 @@ namespace OpenDesk.Editor
                 // 주요 상태 빠른 버튼
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("환경스캔")) ForceTransition(2);
-                if (GUILayout.Button("Node설치")) ForceTransition(3);
-                if (GUILayout.Button("Node실패")) ForceTransition(4);
-                if (GUILayout.Button("WSL2설치")) ForceTransition(6);
+                if (GUILayout.Button("Node선택")) ForceTransition(3);
+                if (GUILayout.Button("Node충돌")) ForceTransition(4);
+                if (GUILayout.Button("Node설치")) ForceTransition(5);
+                if (GUILayout.Button("Node실패")) ForceTransition(6);
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("재시작필요")) ForceTransition(7);
-                if (GUILayout.Button("AI설치중")) ForceTransition(10);
-                if (GUILayout.Button("설치실패")) ForceTransition(11);
-                if (GUILayout.Button("연결중")) ForceTransition(12);
+                if (GUILayout.Button("WSL2설치")) ForceTransition(8);
+                if (GUILayout.Button("재시작필요")) ForceTransition(9);
+                if (GUILayout.Button("AI설치중")) ForceTransition(12);
+                if (GUILayout.Button("설치실패")) ForceTransition(13);
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("연결실패")) ForceTransition(13);
-                if (GUILayout.Button("폴더선택")) ForceTransition(17);
-                if (GUILayout.Button("완료!")) ForceTransition(18);
-                if (GUILayout.Button("에러")) ForceTransition(20);
+                if (GUILayout.Button("연결중")) ForceTransition(14);
+                if (GUILayout.Button("연결실패")) ForceTransition(15);
+                if (GUILayout.Button("폴더선택")) ForceTransition(19);
+                if (GUILayout.Button("완료!")) ForceTransition(20);
+                if (GUILayout.Button("에러")) ForceTransition(22);
                 EditorGUILayout.EndHorizontal();
             }
 
@@ -370,17 +374,38 @@ namespace OpenDesk.Editor
         {
             Debug.Log("=== 외부 환경 상태 확인 ===");
 
-            // Node.js
+            // Node.js (GUI 앱은 셸 PATH 미상속 → 로그인 셸로 탐색)
             try
             {
-                var psi = new System.Diagnostics.ProcessStartInfo
+                var shell = System.IO.File.Exists("/bin/zsh") ? "/bin/zsh"
+                          : System.IO.File.Exists("/bin/bash") ? "/bin/bash" : null;
+
+                string ver = null;
+                if (shell != null)
                 {
-                    FileName = "node", Arguments = "--version",
-                    RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true,
-                };
-                using var p = System.Diagnostics.Process.Start(psi);
-                var ver = p?.StandardOutput.ReadToEnd().Trim();
-                p?.WaitForExit(5000);
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = shell, Arguments = "-l -c \"node --version 2>/dev/null\"",
+                        RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true,
+                    };
+                    using var p = System.Diagnostics.Process.Start(psi);
+                    ver = p?.StandardOutput.ReadToEnd().Trim();
+                    p?.WaitForExit(5000);
+                }
+
+                // 셸 탐색 실패 시 직접 실행 시도
+                if (string.IsNullOrEmpty(ver))
+                {
+                    var psi2 = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "node", Arguments = "--version",
+                        RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true,
+                    };
+                    using var p2 = System.Diagnostics.Process.Start(psi2);
+                    ver = p2?.StandardOutput.ReadToEnd().Trim();
+                    p2?.WaitForExit(5000);
+                }
+
                 Debug.Log($"  Node.js: {(string.IsNullOrEmpty(ver) ? "미설치" : ver)}");
             }
             catch { Debug.Log("  Node.js: 미설치"); }

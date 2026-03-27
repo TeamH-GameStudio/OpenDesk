@@ -182,18 +182,35 @@ namespace OpenDesk.Onboarding.Implementations
             TransitionTo(OnboardingState.ScanningEnvironment);
             await UniTask.Delay(1500, cancellationToken: ct);
 
+            // Node.js 미설치 시나리오 시뮬레이션 — 설치 방법 선택 대기
+            TransitionTo(OnboardingState.NodeInstallChoice);
+            await UniTask.WaitUntil(() =>
+                CurrentState != OnboardingState.NodeInstallChoice || Context.NodeInstallSkipped,
+                cancellationToken: ct);
+
+            // 건너뛰기가 아닌 경우 설치 시뮬레이션
+            if (!Context.NodeInstallSkipped)
+            {
+                if (CurrentState == OnboardingState.NodeInstallChoice)
+                    TransitionTo(OnboardingState.InstallingNodeJs);
+                await UniTask.Delay(2000, cancellationToken: ct);
+            }
+
             // Node.js 버전 충돌 시뮬레이션 — 버튼 클릭까지 대기
             Context.ExistingNodeVersion = "20.14.0";
             Context.NodeProjectPaths.Add("C:\\Users\\user\\Documents\\MyWebApp");
             Context.NodeProjectPaths.Add("C:\\Users\\user\\Documents\\GitHub\\ProjectX");
             TransitionTo(OnboardingState.NodeUpgradeChoice);
-            // 사용자가 3개 버튼 중 하나를 누를 때까지 여기서 멈춤
-            await UniTask.WaitUntil(() => CurrentState != OnboardingState.NodeUpgradeChoice, cancellationToken: ct);
+            // NodeUpgradeSkipped도 체크: Skip 핸들러는 상태를 바꾸지 않고 플래그만 설정
+            await UniTask.WaitUntil(() =>
+                CurrentState != OnboardingState.NodeUpgradeChoice || Context.NodeUpgradeSkipped,
+                cancellationToken: ct);
 
             // 건너뛰기가 아닌 경우 설치 시뮬레이션
             if (!Context.NodeUpgradeSkipped)
             {
-                TransitionTo(OnboardingState.InstallingNodeJs);
+                if (CurrentState == OnboardingState.NodeUpgradeChoice)
+                    TransitionTo(OnboardingState.InstallingNodeJs);
                 await UniTask.Delay(2000, cancellationToken: ct);
             }
 
@@ -240,23 +257,9 @@ namespace OpenDesk.Onboarding.Implementations
 
             if (!hasNode)
             {
-                TransitionTo(OnboardingState.InstallingNodeJs);
-                var nodeInstalled = await _nodeEnv.InstallAsync(ct);
-                if (!nodeInstalled)
-                {
-                    Context.LastErrorMessage = "Node.js 설치에 실패했습니다.";
-                    TransitionTo(OnboardingState.NodeJsFailed);
-                    return false;
-                }
-                _rollback.RecordInstall(new InstalledItem
-                {
-                    Id = "nodejs", DisplayName = "Node.js (신규 설치)",
-                    PreviousState = "미설치",
-                    InstalledState = await _nodeEnv.GetVersionAsync(ct) ?? "24.1.0",
-                    Method = "msi",
-                    CanRollback = true,
-                    RollbackDescription = "Node.js를 컴퓨터에서 완전히 제거합니다.",
-                });
+                // Node.js 없음 → 설치 방법 선택 UI로 전환 (자동 설치 X)
+                TransitionTo(OnboardingState.NodeInstallChoice);
+                return false; // UI에서 사용자 선택 대기
             }
             else
             {
@@ -361,6 +364,11 @@ namespace OpenDesk.Onboarding.Implementations
                 case OnboardingState.OpenClawNotFound:
                 case OnboardingState.InstallFailed:
                     await RunInstallStepAsync(ct);
+                    if (Context.IsOpenClawInstalled)
+                    {
+                        var gw = await RunGatewayStepAsync(ct);
+                        if (gw.IsSuccess) await RunParseAgentsStepAsync(ct);
+                    }
                     break;
 
                 case OnboardingState.GatewayFailed:
@@ -402,8 +410,6 @@ namespace OpenDesk.Onboarding.Implementations
                 CanRollback = true,
                 RollbackDescription = "OpenClaw 백그라운드 서비스를 중지하고 등록을 해제합니다.",
             });
-
-            await RunGatewayStepAsync(ct);
         }
 
         // ── Step 3: Gateway 연결 ────────────────────────────────────────
@@ -537,6 +543,89 @@ namespace OpenDesk.Onboarding.Implementations
 
             CompleteOnboarding();
             return UniTask.CompletedTask;
+        }
+
+        // ── Node.js 신규 설치 — 사용자 선택 처리 ──────────────────────
+
+        public async UniTask HandleNodeInstall_Nvm(CancellationToken ct = default)
+        {
+            Debug.Log("[Onboarding] 사용자 선택: NVM으로 Node.js 설치");
+            TransitionTo(OnboardingState.InstallingNodeJs);
+
+            if (IsMockMode)
+            {
+                await UniTask.Delay(2000, cancellationToken: ct);
+                await ContinueAfterNodeResolvedAsync(ct);
+                return;
+            }
+
+            var success = await _nodeEnv.InstallViaNvmAsync(ct);
+            if (!success)
+            {
+                Context.LastErrorMessage = "NVM 설치에 실패했습니다. 인터넷 연결을 확인해주세요.";
+                TransitionTo(OnboardingState.NodeJsFailed);
+                return;
+            }
+
+            _rollback.RecordInstall(new InstalledItem
+            {
+                Id = "nvm", DisplayName = "nvm (버전 관리 도구)",
+                PreviousState = "미설치", InstalledState = "설치됨", Method = "nvm-install",
+                CanRollback = true, RollbackDescription = "nvm 및 설치된 Node.js 버전을 제거합니다.",
+            });
+            _rollback.RecordInstall(new InstalledItem
+            {
+                Id = "nodejs", DisplayName = "Node.js (nvm 설치)",
+                PreviousState = "미설치",
+                InstalledState = await _nodeEnv.GetVersionAsync(ct) ?? "24.1.0",
+                Method = "nvm", CanRollback = true,
+                RollbackDescription = "Node.js를 제거합니다.",
+            });
+
+            await ContinueAfterNodeResolvedAsync(ct);
+        }
+
+        public async UniTask HandleNodeInstall_Direct(CancellationToken ct = default)
+        {
+            Debug.Log("[Onboarding] 사용자 선택: 직접 설치 (pkg/msi)");
+            TransitionTo(OnboardingState.InstallingNodeJs);
+
+            if (IsMockMode)
+            {
+                await UniTask.Delay(2000, cancellationToken: ct);
+                await ContinueAfterNodeResolvedAsync(ct);
+                return;
+            }
+
+            var success = await _nodeEnv.InstallAsync(ct);
+            if (!success)
+            {
+                Context.LastErrorMessage = "Node.js 설치에 실패했습니다. 관리자 권한이 필요합니다.";
+                TransitionTo(OnboardingState.NodeJsFailed);
+                return;
+            }
+
+            _rollback.RecordInstall(new InstalledItem
+            {
+                Id = "nodejs", DisplayName = "Node.js (직접 설치)",
+                PreviousState = "미설치",
+                InstalledState = await _nodeEnv.GetVersionAsync(ct) ?? "24.1.0",
+                Method = "pkg", CanRollback = true,
+                RollbackDescription = "Node.js를 컴퓨터에서 완전히 제거합니다.",
+            });
+
+            await ContinueAfterNodeResolvedAsync(ct);
+        }
+
+        public UniTask HandleNodeInstall_Skip(CancellationToken ct = default)
+        {
+            Debug.Log("[Onboarding] 사용자 선택: Node.js 설치 건너뛰기");
+            Context.NodeInstallSkipped = true;
+
+            if (IsMockMode)
+                return UniTask.CompletedTask; // Mock에서는 WaitUntil이 플래그 감지하여 다음으로 진행
+
+            return ContinueAfterNodeResolvedAsync(ct);
         }
 
         // ── Node.js 버전 충돌 — 사용자 선택 처리 ──────────────────────

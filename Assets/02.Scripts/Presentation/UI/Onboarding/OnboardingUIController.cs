@@ -42,6 +42,13 @@ namespace OpenDesk.Presentation.UI.Onboarding
         [SerializeField] private GameObject _completePanel;
         [SerializeField] private GameObject _errorPanel;
 
+        // ── Node.js 신규 설치 선택 패널 ──────────────────────────────
+        [Header("Node.js 신규 설치 선택")]
+        [SerializeField] private GameObject _nodeInstallChoicePanel;
+        [SerializeField] private Button     _nodeInstallNvmButton;
+        [SerializeField] private Button     _nodeInstallDirectButton;
+        [SerializeField] private Button     _nodeInstallSkipButton;
+
         // ── Node.js 버전 충돌 패널 ────────────────────────────────────
         [Header("Node.js 버전 충돌")]
         [SerializeField] private GameObject _nodeUpgradePanel;
@@ -107,8 +114,9 @@ namespace OpenDesk.Presentation.UI.Onboarding
 
             _allPanels = new[]
             {
-                _scanningPanel, _nodeUpgradePanel, _installingNodePanel, _wsl2Panel,
-                _detectingPanel, _installingClawPanel, _gatewayPanel,
+                _scanningPanel, _nodeInstallChoicePanel, _nodeUpgradePanel,
+                _installingNodePanel, _wsl2Panel, _detectingPanel,
+                _installingClawPanel, _gatewayPanel,
                 _agentsPanel, _workspacePanel, _completePanel, _errorPanel
             };
 
@@ -143,6 +151,14 @@ namespace OpenDesk.Presentation.UI.Onboarding
 
             _offlineButton?.onClick.AddListener(() =>
                 _onboarding.EnterOfflineMode().Forget());
+
+            // Node.js 신규 설치 선택 버튼
+            _nodeInstallNvmButton?.onClick.AddListener(() =>
+                _onboarding.HandleNodeInstall_Nvm().Forget());
+            _nodeInstallDirectButton?.onClick.AddListener(() =>
+                _onboarding.HandleNodeInstall_Direct().Forget());
+            _nodeInstallSkipButton?.onClick.AddListener(() =>
+                _onboarding.HandleNodeInstall_Skip().Forget());
 
             // Node.js 버전 충돌 선택 버튼
             _nodeSafeInstallButton?.onClick.AddListener(() =>
@@ -319,6 +335,17 @@ namespace OpenDesk.Presentation.UI.Onboarding
                     EstimatedTime = "약 10초",
                     WhyNeeded     = "",
                     Panel         = _scanningPanel,
+                },
+
+                OnboardingState.NodeInstallChoice => new StateInfo
+                {
+                    Progress      = 0.15f,
+                    Title         = "필수 도구 설치 방법 선택",
+                    StepCount     = "Step 1 / 5",
+                    Description   = "AI 비서 실행에 필요한 Node.js가 없어요.\n아래에서 설치 방법을 선택해주세요.",
+                    EstimatedTime = "",
+                    WhyNeeded     = "Node.js는 AI 프로그램을 실행시키는 기반 도구예요.\n\n'NVM으로 설치(권장)'는 관리자 비밀번호 없이 설치되고\n다른 프로그램에 영향을 주지 않아요.\n\n'직접 설치'는 관리자 비밀번호가 필요하지만\n시스템 전체에서 사용할 수 있어요.",
+                    Panel         = _nodeInstallChoicePanel,
                 },
 
                 OnboardingState.NodeUpgradeChoice => new StateInfo

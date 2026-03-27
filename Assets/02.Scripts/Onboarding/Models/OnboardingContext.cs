@@ -31,6 +31,9 @@ namespace OpenDesk.Onboarding.Models
         public List<string> NodeProjectPaths     { get; set; } = new();
         public bool   NodeUpgradeSkipped         { get; set; }
 
+        // Node.js 신규 설치 선택
+        public bool   NodeInstallSkipped         { get; set; }
+
         // 에러
         public string LastErrorMessage    { get; set; } = "";
     }
