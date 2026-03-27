@@ -9,6 +9,8 @@ namespace OpenDesk.Core.Models
         public string          TaskName    { get; }
         public string          SubAgentId  { get; }
         public string          RawPayload  { get; }
+        public string          Message     { get; }   // AI 텍스트 응답 내용
+        public string          RunId       { get; }   // 스트리밍 그룹 식별자
         public DateTime        Timestamp   { get; }
 
         public AgentEvent(
@@ -17,6 +19,8 @@ namespace OpenDesk.Core.Models
             string taskName    = "",
             string subAgentId  = "",
             string rawPayload  = "",
+            string message     = "",
+            string runId       = "",
             DateTime? timestamp = null)
         {
             ActionType = actionType;
@@ -24,6 +28,8 @@ namespace OpenDesk.Core.Models
             TaskName   = taskName   ?? "";
             SubAgentId = subAgentId ?? "";
             RawPayload = rawPayload ?? "";
+            Message    = message    ?? "";
+            RunId      = runId      ?? "";
             Timestamp  = timestamp  ?? DateTime.UtcNow;
         }
 

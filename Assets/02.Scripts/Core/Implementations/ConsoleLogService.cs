@@ -80,20 +80,20 @@ namespace OpenDesk.Core.Implementations
 
             return e.ActionType switch
             {
-                AgentActionType.Connected       => (LogLevel.Info,        "연결",   $"✓ {session} 에이전트 연결됨"),
-                AgentActionType.Disconnected    => (LogLevel.Warning,     "연결",   $"✗ {session} 에이전트 연결 끊김"),
+                AgentActionType.Connected       => (LogLevel.Info,        "연결",   $"[OK] {session} 에이전트 연결됨"),
+                AgentActionType.Disconnected    => (LogLevel.Warning,     "연결",   $"[X] {session} 에이전트 연결 끊김"),
                 AgentActionType.TaskStarted     => (LogLevel.AgentAction, "작업",   $"▶ {session} 작업 시작{task}"),
-                AgentActionType.TaskCompleted   => (LogLevel.Info,        "작업",   $"✓ {session} 작업 완료{task}"),
-                AgentActionType.TaskFailed      => (LogLevel.Error,       "작업",   $"✗ {session} 작업 실패{task}"),
+                AgentActionType.TaskCompleted   => (LogLevel.Info,        "작업",   $"[OK] {session} 작업 완료{task}"),
+                AgentActionType.TaskFailed      => (LogLevel.Error,       "작업",   $"[X] {session} 작업 실패{task}"),
                 AgentActionType.Thinking        => (LogLevel.AgentAction, "사고",   $"💭 {session} 사고 중..."),
-                AgentActionType.Planning        => (LogLevel.AgentAction, "계획",   $"📋 {session} 계획 수립 중{task}"),
+                AgentActionType.Planning        => (LogLevel.AgentAction, "계획",   $" {session} 계획 수립 중{task}"),
                 AgentActionType.Executing       => (LogLevel.AgentAction, "실행",   $"⚙ {session} 실행 중{task}"),
                 AgentActionType.Reviewing       => (LogLevel.AgentAction, "검토",   $"🔍 {session} 결과 검토 중"),
                 AgentActionType.ToolUsing       => (LogLevel.AgentAction, "도구",   $"🔧 {session} 도구 호출{task}"),
                 AgentActionType.ToolResult      => (LogLevel.Info,        "도구",   $"📎 {session} 도구 결과 수신"),
                 AgentActionType.SubAgentSpawned => (LogLevel.Info,        "위임",   $"👥 {session} → 서브에이전트 생성 ({e.SubAgentId})"),
-                AgentActionType.SubAgentCompleted => (LogLevel.Info,      "위임",   $"✓ 서브에이전트 {e.SubAgentId} 완료"),
-                AgentActionType.SubAgentFailed  => (LogLevel.Error,       "위임",   $"✗ 서브에이전트 {e.SubAgentId} 실패"),
+                AgentActionType.SubAgentCompleted => (LogLevel.Info,      "위임",   $"[OK] 서브에이전트 {e.SubAgentId} 완료"),
+                AgentActionType.SubAgentFailed  => (LogLevel.Error,       "위임",   $"[X] 서브에이전트 {e.SubAgentId} 실패"),
                 _                               => (LogLevel.Info,        "기타",   $"{session}: {e.ActionType}"),
             };
         }
