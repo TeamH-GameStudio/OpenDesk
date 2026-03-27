@@ -8,22 +8,23 @@ using R3;
 namespace OpenDesk.Core.Implementations
 {
     /// <summary>
-    /// Google Drive 미사용 시 등록되는 Null Object
-    /// GOOGLE_DRIVE_ENABLED 심볼이 없을 때 CoreInstaller가 이 구현을 주입
+    /// Google Drive 비활성 시 사용되는 더미 구현
+    /// GOOGLE_DRIVE_ENABLED 심볼 없을 때 VContainer 의존성 해소용
     /// </summary>
     public class NullGoogleDriveService : IGoogleDriveService
     {
-        public bool IsAuthenticated => false;
-        public ReadOnlyReactiveProperty<bool> AuthState { get; } =
-            new ReactiveProperty<bool>(false).ToReadOnlyReactiveProperty();
+        private readonly ReactiveProperty<bool> _authState = new(false);
 
-        public UniTask<bool> AuthenticateAsync(CancellationToken ct = default) =>
-            UniTask.FromResult(false);
+        public bool IsAuthenticated => false;
+        public ReadOnlyReactiveProperty<bool> AuthState => _authState;
+
+        public UniTask<bool> AuthenticateAsync(CancellationToken ct = default)
+            => UniTask.FromResult(false);
 
         public void RevokeAuth() { }
 
         public UniTask<IReadOnlyList<WorkspaceEntry>> ListFilesAsync(
-            string folderId, CancellationToken ct = default) =>
-            UniTask.FromResult<IReadOnlyList<WorkspaceEntry>>(System.Array.Empty<WorkspaceEntry>());
+            string folderId, CancellationToken ct = default)
+            => UniTask.FromResult<IReadOnlyList<WorkspaceEntry>>(new List<WorkspaceEntry>());
     }
 }

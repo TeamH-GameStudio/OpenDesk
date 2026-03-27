@@ -21,25 +21,27 @@ namespace OpenDesk.Onboarding.Tests
 
         private class MockDetector : IOpenClawDetector
         {
-            public bool Installed = true;
-            public string InstallPath = "/mock/path/openclaw.yaml";
-            public string Version = "1.0.0";
-            public bool GatewayListening = true;
+            public bool   Installed    = true;
+            public string InstallPath  = "/mock/path/openclaw.yaml";
+            public string Version      = "1.0.0";
+            public bool   GatewayListening = true;
 
-            public UniTask<bool> IsInstalledAsync(System.Threading.CancellationToken ct)
+            public UniTask<bool>   IsInstalledAsync(System.Threading.CancellationToken ct)
                 => UniTask.FromResult(Installed);
             public UniTask<string> GetInstallPathAsync(System.Threading.CancellationToken ct)
                 => UniTask.FromResult(InstallPath);
             public UniTask<string> GetVersionAsync(System.Threading.CancellationToken ct)
                 => UniTask.FromResult(Version);
-            public UniTask<bool> IsGatewayListeningAsync(int port, System.Threading.CancellationToken ct)
+            public UniTask<bool>   IsGatewayListeningAsync(int port, System.Threading.CancellationToken ct)
                 => UniTask.FromResult(GatewayListening);
+            public UniTask<string> GetGatewayTokenAsync(System.Threading.CancellationToken ct)
+                => UniTask.FromResult("mock-token");
         }
 
         private class MockInstaller : IOpenClawInstaller
         {
             public bool ShouldSucceed = true;
-            public ReadOnlyReactiveProperty<float> Progress { get; }
+            public ReadOnlyReactiveProperty<float>  Progress   { get; }
                 = new ReactiveProperty<float>(0f);
             public ReadOnlyReactiveProperty<string> StatusText { get; }
                 = new ReactiveProperty<string>("");
@@ -59,18 +61,18 @@ namespace OpenDesk.Onboarding.Tests
 
         private class MockSettings : IOnboardingSettings
         {
-            public bool IsFirstRun { get; set; } = true;
-            public string SavedGatewayUrl { get; set; } = "ws://localhost:18789/events";
-            public string SavedLocalPath { get; set; } = "";
-            public int AppVersion { get; set; } = 0;
+            public bool   IsFirstRun       { get; set; } = true;
+            public string SavedGatewayUrl  { get; set; } = "ws://127.0.0.1:18789";
+            public string SavedLocalPath   { get; set; } = "";
+            public int    AppVersion       { get; set; } = 0;
             public string CompletedGateway { get; private set; }
-            public string CompletedPath { get; private set; }
+            public string CompletedPath    { get; private set; }
 
             public void MarkOnboardingComplete(string url, string path)
             {
-                IsFirstRun = false;
+                IsFirstRun       = false;
                 CompletedGateway = url;
-                CompletedPath = path;
+                CompletedPath    = path;
             }
             public void ClearAll() { IsFirstRun = true; }
         }
@@ -78,7 +80,7 @@ namespace OpenDesk.Onboarding.Tests
         private class MockBridge : IOpenClawBridgeService
         {
             public bool ShouldConnect = true;
-            public bool IsConnected { get; private set; }
+            public bool IsConnected   { get; private set; }
             public ReadOnlyReactiveProperty<bool> ConnectionState { get; }
                 = new ReactiveProperty<bool>(false);
             public Observable<AgentEvent> OnEventReceived { get; }
@@ -90,6 +92,7 @@ namespace OpenDesk.Onboarding.Tests
                 IsConnected = true;
                 await UniTask.CompletedTask;
             }
+            public void SetGatewayToken(string token) { }
             public UniTask DisconnectAsync() { IsConnected = false; return UniTask.CompletedTask; }
             public UniTask SendMessageAsync(string s, string m, System.Threading.CancellationToken ct)
                 => UniTask.CompletedTask;
@@ -98,8 +101,8 @@ namespace OpenDesk.Onboarding.Tests
 
         private class MockWorkspace : IWorkspaceService
         {
-            public string LocalPath { get; private set; } = "";
-            public bool IsInitialized => !string.IsNullOrEmpty(LocalPath);
+            public string LocalPath     { get; private set; } = "";
+            public bool   IsInitialized => !string.IsNullOrEmpty(LocalPath);
             public Observable<WorkspaceEntry> OnEntryChanged { get; }
                 = new Subject<WorkspaceEntry>();
 
@@ -115,28 +118,21 @@ namespace OpenDesk.Onboarding.Tests
 
         private class MockNodeEnv : INodeEnvironmentService
         {
-            public bool Installed = true;
-            public string Version = "24.1.0";
-            public bool MeetsMin = true;
-            public bool InstallOk = true;
+            public bool   Installed  = true;
+            public string Version    = "24.1.0";
+            public bool   MeetsMin   = true;
+            public bool   InstallOk  = true;
 
-            public ReadOnlyReactiveProperty<float> Progress { get; } = new ReactiveProperty<float>(0f);
+            public ReadOnlyReactiveProperty<float>  Progress   { get; } = new ReactiveProperty<float>(0f);
             public ReadOnlyReactiveProperty<string> StatusText { get; } = new ReactiveProperty<string>("");
 
-            public UniTask<bool> IsInstalledAsync(System.Threading.CancellationToken ct) => UniTask.FromResult(Installed);
-            public UniTask<string> GetVersionAsync(System.Threading.CancellationToken ct) => UniTask.FromResult(Version);
-            public UniTask<bool> MeetsMinVersionAsync(string v, System.Threading.CancellationToken ct) => UniTask.FromResult(MeetsMin);
-            public UniTask<bool> InstallAsync(System.Threading.CancellationToken ct) => UniTask.FromResult(InstallOk);
+            public UniTask<bool>   IsInstalledAsync(System.Threading.CancellationToken ct)   => UniTask.FromResult(Installed);
+            public UniTask<string> GetVersionAsync(System.Threading.CancellationToken ct)    => UniTask.FromResult(Version);
+            public UniTask<bool>   MeetsMinVersionAsync(string v, System.Threading.CancellationToken ct) => UniTask.FromResult(MeetsMin);
+            public UniTask<bool>   InstallAsync(System.Threading.CancellationToken ct)       => UniTask.FromResult(InstallOk);
             public UniTask<System.Collections.Generic.IReadOnlyList<string>> ScanExistingProjectsAsync(System.Threading.CancellationToken ct)
                 => UniTask.FromResult<System.Collections.Generic.IReadOnlyList<string>>(new List<string>());
-            public UniTask<bool> InstallViaNvmAsync(System.Threading.CancellationToken ct) => UniTask.FromResult(InstallOk);
-
-            public string GetNodeBinDirectory()
-            {
-                var nodePath = NodeEnvironmentService.ResolveNodePath();
-                if (nodePath == "node" || nodePath == "node.exe") return null;
-                return System.IO.Path.GetDirectoryName(nodePath);
-            }
+            public UniTask<bool> InstallViaNvmAsync(System.Threading.CancellationToken ct)   => UniTask.FromResult(InstallOk);
         }
 
         private class MockAdmin : IAdminPrivilegeService
@@ -162,25 +158,25 @@ namespace OpenDesk.Onboarding.Tests
         // ── 테스트 ───────────────────────────────────────────────────────────
 
         private OnboardingService CreateService(
-            MockDetector detector = null,
+            MockDetector  detector  = null,
             MockInstaller installer = null,
-            MockParser parser = null,
-            MockSettings settings = null,
-            MockBridge bridge = null,
+            MockParser    parser    = null,
+            MockSettings  settings  = null,
+            MockBridge    bridge    = null,
             MockWorkspace workspace = null,
-            MockNodeEnv nodeEnv = null,
-            MockAdmin admin = null)
+            MockNodeEnv   nodeEnv   = null,
+            MockAdmin     admin     = null)
         {
             return new OnboardingService(
-                detector ?? new MockDetector(),
+                detector  ?? new MockDetector(),
                 installer ?? new MockInstaller(),
-                parser ?? new MockParser(),
-                settings ?? new MockSettings(),
-                bridge ?? new MockBridge(),
+                parser    ?? new MockParser(),
+                settings  ?? new MockSettings(),
+                bridge    ?? new MockBridge(),
                 workspace ?? new MockWorkspace(),
-                nodeEnv ?? new MockNodeEnv(),
-                admin ?? new MockAdmin(),
-                rollback: new MockRollback(),
+                nodeEnv   ?? new MockNodeEnv(),
+                admin     ?? new MockAdmin(),
+                rollback  : new MockRollback(),
                 wsl2: null  // 테스트에서는 WSL2 미사용
             );
         }
@@ -209,9 +205,9 @@ namespace OpenDesk.Onboarding.Tests
         [Test]
         public async Task Start_OpenClaw미설치_자동설치성공_WorkspaceSetup()
         {
-            var detector = new MockDetector { Installed = false };
+            var detector  = new MockDetector  { Installed = false };
             var installer = new MockInstaller { ShouldSucceed = true };
-            var svc = CreateService(detector: detector, installer: installer);
+            var svc       = CreateService(detector: detector, installer: installer);
 
             await svc.StartAsync();
 
@@ -222,9 +218,9 @@ namespace OpenDesk.Onboarding.Tests
         [Test]
         public async Task Start_OpenClaw미설치_자동설치실패_InstallFailed()
         {
-            var detector = new MockDetector { Installed = false };
+            var detector  = new MockDetector  { Installed = false };
             var installer = new MockInstaller { ShouldSucceed = false };
-            var svc = CreateService(detector: detector, installer: installer);
+            var svc       = CreateService(detector: detector, installer: installer);
 
             await svc.StartAsync();
 
@@ -234,9 +230,9 @@ namespace OpenDesk.Onboarding.Tests
         [Test]
         public async Task Retry_InstallFailed에서_재시도성공_WorkspaceSetup으로이동()
         {
-            var detector = new MockDetector { Installed = false };
+            var detector  = new MockDetector  { Installed = false };
             var installer = new MockInstaller { ShouldSucceed = false };
-            var svc = CreateService(detector: detector, installer: installer);
+            var svc       = CreateService(detector: detector, installer: installer);
 
             await svc.StartAsync();
             Assert.AreEqual(OnboardingState.InstallFailed, svc.CurrentState);
@@ -253,7 +249,7 @@ namespace OpenDesk.Onboarding.Tests
         public async Task GatewayFail_오프라인모드진입_Completed()
         {
             var bridge = new MockBridge { ShouldConnect = false };
-            var svc = CreateService(bridge: bridge);
+            var svc    = CreateService(bridge: bridge);
 
             await svc.StartAsync();
             Assert.AreEqual(OnboardingState.GatewayFailed, svc.CurrentState);
@@ -281,7 +277,7 @@ namespace OpenDesk.Onboarding.Tests
         public async Task NoAgents_기본Main에이전트추가됨()
         {
             var parser = new MockParser { Agents = new List<AgentConfig>() };
-            var svc = CreateService(parser: parser);
+            var svc    = CreateService(parser: parser);
 
             await svc.StartAsync();
 
@@ -293,7 +289,7 @@ namespace OpenDesk.Onboarding.Tests
         public async Task MarkComplete_설정저장됨()
         {
             var settings = new MockSettings();
-            var svc = CreateService(settings: settings);
+            var svc      = CreateService(settings: settings);
 
             await svc.StartAsync();
             await svc.SkipWorkspaceSetupAsync();
@@ -305,55 +301,50 @@ namespace OpenDesk.Onboarding.Tests
         // ── M1: 환경 스캔 테스트 ─────────────────────────────────────────
 
         [Test]
-        public async Task Start_NodeJs미설치_NodeInstallChoice상태()
+        public async Task Start_NodeJs미설치_설치성공_계속진행()
         {
-            var nodeEnv = new MockNodeEnv { Installed = false };
+            var nodeEnv = new MockNodeEnv { Installed = false, InstallOk = true };
             var svc = CreateService(nodeEnv: nodeEnv);
 
             await svc.StartAsync();
 
-            // Node.js 미설치 → 사용자 설치 방법 선택 대기
-            Assert.AreEqual(OnboardingState.NodeInstallChoice, svc.CurrentState);
+            // Node.js 설치 후 OpenClaw 감지까지 진행
+            Assert.AreNotEqual(OnboardingState.NodeJsFailed, svc.CurrentState);
         }
 
         [Test]
-        public async Task Start_NodeJs버전낮음_NodeUpgradeChoice상태()
+        public async Task Start_NodeJs미설치_설치실패_NodeJsFailed()
         {
-            var nodeEnv = new MockNodeEnv { Installed = true, MeetsMin = false, Version = "16.0.0" };
+            var nodeEnv = new MockNodeEnv { Installed = false, InstallOk = false };
             var svc = CreateService(nodeEnv: nodeEnv);
 
             await svc.StartAsync();
 
-            // 버전 부족 → 사용자 업그레이드 방법 선택 대기
-            Assert.AreEqual(OnboardingState.NodeUpgradeChoice, svc.CurrentState);
+            Assert.AreEqual(OnboardingState.NodeJsFailed, svc.CurrentState);
         }
 
         [Test]
-        public async Task NodeInstallChoice에서_Skip후_OpenClaw감지진행()
+        public async Task Start_NodeJs버전낮음_자동업그레이드실패_NodeJsFailed()
         {
-            var nodeEnv = new MockNodeEnv { Installed = false };
+            // 버전 부족 + 자동 업그레이드도 실패하는 경우
+            var nodeEnv = new MockNodeEnv { Installed = true, MeetsMin = false, InstallOk = false, Version = "16.0.0" };
             var svc = CreateService(nodeEnv: nodeEnv);
 
             await svc.StartAsync();
-            Assert.AreEqual(OnboardingState.NodeInstallChoice, svc.CurrentState);
 
-            // 건너뛰기 → OpenClaw 감지 → Gateway → 에이전트 → WorkspaceSetup
-            await svc.HandleNodeInstall_Skip();
-            Assert.AreEqual(OnboardingState.WorkspaceSetup, svc.CurrentState);
+            Assert.AreEqual(OnboardingState.NodeJsFailed, svc.CurrentState);
         }
 
         [Test]
-        public async Task NodeUpgradeChoice에서_Skip후_OpenClaw감지진행()
+        public async Task Start_NodeJs버전낮음_자동업그레이드성공_계속진행()
         {
-            var nodeEnv = new MockNodeEnv { Installed = true, MeetsMin = false, Version = "16.0.0" };
+            // 버전 부족하지만 자동 업그레이드 성공
+            var nodeEnv = new MockNodeEnv { Installed = true, MeetsMin = false, InstallOk = true, Version = "16.0.0" };
             var svc = CreateService(nodeEnv: nodeEnv);
 
             await svc.StartAsync();
-            Assert.AreEqual(OnboardingState.NodeUpgradeChoice, svc.CurrentState);
 
-            // 건너뛰기 → OpenClaw 감지 → Gateway → 에이전트 → WorkspaceSetup
-            await svc.HandleNodeUpgrade_Skip();
-            Assert.AreEqual(OnboardingState.WorkspaceSetup, svc.CurrentState);
+            Assert.AreNotEqual(OnboardingState.NodeJsFailed, svc.CurrentState);
         }
 
         [Test]

@@ -14,7 +14,7 @@ namespace OpenDesk.Onboarding.Models
         public string OpenClawConfigPath  { get; set; } = "";
 
         // Gateway
-        public string GatewayUrl          { get; set; } = "ws://localhost:18789/events";
+        public string GatewayUrl          { get; set; } = "ws://127.0.0.1:18789";
         public bool   IsGatewayConnected  { get; set; }
         public int    GatewayRetryCount   { get; set; }
 

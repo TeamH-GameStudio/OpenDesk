@@ -112,6 +112,29 @@ namespace OpenDesk.Onboarding.Implementations
                     return false;
                 }
 
+                // ── Step 3.5: 설치 검증 ─────────────────────────────────
+
+                SetProgress(0.55f, "설치 확인 중...");
+                await UniTask.Delay(1000, cancellationToken: ct);
+
+                var verifyCmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? "openclaw.cmd" : "openclaw";
+                var verified = await RunCommandAsync(verifyCmd, "--version", ct);
+                if (!verified)
+                {
+                    Debug.LogWarning("[Installer] openclaw --version 실패 — PATH 갱신 대기 후 재시도");
+                    await UniTask.Delay(3000, cancellationToken: ct);
+                    verified = await RunCommandAsync(verifyCmd, "--version", ct);
+                }
+
+                if (!verified)
+                {
+                    SetProgress(0f, "OpenClaw 설치는 완료됐으나 실행 확인에 실패했습니다.");
+                    return false;
+                }
+
+                Debug.Log("[Installer] OpenClaw 설치 검증 완료");
+
                 // ── Step 4: 데몬 등록 ────────────────────────────────────
 
                 SetProgress(0.7f, "AI 에이전트 데몬 등록 중...");
@@ -119,13 +142,49 @@ namespace OpenDesk.Onboarding.Implementations
                 if (!daemonSuccess)
                 {
                     Debug.LogWarning("[Installer] 데몬 등록 실패 — 수동 시작 필요할 수 있음");
-                    // 데몬 등록 실패는 치명적이지 않음 — 계속 진행
                 }
 
-                // ── Step 5: Gateway 시작 대기 ────────────────────────────
+                // ── Step 5: Gateway 시작 + 포트 검증 ──────────────────────
 
-                SetProgress(0.85f, "Gateway 시작 대기 중...");
-                await UniTask.Delay(2000, cancellationToken: ct);
+                SetProgress(0.85f, "AI 비서 서비스 시작 중...");
+
+                var gwCmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? "openclaw.cmd" : "openclaw";
+
+                // 먼저 start(데몬) 시도, 실패하면 run(포그라운드)으로 백그라운드 실행
+                RunBackgroundProcessAsync(gwCmd, "gateway start");
+                await UniTask.Delay(3000, cancellationToken: ct);
+
+                // 포트 확인 → 안 떠있으면 run으로 재시도
+                bool earlyCheck = CheckPort18789();
+                if (!earlyCheck)
+                {
+                    Debug.Log("[Installer] gateway start 응답 없음 — gateway run으로 재시도");
+                    RunBackgroundProcessAsync(gwCmd, "gateway run --allow-unconfigured");
+                    await UniTask.Delay(5000, cancellationToken: ct);
+                }
+
+                // Gateway 포트 열림 확인 (최대 3회)
+                bool gatewayReady = false;
+                for (int i = 0; i < 3; i++)
+                {
+                    try
+                    {
+                        using var tcp = new System.Net.Sockets.TcpClient();
+                        var connectTask = tcp.ConnectAsync("127.0.0.1", 18789);
+                        connectTask.Wait(1000);
+                        if (tcp.Connected)
+                        {
+                            gatewayReady = true;
+                            break;
+                        }
+                    }
+                    catch { /* 재시도 */ }
+                    await UniTask.Delay(2000, cancellationToken: ct);
+                }
+
+                if (!gatewayReady)
+                    Debug.LogWarning("[Installer] Gateway 포트(18789) 응답 없음 — 연결 단계에서 재시도 예정");
 
                 // ── Step 6: 관리자 권한 강등 ─────────────────────────────
 
@@ -158,107 +217,119 @@ namespace OpenDesk.Onboarding.Implementations
 
         private async UniTask<bool> InstallViaScriptWindowsAsync(CancellationToken ct)
         {
-            return await RunCommandAsync(
+            // 관리자 권한으로 PowerShell 스크립트 실행 (UAC 팝업)
+            var result = await _admin.RunElevatedAsync(
                 "powershell.exe",
                 "-NoProfile -ExecutionPolicy Bypass -Command \"iwr -useb https://openclaw.ai/install.ps1 | iex\"",
                 ct);
+            return result.ExitCode == 0;
         }
 
         // ── macOS / Linux: bash 스크립트 설치 ───────────────────────────
 
-        private UniTask<bool> InstallViaScriptUnixAsync(CancellationToken ct)
+        private async UniTask<bool> InstallViaScriptUnixAsync(CancellationToken ct)
         {
-            return RunShellAsync("curl -fsSL https://openclaw.ai/install.sh | bash", ct);
+            var result = await _admin.RunElevatedAsync(
+                "bash",
+                "-c \"curl -fsSL https://openclaw.ai/install.sh | bash\"",
+                ct);
+            return result.ExitCode == 0;
         }
 
         // ── npm fallback ────────────────────────────────────────────────
 
         private async UniTask<bool> InstallViaNpmAsync(CancellationToken ct)
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                var ok = await RunCommandAsync("npm.cmd", "install -g openclaw", ct);
-                if (!ok) ok = await RunElevatedNpmAsync(ct);
-                return ok;
-            }
+            var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? "npm.cmd"
+                : "npm";
 
-            // node와 동일한 bin 디렉토리의 npm 우선 사용
-            // NVM node → 사용자 홈 디렉토리에 설치, 권한 문제 없음
-            var binDir = _nodeEnv.GetNodeBinDirectory();
-            if (!string.IsNullOrEmpty(binDir))
-            {
-                var npmPath = System.IO.Path.Combine(binDir, "npm");
-                if (System.IO.File.Exists(npmPath))
-                {
-                    var ok = await RunCommandAsync(npmPath, "install -g openclaw", ct);
-                    if (ok) return true;
-                    // EACCES면 시스템 npm → 권한 상승 시도
-                }
-            }
-
-            // 셸 npm으로 재시도, 실패 시 osascript로 권한 상승
-            var shellOk = await RunShellAsync("npm install -g openclaw", ct);
-            if (!shellOk)
-            {
-                Debug.Log("[Installer] npm 권한 오류 — 관리자 비밀번호 요청 (osascript)");
-                shellOk = await RunElevatedNpmAsync(ct);
-            }
-            return shellOk;
+            // npm global install도 관리자 권한 필요
+            var result = await _admin.RunElevatedAsync(cmd, "install -g openclaw", ct);
+            return result.ExitCode == 0;
         }
 
-        /// <summary>
-        /// macOS: osascript로 네이티브 비밀번호 창 표시 후 권한 상승 설치
-        /// Windows: AdminPrivilegeService UAC
-        /// </summary>
-        private UniTask<bool> RunElevatedNpmAsync(CancellationToken ct)
+        // ── 설정 생성 + Gateway 시작 ──────────────────────────────────────
+
+        private async UniTask<bool> RegisterDaemonAsync(CancellationToken ct)
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            var cmd = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? "openclaw.cmd"
+                : "openclaw";
+
+            // 1단계: 설정 파일이 없을 때만 생성
+            var configPath = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".openclaw", "openclaw.json");
+
+            if (!System.IO.File.Exists(configPath))
             {
-                return UniTask.RunOnThreadPool(async () =>
-                {
-                    var result = await _admin.RunElevatedAsync("npm.cmd", "install -g openclaw", ct);
-                    return result.ExitCode == 0;
-                }, cancellationToken: ct);
+                Debug.Log("[Installer] 설정 파일 없음 — 생성 중");
+                var configOk = await RunCommandAsync(cmd,
+                    "onboard --non-interactive --accept-risk --skip-channels --skip-skills --skip-search --skip-health --auth-choice skip --flow quickstart",
+                    ct);
+                if (!configOk)
+                    Debug.LogWarning("[Installer] 설정 파일 생성 실패");
+            }
+            else
+            {
+                Debug.Log($"[Installer] 설정 파일 이미 존재: {configPath}");
             }
 
-            // macOS/Linux: osascript가 네이티브 비밀번호 창을 띄움
-            var shell = System.IO.File.Exists("/bin/zsh") ? "/bin/zsh" : "/bin/bash";
-            var script = "do shell script \\\"npm install -g openclaw\\\" with administrator privileges";
-            return RunCommandAsync("osascript", $"-e '{script}'", ct);
+            // 2단계: 데몬 서비스 등록 시도 (관리자 권한 — 실패해도 OK)
+            Debug.Log("[Installer] 데몬 서비스 등록 시도 (UAC)...");
+            var daemonResult = await _admin.RunElevatedAsync(cmd,
+                "onboard --non-interactive --accept-risk --install-daemon --skip-channels --skip-skills --skip-search --skip-health --auth-choice skip --flow quickstart",
+                ct);
+
+            if (daemonResult.ExitCode != 0)
+            {
+                Debug.LogWarning("[Installer] 데몬 서비스 등록 실패 — Gateway 직접 시작으로 전환");
+            }
+
+            return true;  // 설정 파일 있으면 Gateway 직접 시작 가능
         }
 
-        // ── 데몬 등록 ───────────────────────────────────────────────────
+        // ── 포트 확인 유틸 ────────────────────────────────────────────────
 
-        private UniTask<bool> RegisterDaemonAsync(CancellationToken ct)
+        private static bool CheckPort18789()
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return RunCommandAsync("openclaw.cmd", "onboard --install-daemon", ct);
-
-            // npm -g로 설치된 바이너리는 node bin 디렉토리에 위치
-            var binDir = _nodeEnv.GetNodeBinDirectory();
-            if (!string.IsNullOrEmpty(binDir))
+            try
             {
-                var clawPath = System.IO.Path.Combine(binDir, "openclaw");
-                if (System.IO.File.Exists(clawPath))
-                    return RunCommandAsync(clawPath, "onboard --install-daemon", ct);
+                using var tcp = new System.Net.Sockets.TcpClient();
+                var task = tcp.ConnectAsync("127.0.0.1", 18789);
+                task.Wait(1000);
+                return tcp.Connected;
             }
+            catch { return false; }
+        }
 
-            return RunShellAsync("openclaw onboard --install-daemon", ct);
+        // ── 백그라운드 프로세스 (Gateway 등 데몬 시작용) ─────────────────
+
+        private static void RunBackgroundProcessAsync(string cmd, string args)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName        = cmd,
+                    Arguments       = args,
+                    UseShellExecute = false,
+                    CreateNoWindow  = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                };
+                var process = Process.Start(psi);
+                Debug.Log($"[Installer] 백그라운드 시작: {cmd} {args} (PID: {process?.Id})");
+                // 프로세스를 닫지 않음 — 백그라운드에서 계속 실행
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Installer] 백그라운드 시작 실패: {cmd} {args} — {ex.Message}");
+            }
         }
 
         // ── 프로세스 실행 유틸리티 ───────────────────────────────────────
-
-        /// <summary>
-        /// macOS/Linux: 로그인 셸(-l)로 명령 실행 → NVM/Homebrew 등 PATH 정상 상속
-        /// </summary>
-        private UniTask<bool> RunShellAsync(string shellCommand, CancellationToken ct)
-        {
-            var shell = System.IO.File.Exists("/bin/zsh")  ? "/bin/zsh"
-                      : System.IO.File.Exists("/bin/bash") ? "/bin/bash"
-                      : "/bin/sh";
-
-            return RunCommandAsync(shell, $"-l -c \"{shellCommand.Replace("\"", "\\\"")}\"", ct);
-        }
 
         private UniTask<bool> RunCommandAsync(string cmd, string args, CancellationToken ct)
         {

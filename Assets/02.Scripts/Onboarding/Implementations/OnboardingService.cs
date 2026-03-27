@@ -129,12 +129,9 @@ namespace OpenDesk.Onboarding.Implementations
             Context.GatewayUrl        = _settings.SavedGatewayUrl;
             Context.LocalWorkspacePath = _settings.SavedLocalPath;
 
-            var connected = await TryConnectGatewayAsync(ct);
-            if (!connected)
-            {
-                await RunGatewayStepAsync(ct);
-                return;
-            }
+            // Gateway 연결 (토큰 자동 읽기 + 자동 시작 포함)
+            var result = await RunGatewayStepAsync(ct);
+            if (!result.IsSuccess) return;
 
             if (!string.IsNullOrEmpty(Context.LocalWorkspacePath))
                 _workspace.SetLocalPath(Context.LocalWorkspacePath);
@@ -161,13 +158,8 @@ namespace OpenDesk.Onboarding.Implementations
             var detectResult = await RunDetectStepAsync(ct);
             if (!detectResult.IsSuccess) return;
 
-            // Step 2: Gateway 연결
-            var gatewayResult = await RunGatewayStepAsync(ct);
-            if (!gatewayResult.IsSuccess) return;
-
-            // Step 3: 에이전트 파싱
-            await RunParseAgentsStepAsync(ct);
-            // Step 4: WorkspaceSetup은 유저 액션 대기 (UI에서 트리거)
+            // Step 2: Gateway 연결 → 성공 시 내부에서 에이전트 파싱 + 워크스페이스까지 진행
+            await RunGatewayStepAsync(ct);
         }
 
         // ── Mock 온보딩 (에디터 테스트용) ──────────────────────────────
@@ -182,35 +174,18 @@ namespace OpenDesk.Onboarding.Implementations
             TransitionTo(OnboardingState.ScanningEnvironment);
             await UniTask.Delay(1500, cancellationToken: ct);
 
-            // Node.js 미설치 시나리오 시뮬레이션 — 설치 방법 선택 대기
-            TransitionTo(OnboardingState.NodeInstallChoice);
-            await UniTask.WaitUntil(() =>
-                CurrentState != OnboardingState.NodeInstallChoice || Context.NodeInstallSkipped,
-                cancellationToken: ct);
-
-            // 건너뛰기가 아닌 경우 설치 시뮬레이션
-            if (!Context.NodeInstallSkipped)
-            {
-                if (CurrentState == OnboardingState.NodeInstallChoice)
-                    TransitionTo(OnboardingState.InstallingNodeJs);
-                await UniTask.Delay(2000, cancellationToken: ct);
-            }
-
             // Node.js 버전 충돌 시뮬레이션 — 버튼 클릭까지 대기
             Context.ExistingNodeVersion = "20.14.0";
             Context.NodeProjectPaths.Add("C:\\Users\\user\\Documents\\MyWebApp");
             Context.NodeProjectPaths.Add("C:\\Users\\user\\Documents\\GitHub\\ProjectX");
             TransitionTo(OnboardingState.NodeUpgradeChoice);
-            // NodeUpgradeSkipped도 체크: Skip 핸들러는 상태를 바꾸지 않고 플래그만 설정
-            await UniTask.WaitUntil(() =>
-                CurrentState != OnboardingState.NodeUpgradeChoice || Context.NodeUpgradeSkipped,
-                cancellationToken: ct);
+            // 사용자가 3개 버튼 중 하나를 누를 때까지 여기서 멈춤
+            await UniTask.WaitUntil(() => CurrentState != OnboardingState.NodeUpgradeChoice, cancellationToken: ct);
 
             // 건너뛰기가 아닌 경우 설치 시뮬레이션
             if (!Context.NodeUpgradeSkipped)
             {
-                if (CurrentState == OnboardingState.NodeUpgradeChoice)
-                    TransitionTo(OnboardingState.InstallingNodeJs);
+                TransitionTo(OnboardingState.InstallingNodeJs);
                 await UniTask.Delay(2000, cancellationToken: ct);
             }
 
@@ -257,9 +232,27 @@ namespace OpenDesk.Onboarding.Implementations
 
             if (!hasNode)
             {
-                // Node.js 없음 → 설치 방법 선택 UI로 전환 (자동 설치 X)
-                TransitionTo(OnboardingState.NodeInstallChoice);
-                return false; // UI에서 사용자 선택 대기
+                TransitionTo(OnboardingState.InstallingNodeJs);
+                var nodeInstalled = await _nodeEnv.InstallAsync(ct);
+                if (!nodeInstalled)
+                {
+                    Context.LastErrorMessage =
+                        "필수 도구 설치에 실패했어요.\n\n" +
+                        "• 인터넷 연결을 확인해주세요.\n" +
+                        "• Windows 보안 확인 창에서 '예'를 눌러주세요.\n" +
+                        "• 백신 프로그램이 설치를 차단했을 수 있어요.";
+                    TransitionTo(OnboardingState.NodeJsFailed);
+                    return false;
+                }
+                _rollback.RecordInstall(new InstalledItem
+                {
+                    Id = "nodejs", DisplayName = "Node.js (신규 설치)",
+                    PreviousState = "미설치",
+                    InstalledState = await _nodeEnv.GetVersionAsync(ct) ?? "24.1.0",
+                    Method = "msi",
+                    CanRollback = true,
+                    RollbackDescription = "Node.js를 컴퓨터에서 완전히 제거합니다.",
+                });
             }
             else
             {
@@ -344,7 +337,10 @@ namespace OpenDesk.Onboarding.Implementations
                 return StepResult.Success(OnboardingState.ConnectingGateway);
 
             return StepResult.Fail(OnboardingState.InstallFailed,
-                "AI 비서 설치에 실패했습니다.");
+                "AI 비서 설치에 실패했어요.\n\n" +
+                "• 인터넷 연결을 확인해주세요.\n" +
+                "• Windows 보안 확인 창에서 '예'를 눌러주세요.\n" +
+                "• '다시 시도' 버튼을 눌러보세요.");
         }
 
         // ── Step 2: OpenClaw 설치 (UI 트리거) ───────────────────────────
@@ -364,11 +360,6 @@ namespace OpenDesk.Onboarding.Implementations
                 case OnboardingState.OpenClawNotFound:
                 case OnboardingState.InstallFailed:
                     await RunInstallStepAsync(ct);
-                    if (Context.IsOpenClawInstalled)
-                    {
-                        var gw = await RunGatewayStepAsync(ct);
-                        if (gw.IsSuccess) await RunParseAgentsStepAsync(ct);
-                    }
                     break;
 
                 case OnboardingState.GatewayFailed:
@@ -410,45 +401,118 @@ namespace OpenDesk.Onboarding.Implementations
                 CanRollback = true,
                 RollbackDescription = "OpenClaw 백그라운드 서비스를 중지하고 등록을 해제합니다.",
             });
+
+            await RunGatewayStepAsync(ct);
         }
 
         // ── Step 3: Gateway 연결 ────────────────────────────────────────
 
+        private const int MaxGatewayConnectRetry = 5;
+
         private async UniTask<StepResult> RunGatewayStepAsync(CancellationToken ct)
         {
-            TransitionTo(OnboardingState.ConnectingGateway);
-            Context.GatewayRetryCount = 0;
+            // ── Step 1: 기존 연결 정리 ─────────────────────────
+            try { await _bridge.DisconnectAsync(); }
+            catch { /* 무시 */ }
 
-            while (Context.GatewayRetryCount < MaxGatewayRetry)
+            // ── Step 2: Gateway 토큰 읽기 (연결 전 필수!) ──────
+            var token = await _detector.GetGatewayTokenAsync(ct);
+            if (!string.IsNullOrEmpty(token))
             {
-                var connected = await TryConnectGatewayAsync(ct);
-                if (connected)
+                _bridge.SetGatewayToken(token);
+                PlayerPrefs.SetString("OpenDesk_GatewayToken", token);
+                PlayerPrefs.Save();
+                Debug.Log($"[Onboarding] Gateway 토큰 설정 완료 ({token.Length}자)");
+            }
+
+            // ── Step 3: Gateway 프로세스 확인 + 자동 시작 ──────
+            TransitionTo(OnboardingState.ConnectingGateway);
+
+            var portOpen = await _detector.IsGatewayListeningAsync(18789, ct);
+            if (!portOpen)
+            {
+                Debug.Log("[Onboarding] Gateway 포트 닫힘 — 자동 시작 시도");
+
+                // gateway run을 백그라운드로 시작
+                await UniTask.RunOnThreadPool(() =>
                 {
-                    await RunParseAgentsStepAsync(ct);
-                    return StepResult.Success(OnboardingState.ParsingAgents);
+                    try
+                    {
+                        var cmd = System.Runtime.InteropServices.RuntimeInformation
+                            .IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
+                            ? "openclaw.cmd" : "openclaw";
+                        var psi = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = cmd,
+                            Arguments = "gateway run --allow-unconfigured",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                        };
+                        System.Diagnostics.Process.Start(psi);
+                        Debug.Log("[Onboarding] Gateway 프로세스 시작됨");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"[Onboarding] Gateway 시작 실패: {ex.Message}");
+                    }
+                }, cancellationToken: ct);
+
+                // Gateway 뜰 때까지 최대 15초 대기
+                for (int i = 0; i < 15; i++)
+                {
+                    await UniTask.Delay(1000, cancellationToken: ct);
+                    if (await _detector.IsGatewayListeningAsync(18789, ct))
+                    {
+                        Debug.Log($"[Onboarding] Gateway 포트 열림 ({i + 1}초 후)");
+                        break;
+                    }
+                }
+            }
+
+            // ── Step 4: WebSocket 연결 (최대 5회) ──────────────
+            for (int attempt = 1; attempt <= MaxGatewayConnectRetry; attempt++)
+            {
+                Debug.Log($"[Onboarding] Gateway 연결 시도 {attempt}/{MaxGatewayConnectRetry}");
+
+                try
+                {
+                    await _bridge.ConnectAsync(Context.GatewayUrl, ct);
+
+                    // 연결 후 3초 대기 — 인증 실패로 끊기는지 확인
+                    await UniTask.Delay(3000, cancellationToken: ct);
+
+                    if (_bridge.IsConnected)
+                    {
+                        Debug.Log("[Onboarding] Gateway 연결 성공 + 유지 확인!");
+                        Context.IsGatewayConnected = true;
+                        await RunParseAgentsStepAsync(ct);
+                        return StepResult.Success(OnboardingState.ParsingAgents);
+                    }
+
+                    Debug.LogWarning($"[Onboarding] 연결 후 끊김 (시도 {attempt})");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[Onboarding] 연결 실패 (시도 {attempt}): {ex.Message}");
                 }
 
-                Context.GatewayRetryCount++;
-                await UniTask.Delay(1000, cancellationToken: ct);
+                // 기존 연결 정리 후 재시도
+                try { await _bridge.DisconnectAsync(); }
+                catch { /* 무시 */ }
+
+                if (attempt < MaxGatewayConnectRetry)
+                    await UniTask.Delay(2000, cancellationToken: ct);
             }
 
-            Context.LastErrorMessage = $"Gateway 연결 실패 ({Context.GatewayUrl})";
+            Context.LastErrorMessage =
+                "AI 비서와의 연결에 실패했어요.\n\n" +
+                "• AI 비서 서비스가 아직 시작되지 않았을 수 있어요.\n" +
+                "• 잠시 후 '다시 시도'를 눌러보세요.\n" +
+                "• 계속 실패하면 '인터넷 없이 시작하기'를 선택하세요.";
             TransitionTo(OnboardingState.GatewayFailed);
             return StepResult.Fail(OnboardingState.GatewayFailed, Context.LastErrorMessage);
-        }
-
-        private async UniTask<bool> TryConnectGatewayAsync(CancellationToken ct)
-        {
-            try
-            {
-                await _bridge.ConnectAsync(Context.GatewayUrl, ct);
-                Context.IsGatewayConnected = _bridge.IsConnected;
-                return _bridge.IsConnected;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         // ── Gateway 수동 URL 입력 (UI 액션) ─────────────────────────────
@@ -545,134 +609,18 @@ namespace OpenDesk.Onboarding.Implementations
             return UniTask.CompletedTask;
         }
 
-        // ── Node.js 신규 설치 — 사용자 선택 처리 ──────────────────────
-
-        public async UniTask HandleNodeInstall_Nvm(CancellationToken ct = default)
-        {
-            Debug.Log("[Onboarding] 사용자 선택: NVM으로 Node.js 설치");
-            TransitionTo(OnboardingState.InstallingNodeJs);
-
-            if (IsMockMode)
-            {
-                await UniTask.Delay(2000, cancellationToken: ct);
-                await ContinueAfterNodeResolvedAsync(ct);
-                return;
-            }
-
-            var success = await _nodeEnv.InstallViaNvmAsync(ct);
-            if (!success)
-            {
-                Context.LastErrorMessage = "NVM 설치에 실패했습니다. 인터넷 연결을 확인해주세요.";
-                TransitionTo(OnboardingState.NodeJsFailed);
-                return;
-            }
-
-            _rollback.RecordInstall(new InstalledItem
-            {
-                Id = "nvm", DisplayName = "nvm (버전 관리 도구)",
-                PreviousState = "미설치", InstalledState = "설치됨", Method = "nvm-install",
-                CanRollback = true, RollbackDescription = "nvm 및 설치된 Node.js 버전을 제거합니다.",
-            });
-            _rollback.RecordInstall(new InstalledItem
-            {
-                Id = "nodejs", DisplayName = "Node.js (nvm 설치)",
-                PreviousState = "미설치",
-                InstalledState = await _nodeEnv.GetVersionAsync(ct) ?? "24.1.0",
-                Method = "nvm", CanRollback = true,
-                RollbackDescription = "Node.js를 제거합니다.",
-            });
-
-            await ContinueAfterNodeResolvedAsync(ct);
-        }
-
-        public async UniTask HandleNodeInstall_Direct(CancellationToken ct = default)
-        {
-            Debug.Log("[Onboarding] 사용자 선택: 직접 설치 (pkg/msi)");
-            TransitionTo(OnboardingState.InstallingNodeJs);
-
-            if (IsMockMode)
-            {
-                await UniTask.Delay(2000, cancellationToken: ct);
-                await ContinueAfterNodeResolvedAsync(ct);
-                return;
-            }
-
-            var success = await _nodeEnv.InstallAsync(ct);
-            if (!success)
-            {
-                Context.LastErrorMessage = "Node.js 설치에 실패했습니다. 관리자 권한이 필요합니다.";
-                TransitionTo(OnboardingState.NodeJsFailed);
-                return;
-            }
-
-            _rollback.RecordInstall(new InstalledItem
-            {
-                Id = "nodejs", DisplayName = "Node.js (직접 설치)",
-                PreviousState = "미설치",
-                InstalledState = await _nodeEnv.GetVersionAsync(ct) ?? "24.1.0",
-                Method = "pkg", CanRollback = true,
-                RollbackDescription = "Node.js를 컴퓨터에서 완전히 제거합니다.",
-            });
-
-            await ContinueAfterNodeResolvedAsync(ct);
-        }
-
-        public UniTask HandleNodeInstall_Skip(CancellationToken ct = default)
-        {
-            Debug.Log("[Onboarding] 사용자 선택: Node.js 설치 건너뛰기");
-            Context.NodeInstallSkipped = true;
-
-            if (IsMockMode)
-                return UniTask.CompletedTask; // Mock에서는 WaitUntil이 플래그 감지하여 다음으로 진행
-
-            return ContinueAfterNodeResolvedAsync(ct);
-        }
-
         // ── Node.js 버전 충돌 — 사용자 선택 처리 ──────────────────────
 
+        /// <summary>"업그레이드" 선택 — MSI 덮어쓰기 (안전 설치도 동일 경로)</summary>
         public async UniTask HandleNodeUpgrade_SafeInstall(CancellationToken ct = default)
         {
-            Debug.Log("[Onboarding] 사용자 선택: 안전 설치 (nvm)");
-            TransitionTo(OnboardingState.InstallingNodeJs);
-
-            if (IsMockMode)
-            {
-                Debug.Log("[Onboarding] ★ Mock — 실제 설치 건너뜀");
-                await UniTask.Delay(2000, cancellationToken: ct);
-                return;
-            }
-
-            var success = await _nodeEnv.InstallViaNvmAsync(ct);
-            if (!success)
-            {
-                Context.LastErrorMessage = "안전 설치에 실패했습니다. 인터넷 연결을 확인해주세요.";
-                TransitionTo(OnboardingState.NodeJsFailed);
-                return;
-            }
-
-            _rollback.RecordInstall(new InstalledItem
-            {
-                Id = "nvm", DisplayName = "nvm (버전 관리 도구)",
-                PreviousState = "미설치", InstalledState = "설치됨", Method = "installer",
-                CanRollback = true,
-                RollbackDescription = "nvm 버전 관리 도구를 제거합니다.",
-            });
-            _rollback.RecordInstall(new InstalledItem
-            {
-                Id = "nodejs_nvm", DisplayName = "Node.js (nvm 안전 설치)",
-                PreviousState = Context.ExistingNodeVersion,
-                InstalledState = await _nodeEnv.GetVersionAsync(ct) ?? "24.1.0",
-                Method = "nvm",
-                CanRollback = true,
-                RollbackDescription = "새로 설치한 Node.js 버전을 제거하고 이전 버전으로 돌아갑니다.",
-            });
-
-            await ContinueAfterNodeResolvedAsync(ct);
+            // nvm은 불안정하므로 MSI 업그레이드로 통일
+            await HandleNodeUpgrade_Overwrite(ct);
         }
 
         public async UniTask HandleNodeUpgrade_Overwrite(CancellationToken ct = default)
         {
-            Debug.Log("[Onboarding] 사용자 선택: 기존 버전 업그레이드");
+            Debug.Log("[Onboarding] Node.js 업그레이드 시작 (MSI)");
             TransitionTo(OnboardingState.InstallingNodeJs);
 
             if (IsMockMode)
@@ -686,7 +634,11 @@ namespace OpenDesk.Onboarding.Implementations
             var success = await _nodeEnv.InstallAsync(ct);
             if (!success)
             {
-                Context.LastErrorMessage = "업그레이드에 실패했습니다. 인터넷 연결을 확인해주세요.";
+                Context.LastErrorMessage =
+                    "업그레이드에 실패했습니다.\n\n" +
+                    "• 인터넷 연결을 확인해주세요.\n" +
+                    "• 백신 프로그램이 설치를 차단했을 수 있어요.\n" +
+                    "• Windows 보안 확인 창에서 '예'를 눌러주세요.";
                 TransitionTo(OnboardingState.NodeJsFailed);
                 return;
             }

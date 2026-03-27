@@ -31,6 +31,8 @@ namespace OpenDesk.Core.Implementations
         private const int HeartbeatIntervalMs  = 55_000; // 55초 (캐시 TTL 1시간 대응)
 
         private string _lastGatewayUrl;
+        private string _lastToken;
+        private string _pendingToken;
         private bool   _intentionalDisconnect;
 
         // 연결 끊김 시 메시지 버퍼 (재연결 후 전송)
@@ -46,6 +48,12 @@ namespace OpenDesk.Core.Implementations
             _parser = parser;
         }
 
+        public void SetGatewayToken(string token)
+        {
+            _pendingToken = token;
+            Debug.Log($"[Bridge] Gateway 토큰 설정됨 ({(string.IsNullOrEmpty(token) ? "없음" : $"{token.Length}자")})");
+        }
+
         public async UniTask ConnectAsync(string gatewayUrl, CancellationToken ct = default)
         {
             // Mock 모드에서는 실제 연결하지 않음
@@ -59,11 +67,22 @@ namespace OpenDesk.Core.Implementations
             if (_socket != null)
                 await DisconnectInternalAsync(intentional: true);
 
-            _lastGatewayUrl = gatewayUrl;
+            _lastToken = _pendingToken;
             _intentionalDisconnect = false;
             _loopCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-            _socket = new WebSocket(gatewayUrl);
+            // 토큰이 있으면 URL 쿼리 파라미터로 전달 (OpenClaw 방식: connect.params.auth.token)
+            var connectUrl = gatewayUrl;
+            if (!string.IsNullOrEmpty(_lastToken))
+            {
+                var separator = gatewayUrl.Contains("?") ? "&" : "?";
+                connectUrl = $"{gatewayUrl}{separator}token={_lastToken}";
+                Debug.Log("[Bridge] 토큰 인증 쿼리 파라미터 포함");
+            }
+
+            _lastGatewayUrl = connectUrl;
+
+            _socket = new WebSocket(connectUrl);
 
             _socket.OnOpen    += OnOpen;
             _socket.OnMessage += OnMessage;
@@ -183,6 +202,7 @@ namespace OpenDesk.Core.Implementations
                 {
                     _loopCts = new CancellationTokenSource();
 
+                    // _lastGatewayUrl에 이미 토큰 쿼리 파라미터 포함됨
                     _socket = new WebSocket(_lastGatewayUrl);
                     _socket.OnOpen    += OnOpen;
                     _socket.OnMessage += OnMessage;

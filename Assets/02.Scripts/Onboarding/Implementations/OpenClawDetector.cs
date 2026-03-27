@@ -17,21 +17,38 @@ namespace OpenDesk.Onboarding.Implementations
     public class OpenClawDetector : IOpenClawDetector
     {
         // 플랫폼별 기본 설치 경로
+        // OpenClaw 설정 파일 경로 후보 (여러 곳 탐색)
+        private static readonly string[] ConfigCandidates = GetConfigCandidates();
+
+        private static string[] GetConfigCandidates()
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return new[]
+                {
+                    Path.Combine(home, ".openclaw", "openclaw.json"),         // 실제 OpenClaw 기본 경로
+                    Path.Combine(appData, "openclaw", "openclaw.json"),       // 레거시/대체 경로
+                };
+
+            // macOS / Linux
+            return new[]
+            {
+                Path.Combine(home, ".openclaw", "openclaw.json"),
+            };
+        }
+
         private static string DefaultConfigPath
         {
             get
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    return Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        "openclaw", "openclaw.json"
-                    );
+                // 후보 중 실제 존재하는 파일 반환
+                foreach (var path in ConfigCandidates)
+                    if (File.Exists(path)) return path;
 
-                // macOS / Linux
-                return Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".openclaw", "openclaw.json"
-                );
+                // 없으면 첫 번째 후보 반환 (생성 시 사용)
+                return ConfigCandidates[0];
             }
         }
 
@@ -39,16 +56,9 @@ namespace OpenDesk.Onboarding.Implementations
         {
             get
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    return Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        "openclaw", "workspace"
-                    );
-
-                return Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".openclaw", "workspace"
-                );
+                // 설정 파일과 같은 폴더의 workspace
+                var configDir = Path.GetDirectoryName(DefaultConfigPath) ?? "";
+                return Path.Combine(configDir, "workspace");
             }
         }
 
@@ -158,6 +168,71 @@ namespace OpenDesk.Onboarding.Implementations
                 }
                 catch
                 {
+                    return null;
+                }
+            }, cancellationToken: ct);
+        }
+
+        public async UniTask<string> GetGatewayTokenAsync(CancellationToken ct = default)
+        {
+            return await UniTask.RunOnThreadPool(() =>
+            {
+                try
+                {
+                    var configPath = DefaultConfigPath;
+                    if (!File.Exists(configPath)) return null;
+
+                    var json = File.ReadAllText(configPath);
+
+                    // "auth" 섹션 안의 "token" 값만 추출
+                    // "auth": { "mode": "token", "token": "실제토큰값" }
+                    // → "mode" 뒤의 "token"이 아닌, 키가 "token"인 값을 찾아야 함
+
+                    // auth 섹션 찾기
+                    var authIdx = json.IndexOf("\"auth\"", StringComparison.OrdinalIgnoreCase);
+                    if (authIdx < 0) return null;
+
+                    // auth 섹션 이후에서 "token": "값" 패턴 찾기
+                    // "mode": "token" 을 건너뛰기 위해, "token" 키 뒤에 : 가 오는 것만 찾음
+                    var searchFrom = authIdx;
+                    while (searchFrom < json.Length)
+                    {
+                        var tokenKeyIdx = json.IndexOf("\"token\"", searchFrom, StringComparison.Ordinal);
+                        if (tokenKeyIdx < 0) break;
+
+                        // "token" 뒤에 : 가 오는지 확인 (키인지 값인지 구분)
+                        var afterKey = json.IndexOf(':', tokenKeyIdx + 7);
+                        if (afterKey < 0) break;
+
+                        // : 앞에 다른 문자가 없는지 (공백만 허용)
+                        var between = json.Substring(tokenKeyIdx + 7, afterKey - tokenKeyIdx - 7).Trim();
+                        if (between.Length == 0)
+                        {
+                            // 이것이 "token": "값" 패턴 — 값 추출
+                            var valStart = json.IndexOf('"', afterKey + 1) + 1;
+                            var valEnd   = json.IndexOf('"', valStart);
+
+                            if (valStart > 0 && valEnd > valStart)
+                            {
+                                var token = json.Substring(valStart, valEnd - valStart);
+                                // "token" 모드 값(5자)이 아닌 실제 토큰(20자+)만 반환
+                                if (token.Length > 10)
+                                {
+                                    Debug.Log($"[Detector] Gateway 토큰 발견 ({token.Length}자)");
+                                    return token;
+                                }
+                            }
+                        }
+
+                        searchFrom = tokenKeyIdx + 7;
+                    }
+
+                    Debug.Log("[Detector] Gateway 토큰 없음 (auth 섹션에 유효한 토큰 미발견)");
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[Detector] 토큰 읽기 실패: {ex.Message}");
                     return null;
                 }
             }, cancellationToken: ct);

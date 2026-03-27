@@ -20,8 +20,6 @@ namespace OpenDesk.Editor
             "Init",
             "CheckingFirstRun",
             "ScanningEnvironment",
-            "NodeInstallChoice",
-            "NodeUpgradeChoice",
             "InstallingNodeJs",
             "NodeJsFailed",
             "CheckingWsl2",
@@ -43,7 +41,13 @@ namespace OpenDesk.Editor
         };
 
         private int _selectedState;
-        private bool _useMockMode = true;
+        private bool _useMockMode;
+
+        private void OnEnable()
+        {
+            // 현재 저장된 Mock 모드 상태 반영
+            _useMockMode = PlayerPrefs.GetInt("OpenDesk_MockMode", 0) == 1;
+        }
         private Vector2 _scrollPos;
 
         [MenuItem("Window/OpenDesk/Onboarding Debug")]
@@ -66,18 +70,22 @@ namespace OpenDesk.Editor
                 "온보딩 UI 플로우를 테스트할 수 있습니다.",
                 MessageType.Info);
 
-            _useMockMode = EditorGUILayout.Toggle("Mock 모드 사용", _useMockMode);
-
-            EditorGUILayout.Space(5);
-
-            if (GUILayout.Button("▶  Mock 모드로 Play 시작", GUILayout.Height(35)))
+            var newMock = EditorGUILayout.Toggle("Mock 모드 사용", _useMockMode);
+            if (newMock != _useMockMode)
             {
+                _useMockMode = newMock;
                 if (_useMockMode)
                     EnableMockMode();
                 else
                     DisableMockMode();
+            }
 
+            EditorGUILayout.Space(5);
+
+            if (GUILayout.Button(_useMockMode ? "▶  Mock 모드로 Play 시작" : "▶  실제 모드로 Play 시작", GUILayout.Height(35)))
+            {
                 ResetPlayerPrefs();
+                // Mock 상태는 이미 토글에서 저장됨, Play만 시작
                 EditorApplication.isPlaying = true;
             }
 
@@ -108,9 +116,12 @@ namespace OpenDesk.Editor
             var isFirstRun = PlayerPrefs.GetInt("OpenDesk_IsFirstRun", 1);
             var gatewayUrl = PlayerPrefs.GetString("OpenDesk_GatewayUrl", "(없음)");
             var rebootPending = PlayerPrefs.GetInt("OpenDesk_RebootPending", 0);
+            var officeSetup = PlayerPrefs.GetInt("OpenDesk_OfficeSetupDone", 0);
             EditorGUILayout.LabelField($"  IsFirstRun: {(isFirstRun == 1 ? "true (온보딩 실행됨)" : "false (건너뜀)")}");
             EditorGUILayout.LabelField($"  GatewayUrl: {gatewayUrl}");
             EditorGUILayout.LabelField($"  RebootPending: {(rebootPending == 1 ? "true" : "false")}");
+            EditorGUILayout.LabelField($"  OfficeSetupDone: {(officeSetup == 1 ? "true (마법사 완료)" : "false (마법사 표시됨)")}");
+
 
             EditorGUILayout.Space(15);
 
@@ -143,25 +154,23 @@ namespace OpenDesk.Editor
                 // 주요 상태 빠른 버튼
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("환경스캔")) ForceTransition(2);
-                if (GUILayout.Button("Node선택")) ForceTransition(3);
-                if (GUILayout.Button("Node충돌")) ForceTransition(4);
-                if (GUILayout.Button("Node설치")) ForceTransition(5);
-                if (GUILayout.Button("Node실패")) ForceTransition(6);
+                if (GUILayout.Button("Node설치")) ForceTransition(3);
+                if (GUILayout.Button("Node실패")) ForceTransition(4);
+                if (GUILayout.Button("WSL2설치")) ForceTransition(6);
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("WSL2설치")) ForceTransition(8);
-                if (GUILayout.Button("재시작필요")) ForceTransition(9);
-                if (GUILayout.Button("AI설치중")) ForceTransition(12);
-                if (GUILayout.Button("설치실패")) ForceTransition(13);
+                if (GUILayout.Button("재시작필요")) ForceTransition(7);
+                if (GUILayout.Button("AI설치중")) ForceTransition(10);
+                if (GUILayout.Button("설치실패")) ForceTransition(11);
+                if (GUILayout.Button("연결중")) ForceTransition(12);
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("연결중")) ForceTransition(14);
-                if (GUILayout.Button("연결실패")) ForceTransition(15);
-                if (GUILayout.Button("폴더선택")) ForceTransition(19);
-                if (GUILayout.Button("완료!")) ForceTransition(20);
-                if (GUILayout.Button("에러")) ForceTransition(22);
+                if (GUILayout.Button("연결실패")) ForceTransition(13);
+                if (GUILayout.Button("폴더선택")) ForceTransition(17);
+                if (GUILayout.Button("완료!")) ForceTransition(18);
+                if (GUILayout.Button("에러")) ForceTransition(20);
                 EditorGUILayout.EndHorizontal();
             }
 
@@ -258,8 +267,9 @@ namespace OpenDesk.Editor
             PlayerPrefs.DeleteKey("OpenDesk_LocalPath");
             PlayerPrefs.DeleteKey("OpenDesk_AppVersion");
             PlayerPrefs.DeleteKey("OpenDesk_RebootPending");
+            PlayerPrefs.DeleteKey("OpenDesk_OfficeSetupDone");
             PlayerPrefs.Save();
-            Debug.Log("[Debug] OpenDesk PlayerPrefs 모두 초기화 완료");
+            Debug.Log("[Debug] OpenDesk PlayerPrefs 모두 초기화 완료 (온보딩 + Office 마법사)");
         }
 
         // ── 상태 강제 전환 ─────────────────────────────────
@@ -374,43 +384,59 @@ namespace OpenDesk.Editor
         {
             Debug.Log("=== 외부 환경 상태 확인 ===");
 
-            // Node.js (GUI 앱은 셸 PATH 미상속 → 로그인 셸로 탐색)
-            try
+            // Node.js (nvm/homebrew/직접설치 모두 탐색)
             {
-                var shell = System.IO.File.Exists("/bin/zsh") ? "/bin/zsh"
-                          : System.IO.File.Exists("/bin/bash") ? "/bin/bash" : null;
+                string nodeVer = null;
+                string nodePath = "node";
 
-                string ver = null;
-                if (shell != null)
+                // 후보 경로들 (Mac nvm, homebrew, Linux 등)
+                var candidates = new[]
                 {
-                    var psi = new System.Diagnostics.ProcessStartInfo
+                    "node",  // PATH에 있는 경우
+#if !UNITY_EDITOR_WIN
+                    System.IO.Path.Combine(System.Environment.GetFolderPath(
+                        System.Environment.SpecialFolder.UserProfile), ".nvm/current/bin/node"),
+                    "/usr/local/bin/node",
+                    "/opt/homebrew/bin/node",
+#endif
+                };
+
+                foreach (var candidate in candidates)
+                {
+                    try
                     {
-                        FileName = shell, Arguments = "-l -c \"node --version 2>/dev/null\"",
-                        RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true,
-                    };
-                    using var p = System.Diagnostics.Process.Start(psi);
-                    ver = p?.StandardOutput.ReadToEnd().Trim();
-                    p?.WaitForExit(5000);
+                        var psi = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = candidate, Arguments = "--version",
+                            RedirectStandardOutput = true, RedirectStandardError = true,
+                            UseShellExecute = false, CreateNoWindow = true,
+                        };
+#if !UNITY_EDITOR_WIN
+                        // Mac/Linux: 셸 환경 로드하여 nvm PATH 포함
+                        psi.FileName = "/bin/bash";
+                        psi.Arguments = $"-l -c \"{candidate} --version\"";
+#endif
+                        using var p = System.Diagnostics.Process.Start(psi);
+                        var ver = p?.StandardOutput.ReadToEnd().Trim();
+                        p?.WaitForExit(5000);
+                        if (p?.ExitCode == 0 && !string.IsNullOrEmpty(ver))
+                        {
+                            nodeVer = ver;
+                            nodePath = candidate;
+                            break;
+                        }
+                    }
+                    catch { /* 다음 후보 시도 */ }
                 }
 
-                // 셸 탐색 실패 시 직접 실행 시도
-                if (string.IsNullOrEmpty(ver))
-                {
-                    var psi2 = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = "node", Arguments = "--version",
-                        RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true,
-                    };
-                    using var p2 = System.Diagnostics.Process.Start(psi2);
-                    ver = p2?.StandardOutput.ReadToEnd().Trim();
-                    p2?.WaitForExit(5000);
-                }
-
-                Debug.Log($"  Node.js: {(string.IsNullOrEmpty(ver) ? "미설치" : ver)}");
+                if (!string.IsNullOrEmpty(nodeVer))
+                    Debug.Log($"  Node.js: {nodeVer} ({nodePath})");
+                else
+                    Debug.Log("  Node.js: 미설치 (PATH, nvm, homebrew 모두 미발견)");
             }
-            catch { Debug.Log("  Node.js: 미설치"); }
 
-            // WSL2
+            // WSL2 (Windows 전용)
+#if UNITY_EDITOR_WIN
             try
             {
                 var psi = new System.Diagnostics.ProcessStartInfo
@@ -424,12 +450,29 @@ namespace OpenDesk.Editor
                 Debug.Log($"  WSL2: {(p?.ExitCode == 0 ? "활성화됨" : "미설치")}");
             }
             catch { Debug.Log("  WSL2: 미설치"); }
+#else
+            Debug.Log("  WSL2: 해당 없음 (macOS/Linux)");
+#endif
 
-            // OpenClaw
-            var configPath = System.IO.Path.Combine(
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
-                "openclaw", "openclaw.json");
-            Debug.Log($"  OpenClaw 설정: {(System.IO.File.Exists(configPath) ? "발견" : "미발견")} ({configPath})");
+            // OpenClaw (여러 경로 탐색)
+            var home = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+            var appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData);
+            string[] configPaths = {
+                System.IO.Path.Combine(home, ".openclaw", "openclaw.json"),
+                System.IO.Path.Combine(appData, "openclaw", "openclaw.json"),
+            };
+            bool configFound = false;
+            foreach (var cp in configPaths)
+            {
+                if (System.IO.File.Exists(cp))
+                {
+                    Debug.Log($"  OpenClaw 설정: 발견 ({cp})");
+                    configFound = true;
+                    break;
+                }
+            }
+            if (!configFound)
+                Debug.Log($"  OpenClaw 설정: 미발견 (탐색: {string.Join(", ", configPaths)})");
 
             // 포트 18789
             try

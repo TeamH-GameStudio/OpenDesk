@@ -21,8 +21,14 @@ namespace OpenDesk.Onboarding.Implementations
     /// </summary>
     public class NodeEnvironmentService : INodeEnvironmentService, IDisposable
     {
+        private readonly IAdminPrivilegeService _admin;
         private readonly ReactiveProperty<float>  _progress   = new(0f);
         private readonly ReactiveProperty<string> _statusText = new("");
+
+        public NodeEnvironmentService(IAdminPrivilegeService admin)
+        {
+            _admin = admin;
+        }
 
         public ReadOnlyReactiveProperty<float>  Progress   => _progress;
         public ReadOnlyReactiveProperty<string> StatusText => _statusText;
@@ -37,127 +43,91 @@ namespace OpenDesk.Onboarding.Implementations
             return version != null;
         }
 
-        // 한 번 찾으면 캐싱
-        private static string _resolvedNodePath;
-
-        /// <summary>
-        /// Unity 프로세스는 GUI 앱이므로 셸 PATH(NVM/fnm/volta 등)를 상속받지 못함.
-        /// 로그인 셸로 which 조회 → 일반적인 경로 직접 탐색 순으로 node 절대 경로를 찾음.
-        /// </summary>
-        public static string ResolveNodePath()
-        {
-            if (_resolvedNodePath != null) return _resolvedNodePath;
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                _resolvedNodePath = "node.exe";
-                return _resolvedNodePath;
-            }
-
-            // ── 1. 로그인 셸로 which node 실행 (NVM/fnm/volta 등 모두 커버) ──
-            foreach (var shell in new[] { "/bin/zsh", "/bin/bash" })
-            {
-                if (!File.Exists(shell)) continue;
-                try
-                {
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName               = shell,
-                        Arguments              = "-l -c \"which node 2>/dev/null\"",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError  = true,
-                        UseShellExecute        = false,
-                        CreateNoWindow         = true,
-                    };
-                    using var p = Process.Start(psi);
-                    if (p == null) continue;
-                    var path = p.StandardOutput.ReadToEnd().Trim();
-                    p.WaitForExit(5_000);
-                    if (p.ExitCode == 0 && !string.IsNullOrEmpty(path) && File.Exists(path))
-                    {
-                        _resolvedNodePath = path;
-                        return _resolvedNodePath;
-                    }
-                }
-                catch { /* 다음 방법으로 */ }
-            }
-
-            // ── 2. 공통 경로 직접 탐색 ────────────────────────────────────
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var candidates = new List<string>
-            {
-                "/usr/local/bin/node",
-                "/opt/homebrew/bin/node",       // Homebrew (Apple Silicon)
-                "/usr/bin/node",
-            };
-
-            // NVM
-            var nvmDir = Path.Combine(home, ".nvm", "versions", "node");
-            if (Directory.Exists(nvmDir))
-            {
-                foreach (var dir in Directory.GetDirectories(nvmDir))
-                    candidates.Add(Path.Combine(dir, "bin", "node"));
-            }
-
-            // fnm
-            var fnmDir = Path.Combine(home, ".fnm", "node-versions");
-            if (Directory.Exists(fnmDir))
-            {
-                foreach (var dir in Directory.GetDirectories(fnmDir))
-                    candidates.Add(Path.Combine(dir, "installation", "bin", "node"));
-            }
-
-            // volta
-            candidates.Add(Path.Combine(home, ".volta", "bin", "node"));
-
-            // asdf
-            var asdfDir = Path.Combine(home, ".asdf", "installs", "nodejs");
-            if (Directory.Exists(asdfDir))
-            {
-                foreach (var dir in Directory.GetDirectories(asdfDir))
-                    candidates.Add(Path.Combine(dir, "bin", "node"));
-            }
-
-            foreach (var c in candidates)
-            {
-                if (File.Exists(c))
-                {
-                    _resolvedNodePath = c;
-                    return _resolvedNodePath;
-                }
-            }
-
-            // ── 3. 최후 수단: 그냥 "node" (시스템 PATH 기대) ─────────────
-            _resolvedNodePath = "node";
-            return _resolvedNodePath;
-        }
-
         public async UniTask<string> GetVersionAsync(CancellationToken ct = default)
         {
             return await UniTask.RunOnThreadPool(() =>
             {
                 try
                 {
-                    var psi = new ProcessStartInfo
+                    ProcessStartInfo psi;
+
+                    // OS별 후보 경로 (PATH 기본 → nvm → 직접설치 순서)
+                    string[] candidates;
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        FileName               = ResolveNodePath(),
-                        Arguments              = "--version",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError  = true,
-                        UseShellExecute        = false,
-                        CreateNoWindow         = true,
-                    };
+                        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                        var progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                        // NVM_SYMLINK: nvm-windows가 활성 버전을 가리키는 심링크
+                        var nvmSymlink = Environment.GetEnvironmentVariable("NVM_SYMLINK") ?? "";
+                        candidates = new[]
+                        {
+                            "node.exe",
+                            string.IsNullOrEmpty(nvmSymlink) ? "" : Path.Combine(nvmSymlink, "node.exe"),
+                            Path.Combine(appData, "nvm", "current", "node.exe"),
+                            Path.Combine(progFiles, "nodejs", "node.exe"),
+                        };
+                    }
+                    else
+                    {
+                        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                        candidates = new[]
+                        {
+                            "node",
+                            Path.Combine(home, ".nvm/versions/node"),  // placeholder, bash -l이 해결
+                            "/usr/local/bin/node",
+                            "/opt/homebrew/bin/node",
+                        };
+                    }
 
-                    using var process = Process.Start(psi);
-                    if (process == null) return null;
+                    foreach (var candidate in candidates)
+                    {
+                        try
+                        {
+                            ProcessStartInfo tryPsi;
 
-                    var output = process.StandardOutput.ReadToEnd().Trim();
-                    process.WaitForExit(5_000);
+                            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                            {
+                                tryPsi = new ProcessStartInfo
+                                {
+                                    FileName               = candidate,
+                                    Arguments              = "--version",
+                                    RedirectStandardOutput = true,
+                                    RedirectStandardError  = true,
+                                    UseShellExecute        = false,
+                                    CreateNoWindow         = true,
+                                };
+                            }
+                            else
+                            {
+                                // macOS/Linux: login shell로 nvm PATH 포함
+                                tryPsi = new ProcessStartInfo
+                                {
+                                    FileName               = "/bin/bash",
+                                    Arguments              = $"-l -c \"{candidate} --version\"",
+                                    RedirectStandardOutput = true,
+                                    RedirectStandardError  = true,
+                                    UseShellExecute        = false,
+                                    CreateNoWindow         = true,
+                                };
+                            }
 
-                    if (process.ExitCode != 0) return null;
+                            using var p = Process.Start(tryPsi);
+                            if (p == null) continue;
 
-                    // "v24.1.0" → "24.1.0"
-                    return output.StartsWith("v") ? output.Substring(1) : output;
+                            var ver = p.StandardOutput.ReadToEnd().Trim();
+                            p.WaitForExit(5_000);
+
+                            if (p.ExitCode == 0 && !string.IsNullOrEmpty(ver))
+                            {
+                                Debug.Log($"[NodeEnv] Node.js 발견: {ver} ({candidate})");
+                                return ver.StartsWith("v") ? ver.Substring(1) : ver;
+                            }
+                        }
+                        catch { /* 다음 후보 */ }
+                    }
+
+                    return null;
                 }
                 catch
                 {
@@ -226,13 +196,14 @@ namespace OpenDesk.Onboarding.Implementations
                 return false;
             }
 
-            SetProgress(0.5f, "Node.js 설치 중... (잠시 기다려주세요)");
+            SetProgress(0.5f, "Node.js 설치 중... (보안 확인 창이 뜨면 '예'를 눌러주세요)");
 
-            // 사일런트 설치 (관리자 권한 필요)
-            var success = await RunCommandAsync(
+            // 관리자 권한으로 MSI 설치 (UAC 팝업)
+            var result = await _admin.RunElevatedAsync(
                 "msiexec.exe",
                 $"/i \"{msiPath}\" /qn /norestart",
                 ct);
+            var success = result.ExitCode == 0;
 
             // 설치 파일 정리
             try { File.Delete(msiPath); } catch { /* 무시 */ }
@@ -343,15 +314,33 @@ namespace OpenDesk.Onboarding.Implementations
             {
                 try
                 {
-                    var psi = new ProcessStartInfo
+                    ProcessStartInfo psi;
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        FileName               = cmd,
-                        Arguments              = args,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError  = true,
-                        UseShellExecute        = false,
-                        CreateNoWindow         = true,
-                    };
+                        psi = new ProcessStartInfo
+                        {
+                            FileName               = cmd,
+                            Arguments              = args,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError  = true,
+                            UseShellExecute        = false,
+                            CreateNoWindow         = true,
+                        };
+                    }
+                    else
+                    {
+                        // macOS/Linux: login shell로 감싸서 nvm/homebrew PATH 포함
+                        psi = new ProcessStartInfo
+                        {
+                            FileName               = "/bin/bash",
+                            Arguments              = $"-l -c \"{cmd} {args}\"",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError  = true,
+                            UseShellExecute        = false,
+                            CreateNoWindow         = true,
+                        };
+                    }
 
                     using var process = Process.Start(psi);
                     if (process == null) return false;
@@ -459,9 +448,8 @@ namespace OpenDesk.Onboarding.Implementations
 
                 // nvm-windows 설치 여부 확인
                 var hasNvm = await RunCommandAsync(
-                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nvm.exe" : ResolveShell(),
-                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "version" : "-l -c \"nvm --version 2>/dev/null\"",
-                    ct);
+                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nvm.exe" : "nvm",
+                    "version", ct);
 
                 if (!hasNvm)
                 {
@@ -520,21 +508,20 @@ namespace OpenDesk.Onboarding.Implementations
                     }
                 }
 
-                // nvm으로 Node.js 24 설치
-                SetProgress(0.5f, $"Node.js {TargetVersion} 설치 중... (기존 버전은 유지돼요)");
-                bool installNode;
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                // nvm 실행 경로 찾기 (방금 설치했으면 PATH에 없을 수 있음)
+                var nvmCmd = FindNvmCommand();
+                Debug.Log($"[NodeEnv] nvm 경로: {nvmCmd}");
+
+                if (string.IsNullOrEmpty(nvmCmd))
                 {
-                    installNode = await RunCommandAsync("nvm.exe", $"install {TargetVersion}", ct);
-                    if (installNode) await RunCommandAsync("nvm.exe", $"use {TargetVersion}", ct);
-                }
-                else
-                {
-                    var shell = ResolveShell();
-                    installNode = await RunCommandAsync(shell,
-                        $"-l -c \"nvm install {TargetVersion} && nvm use {TargetVersion} && nvm alias default {TargetVersion}\"", ct);
+                    SetProgress(0f, "nvm을 찾을 수 없어요. Unity를 재시작한 후 다시 시도해주세요.");
+                    return false;
                 }
 
+                // nvm으로 Node.js 24 설치
+                SetProgress(0.5f, $"Node.js {TargetVersion} 설치 중... (기존 버전은 유지돼요)");
+
+                var installNode = await RunNvmCommandAsync(nvmCmd, $"install {TargetVersion}", ct);
                 if (!installNode)
                 {
                     SetProgress(0f, "Node.js 설치에 실패했어요.");
@@ -543,6 +530,7 @@ namespace OpenDesk.Onboarding.Implementations
 
                 // 새 버전을 기본으로 설정
                 SetProgress(0.8f, "새 버전을 활성화하고 있어요...");
+                await RunNvmCommandAsync(nvmCmd, $"use {TargetVersion}", ct);
 
                 // 확인
                 SetProgress(0.9f, "설치 확인 중...");
@@ -568,18 +556,89 @@ namespace OpenDesk.Onboarding.Implementations
             }
         }
 
-        public string GetNodeBinDirectory()
+        /// <summary>nvm 실행 파일 경로를 찾습니다 (PATH + 기본 설치 경로)</summary>
+        private static string FindNvmCommand()
         {
-            var nodePath = ResolveNodePath();
-            if (nodePath == "node" || nodePath == "node.exe") return null;
-            return System.IO.Path.GetDirectoryName(nodePath);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // 1. NVM_HOME 환경변수 (nvm-windows가 설정)
+                var nvmHome = Environment.GetEnvironmentVariable("NVM_HOME") ?? "";
+                if (!string.IsNullOrEmpty(nvmHome))
+                {
+                    var p = Path.Combine(nvmHome, "nvm.exe");
+                    if (File.Exists(p)) return p;
+                }
+
+                // 2. AppData 기본 경로
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var defaultPath = Path.Combine(appData, "nvm", "nvm.exe");
+                if (File.Exists(defaultPath)) return defaultPath;
+
+                // 3. ProgramFiles
+                var progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                var pfPath = Path.Combine(progFiles, "nvm", "nvm.exe");
+                if (File.Exists(pfPath)) return pfPath;
+
+                // 4. PATH에서 시도
+                return "nvm.exe";
+            }
+            else
+            {
+                // macOS/Linux: bash -l 로 실행하므로 "nvm" 자체로 OK
+                return "nvm";
+            }
         }
 
-        private static string ResolveShell()
+        /// <summary>nvm 명령을 실행합니다 (Windows: 직접 경로, Mac: bash -l)</summary>
+        private UniTask<bool> RunNvmCommandAsync(string nvmCmd, string args, CancellationToken ct)
         {
-            if (File.Exists("/bin/zsh"))  return "/bin/zsh";
-            if (File.Exists("/bin/bash")) return "/bin/bash";
-            return "/bin/sh";
+            return UniTask.RunOnThreadPool(() =>
+            {
+                try
+                {
+                    ProcessStartInfo psi;
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        psi = new ProcessStartInfo
+                        {
+                            FileName               = nvmCmd,
+                            Arguments              = args,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError  = true,
+                            UseShellExecute        = false,
+                            CreateNoWindow         = true,
+                        };
+                    }
+                    else
+                    {
+                        psi = new ProcessStartInfo
+                        {
+                            FileName               = "/bin/bash",
+                            Arguments              = $"-l -c \"nvm {args}\"",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError  = true,
+                            UseShellExecute        = false,
+                            CreateNoWindow         = true,
+                        };
+                    }
+
+                    using var process = Process.Start(psi);
+                    if (process == null) return false;
+
+                    var stdout = process.StandardOutput.ReadToEnd();
+                    var stderr = process.StandardError.ReadToEnd();
+                    process.WaitForExit(ProcessTimeout);
+
+                    Debug.Log($"[NodeEnv] nvm {args} → exit:{process.ExitCode} out:{stdout.Trim()}");
+                    return process.ExitCode == 0;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[NodeEnv] nvm 명령 실패: {nvmCmd} {args} — {ex.Message}");
+                    return false;
+                }
+            }, cancellationToken: ct);
         }
 
         private void SetProgress(float value, string text)

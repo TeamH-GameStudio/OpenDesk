@@ -26,7 +26,7 @@ namespace OpenDesk.Core.Installers
         private IDisposable _eventSubscription;
         private CancellationTokenSource _cts;
 
-        private const string DefaultGatewayUrl = "ws://localhost:18789/events";
+        private const string DefaultGatewayUrl = "ws://127.0.0.1:18789";
 
         public AppBootstrapper(
             IOpenClawBridgeService bridge,
@@ -101,7 +101,14 @@ namespace OpenDesk.Core.Installers
             // 리소스 모니터링 시작 (백그라운드)
             _costMonitor.StartMonitoringAsync(ct).Forget();
 
-            // Gateway 연결
+            // Gateway 토큰 복원 + 연결
+            var savedToken = PlayerPrefs.GetString("OpenDesk_GatewayToken", "");
+            if (!string.IsNullOrEmpty(savedToken))
+            {
+                _bridge.SetGatewayToken(savedToken);
+                Debug.Log("[Boot] 저장된 Gateway 토큰 복원됨");
+            }
+
             var gatewayUrl = PlayerPrefs.GetString("OpenDesk_GatewayUrl", DefaultGatewayUrl);
 
             try
