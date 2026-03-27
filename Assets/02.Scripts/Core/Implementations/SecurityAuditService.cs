@@ -52,7 +52,7 @@ namespace OpenDesk.Core.Implementations
                 await RunExternalAuditAsync(report, "--deep", ct);
             }
 
-            SetProgress(1f, report.IsClean ? "✓ 보안 점검 통과" : $"⚠ {report.CriticalCount} 치명적, {report.WarnCount} 경고 발견");
+            SetProgress(1f, report.IsClean ? "[OK] 보안 점검 통과" : $"[!] {report.CriticalCount} 치명적, {report.WarnCount} 경고 발견");
             LastReport = report;
 
             Debug.Log($"[Security] 감사 완료 — Critical: {report.CriticalCount}, Warn: {report.WarnCount}, Pass: {report.PassCount}");
@@ -72,7 +72,7 @@ namespace OpenDesk.Core.Implementations
             // 수정 후 재점검
             var verifyReport = await RunAuditAsync(deep: false, ct);
 
-            SetProgress(1f, verifyReport.IsClean ? "✓ 자동 수정 완료" : "⚠ 일부 항목 수동 수정 필요");
+            SetProgress(1f, verifyReport.IsClean ? "[OK] 자동 수정 완료" : "[!] 일부 항목 수동 수정 필요");
             return verifyReport;
         }
 

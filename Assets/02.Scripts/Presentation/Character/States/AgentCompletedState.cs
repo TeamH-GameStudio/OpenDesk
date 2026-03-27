@@ -24,7 +24,7 @@ namespace OpenDesk.Presentation.Character.States
         {
             _ctx.Animation.PlayAnimation("Celebrate", loop: false);
             _timer = CompleteDuration;
-            Debug.Log($"[{_ctx.AgentName}] Completed 진입 🎉");
+            Debug.Log($"[{_ctx.AgentName}] Completed 진입 ");
         }
 
         public void Update(float deltaTime)

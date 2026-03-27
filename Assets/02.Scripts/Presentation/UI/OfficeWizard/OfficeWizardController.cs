@@ -260,6 +260,13 @@ namespace OpenDesk.Presentation.UI.OfficeWizard
             if (_wizardProgressBar != null)  _wizardProgressBar.value = progress;
             if (_wizardStepText != null)     _wizardStepText.text     = stepText;
             if (panel != null)               panel.SetActive(true);
+
+            // 상태별 진입 액션
+            if (state == OfficeWizardState.OllamaSetup)
+                CheckOllamaAsync().Forget();
+
+            if (state == OfficeWizardState.Complete && _setupSummaryText != null)
+                _setupSummaryText.text = $"• AI 모델: {_setupModelName}\n• 채널: {_setupChannelName}";
         }
 
         private void GoBack()
@@ -367,7 +374,7 @@ namespace OpenDesk.Presentation.UI.OfficeWizard
                     var valid = status == ApiKeyStatus.Valid;
 
                     if (_apiKeyStatusText != null)
-                        _apiKeyStatusText.text = valid ? "✓ 키가 확인되었어요!" : "✗ 유효하지 않은 키예요. 다시 확인해주세요.";
+                        _apiKeyStatusText.text = valid ? "[OK] 키가 확인되었어요!" : "[X] 유효하지 않은 키예요. 다시 확인해주세요.";
                     if (_apiKeyNextButton != null)
                         _apiKeyNextButton.gameObject.SetActive(valid);
                 }
@@ -375,7 +382,7 @@ namespace OpenDesk.Presentation.UI.OfficeWizard
                 {
                     // Mock 모드
                     await UniTask.Delay(1000);
-                    if (_apiKeyStatusText != null) _apiKeyStatusText.text = "✓ 키가 확인되었어요! (Mock)";
+                    if (_apiKeyStatusText != null) _apiKeyStatusText.text = "[OK] 키가 확인되었어요! (Mock)";
                     if (_apiKeyNextButton != null) _apiKeyNextButton.gameObject.SetActive(true);
                 }
             }
@@ -415,14 +422,14 @@ namespace OpenDesk.Presentation.UI.OfficeWizard
                     var ok = result == ChannelStatus.Connected;
 
                     if (_channelStatusText != null)
-                        _channelStatusText.text = ok ? "✓ 연결 성공!" : "✗ 연결 실패. 토큰을 확인해주세요.";
+                        _channelStatusText.text = ok ? "[OK] 연결 성공!" : "[X] 연결 실패. 토큰을 확인해주세요.";
                     if (_channelNextButton != null)
                         _channelNextButton.gameObject.SetActive(ok);
                 }
                 else
                 {
                     await UniTask.Delay(1000);
-                    if (_channelStatusText != null) _channelStatusText.text = "✓ 연결 성공! (Mock)";
+                    if (_channelStatusText != null) _channelStatusText.text = "[OK] 연결 성공! (Mock)";
                     if (_channelNextButton != null) _channelNextButton.gameObject.SetActive(true);
                 }
             }
@@ -430,6 +437,49 @@ namespace OpenDesk.Presentation.UI.OfficeWizard
             {
                 if (_channelStatusText != null) _channelStatusText.text = $"오류: {ex.Message}";
             }
+        }
+
+        // ================================================================
+        //  Ollama 감지
+        // ================================================================
+
+        private async UniTaskVoid CheckOllamaAsync()
+        {
+            if (_ollamaStatusText != null) _ollamaStatusText.text = "Ollama 확인 중...";
+            if (_ollamaProgressSlider != null) _ollamaProgressSlider.value = 0.3f;
+            if (_ollamaNextButton != null) _ollamaNextButton.gameObject.SetActive(false);
+
+            try
+            {
+                // Ollama는 localhost:11434에서 실행됨
+                using var request = UnityEngine.Networking.UnityWebRequest.Get("http://localhost:11434/api/tags");
+                request.timeout = 3;
+                await request.SendWebRequest();
+
+                if (request.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+                {
+                    if (_ollamaStatusText != null)
+                        _ollamaStatusText.text = "Ollama가 이미 설치되어 있어요!";
+                    if (_ollamaProgressSlider != null) _ollamaProgressSlider.value = 1f;
+                    if (_ollamaNextButton != null) _ollamaNextButton.gameObject.SetActive(true);
+                }
+                else
+                {
+                    ShowOllamaNotFound();
+                }
+            }
+            catch
+            {
+                ShowOllamaNotFound();
+            }
+        }
+
+        private void ShowOllamaNotFound()
+        {
+            if (_ollamaStatusText != null)
+                _ollamaStatusText.text = "Ollama가 설치되어 있지 않아요.\n ollama.com에서 설치 후 '다음'을 눌러주세요.";
+            if (_ollamaProgressSlider != null) _ollamaProgressSlider.value = 0f;
+            if (_ollamaNextButton != null) _ollamaNextButton.gameObject.SetActive(true);
         }
 
         // ================================================================

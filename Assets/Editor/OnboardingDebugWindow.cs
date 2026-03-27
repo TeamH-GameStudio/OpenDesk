@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using OpenDesk.Presentation.UI.Onboarding;
 using UnityEditor;
 using UnityEngine;
 
@@ -124,6 +125,30 @@ namespace OpenDesk.Editor
 
 
             EditorGUILayout.Space(15);
+
+            // ════════════════════════════════════════════
+            //  섹션 2.5: 플레이 중 온보딩 재시작 (플레이 모드 끄지 않고!)
+            // ════════════════════════════════════════════
+            if (Application.isPlaying)
+            {
+                GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
+                if (GUILayout.Button("온보딩 처음부터 재시작 (Play 유지)", GUILayout.Height(35)))
+                {
+                    // OnboardingUIController를 통해 RestartAsync 호출
+                    var uiCtrl = UnityEngine.Object.FindObjectOfType<OpenDesk.Presentation.UI.Onboarding.OnboardingUIController>();
+                    if (uiCtrl != null)
+                    {
+                        uiCtrl.DebugRestart();
+                        Debug.Log("[Debug] 온보딩 재시작 호출 완료 — Play 모드 유지");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[Debug] OnboardingUIController를 찾을 수 없습니다.");
+                    }
+                }
+                GUI.backgroundColor = Color.white;
+                EditorGUILayout.Space(10);
+            }
 
             // ════════════════════════════════════════════
             //  섹션 3: 상태 강제 전환 (Play 모드 전용)

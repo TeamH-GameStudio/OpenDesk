@@ -55,7 +55,7 @@ namespace OpenDesk.Core.Installers
 
             if (IsMockMode)
             {
-                Debug.Log("[Boot] ★ Mock 모드 — Gateway 연결 건너뜀, UI만 테스트 가능");
+                Debug.Log("[Boot] * Mock 모드 — Gateway 연결 건너뜀, UI만 테스트 가능");
                 MockBootAsync().Forget();
                 return;
             }
@@ -151,6 +151,9 @@ namespace OpenDesk.Core.Installers
             _cts?.Dispose();
             _eventSubscription?.Dispose();
             _eventSubscription = null;
+
+            // 씬 전환 시 Bridge 연결을 정리하여 WebSocket Dispose 에러 방지
+            _bridge.Dispose();
         }
     }
 }

@@ -101,12 +101,12 @@ namespace OpenDesk.Presentation.UI.Panels
                 await _bridge.ConnectAsync(url);
 
                 if (_gatewayStatusText != null)
-                    _gatewayStatusText.text = "✓ 연결 성공";
+                    _gatewayStatusText.text = "[OK] 연결 성공";
             }
             catch (System.Exception ex)
             {
                 if (_gatewayStatusText != null)
-                    _gatewayStatusText.text = $"✗ 실패: {ex.Message}";
+                    _gatewayStatusText.text = $"[X] 실패: {ex.Message}";
             }
         }
 

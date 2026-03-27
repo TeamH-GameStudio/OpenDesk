@@ -69,8 +69,41 @@ namespace OpenDesk.Onboarding.Implementations
 
         // ── 진입점 ──────────────────────────────────────────────────────
 
+        private CancellationTokenSource _flowCts;
+
+        public async UniTask RestartAsync(CancellationToken ct = default)
+        {
+            Debug.Log("[Onboarding] ── 전체 재시작 ──");
+
+            // 1. 진행 중인 플로우 취소
+            _flowCts?.Cancel();
+            _flowCts?.Dispose();
+
+            // 2. Gateway 연결 정리
+            try { await _bridge.DisconnectAsync(); }
+            catch { /* 무시 */ }
+
+            // 3. 상태 + 컨텍스트 초기화
+            Context.Reset();
+
+            // 4. PlayerPrefs 온보딩 관련 초기화 (IsFirstRun은 true로 복원)
+            PlayerPrefs.SetInt("OpenDesk_IsFirstRun", 1);
+            PlayerPrefs.DeleteKey(RebootPendingKey);
+            PlayerPrefs.Save();
+
+            // 5. Settings 초기화
+            _settings.ClearAll();
+
+            // 6. 처음부터 재시작
+            await StartAsync(ct);
+        }
+
         public async UniTask StartAsync(CancellationToken ct = default)
         {
+            _flowCts?.Cancel();
+            _flowCts?.Dispose();
+            _flowCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var flowCt = _flowCts.Token;
             TransitionTo(OnboardingState.CheckingFirstRun);
 
             // 재부팅 복귀 감지 (WSL2 설치 후 재시작한 경우)
@@ -79,19 +112,19 @@ namespace OpenDesk.Onboarding.Implementations
                 PlayerPrefs.DeleteKey(RebootPendingKey);
                 PlayerPrefs.Save();
                 Debug.Log("[Onboarding] 재부팅 복귀 감지 — WSL2 이후 단계부터 재개");
-                await RunPostRebootFlowAsync(ct);
+                await RunPostRebootFlowAsync(flowCt);
                 return;
             }
 
             // 재방문: 저장된 설정으로 바로 복원 시도
             if (!_settings.IsFirstRun)
             {
-                await ResumeFromSavedSettingsAsync(ct);
+                await ResumeFromSavedSettingsAsync(flowCt);
                 return;
             }
 
             // 최초 실행: 정규 온보딩 플로우
-            await RunFullOnboardingAsync(ct);
+            await RunFullOnboardingAsync(flowCt);
         }
 
         /// <summary>
@@ -168,7 +201,7 @@ namespace OpenDesk.Onboarding.Implementations
 
         private async UniTask RunMockOnboardingAsync(CancellationToken ct)
         {
-            Debug.Log("[Onboarding] ★ Mock 모드 — 실제 설치 없이 UI 플로우 시뮬레이션");
+            Debug.Log("[Onboarding] * Mock 모드 — 실제 설치 없이 UI 플로우 시뮬레이션");
 
             // Step 0: 환경 스캔 시뮬레이션
             TransitionTo(OnboardingState.ScanningEnvironment);
@@ -493,6 +526,8 @@ namespace OpenDesk.Onboarding.Implementations
 
                     Debug.LogWarning($"[Onboarding] 연결 후 끊김 (시도 {attempt})");
                 }
+                catch (OperationCanceledException) { return StepResult.Fail(OnboardingState.GatewayFailed, "취소됨"); }
+                catch (ObjectDisposedException) { return StepResult.Fail(OnboardingState.GatewayFailed, "취소됨"); }
                 catch (Exception ex)
                 {
                     Debug.LogWarning($"[Onboarding] 연결 실패 (시도 {attempt}): {ex.Message}");
@@ -506,11 +541,18 @@ namespace OpenDesk.Onboarding.Implementations
                     await UniTask.Delay(2000, cancellationToken: ct);
             }
 
+            // 포트 충돌 감지: Gateway 시작은 됐지만 연결 실패 시
+            var portStillOpen = await _detector.IsGatewayListeningAsync(18789, ct);
+            var portConflictHint = portStillOpen
+                ? "\n• 다른 프로그램이 같은 포트(18789)를 사용 중일 수 있어요."
+                : "";
+
             Context.LastErrorMessage =
                 "AI 비서와의 연결에 실패했어요.\n\n" +
                 "• AI 비서 서비스가 아직 시작되지 않았을 수 있어요.\n" +
-                "• 잠시 후 '다시 시도'를 눌러보세요.\n" +
-                "• 계속 실패하면 '인터넷 없이 시작하기'를 선택하세요.";
+                "• 잠시 후 '다시 시도'를 눌러보세요." +
+                portConflictHint +
+                "\n• 계속 실패하면 '인터넷 없이 시작하기'를 선택하세요.";
             TransitionTo(OnboardingState.GatewayFailed);
             return StepResult.Fail(OnboardingState.GatewayFailed, Context.LastErrorMessage);
         }
@@ -625,7 +667,7 @@ namespace OpenDesk.Onboarding.Implementations
 
             if (IsMockMode)
             {
-                Debug.Log("[Onboarding] ★ Mock — 실제 설치 건너뜀");
+                Debug.Log("[Onboarding] * Mock — 실제 설치 건너뜀");
                 await UniTask.Delay(2000, cancellationToken: ct);
                 return;
             }

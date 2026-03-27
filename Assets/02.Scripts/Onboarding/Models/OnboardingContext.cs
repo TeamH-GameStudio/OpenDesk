@@ -33,5 +33,24 @@ namespace OpenDesk.Onboarding.Models
 
         // 에러
         public string LastErrorMessage    { get; set; } = "";
+
+        /// <summary>모든 상태를 초기값으로 리셋 (플레이 모드 재시작 없이 온보딩 재실행용)</summary>
+        public void Reset()
+        {
+            IsOpenClawInstalled = false;
+            OpenClawVersion     = "";
+            OpenClawConfigPath  = "";
+            GatewayUrl          = "ws://127.0.0.1:18789";
+            IsGatewayConnected  = false;
+            GatewayRetryCount   = 0;
+            DetectedAgents.Clear();
+            IsOfflineMode       = false;
+            LocalWorkspacePath  = "";
+            WorkspaceSkipped    = false;
+            ExistingNodeVersion = "";
+            NodeProjectPaths.Clear();
+            NodeUpgradeSkipped  = false;
+            LastErrorMessage    = "";
+        }
     }
 }

@@ -122,6 +122,16 @@ namespace OpenDesk.Onboarding.Implementations
                         StdErr   = stderr,
                     };
                 }
+                catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+                {
+                    // ERROR_CANCELLED (1223) = 사용자가 UAC에서 "아니오" 선택
+                    Debug.LogWarning("[Admin] 사용자가 권한 요청을 거부했습니다.");
+                    return new ProcessOutput
+                    {
+                        ExitCode = -1223,
+                        StdErr   = "UAC_DENIED",
+                    };
+                }
                 catch (Exception ex)
                 {
                     Debug.LogWarning($"[Admin] 관리자 실행 실패: {ex.Message}");

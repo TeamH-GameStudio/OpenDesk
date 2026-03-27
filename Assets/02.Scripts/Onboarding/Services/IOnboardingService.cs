@@ -16,8 +16,11 @@ namespace OpenDesk.Onboarding.Services
 
         OnboardingContext Context { get; }
 
-        // 온보딩 시작
+        // 온보딩 시작 / 재시작
         UniTask StartAsync(CancellationToken ct = default);
+
+        /// <summary>상태+컨텍스트 전부 초기화 후 처음부터 재시작 (플레이 모드 재시작 불필요)</summary>
+        UniTask RestartAsync(CancellationToken ct = default);
 
         // UI에서 트리거하는 사용자 액션들
         UniTask RetryCurrentStepAsync(CancellationToken ct = default);

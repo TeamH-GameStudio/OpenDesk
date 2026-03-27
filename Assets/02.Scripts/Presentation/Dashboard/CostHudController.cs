@@ -89,7 +89,7 @@ namespace OpenDesk.Presentation.Dashboard
             _costMonitor.OnCostAlert.Subscribe(cost =>
             {
                 if (_alertPanel != null) _alertPanel.SetActive(true);
-                if (_alertText != null)  _alertText.text = $"⚠ API 비용 ${cost:F2} 초과!";
+                if (_alertText != null)  _alertText.text = $"[!] API 비용 ${cost:F2} 초과!";
             }).AddTo(this);
         }
     }

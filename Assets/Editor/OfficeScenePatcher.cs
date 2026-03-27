@@ -1,17 +1,22 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using VContainer.Unity;
 
 namespace OpenDesk.Editor
 {
     /// <summary>
     /// Office 씬에 환영 마법사 UI를 자동 생성 + Inspector 바인딩
+    /// + OfficeInstaller (VContainer) 자동 배치 + 13개 UI 컨트롤러 배치
     /// 이미 있는 요소는 건드리지 않음
     ///
-    /// 사용: OpenDesk > Patch Office Scene (환영 마법사 추가)
+    /// 사용:
+    ///   OpenDesk > Patch Office Scene (환영 마법사 추가)
+    ///   OpenDesk > Setup Office DI (OfficeInstaller + 컨트롤러 배치)
     /// </summary>
     public static class OfficeScenePatcher
     {
@@ -582,6 +587,342 @@ namespace OpenDesk.Editor
             }
 
             return go;
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  OfficeInstaller + 13개 UI 컨트롤러 자동 배치
+        // ═══════════════════════════════════════════════════════
+
+        [MenuItem("OpenDesk/Setup Office DI (OfficeInstaller + 컨트롤러 배치)")]
+        public static void SetupOfficeDI()
+        {
+            // CoreInstaller 찾기
+            var coreInstallerType = System.Type.GetType(
+                "OpenDesk.Core.Installers.CoreInstaller, Assembly-CSharp");
+            if (coreInstallerType == null)
+            {
+                Debug.LogError("[OfficeDI] CoreInstaller 타입 미발견 — 컴파일 후 다시 실행");
+                return;
+            }
+
+            var coreGo = FindObjectWithComponent(coreInstallerType);
+            if (coreGo == null)
+            {
+                Debug.LogError("[OfficeDI] 씬에 CoreInstaller가 없습니다. Office 씬을 먼저 열어주세요.");
+                return;
+            }
+
+            Debug.Log("[OfficeDI] Office DI 세팅 시작...");
+
+            // ── OfficeInstaller 생성 또는 찾기 ──
+            var officeInstallerType = System.Type.GetType(
+                "OpenDesk.Presentation.Installers.OfficeInstaller, Assembly-CSharp");
+            if (officeInstallerType == null)
+            {
+                Debug.LogError("[OfficeDI] OfficeInstaller 타입 미발견 — 컴파일 후 다시 실행");
+                return;
+            }
+
+            var officeGo = FindObjectWithComponent(officeInstallerType);
+            if (officeGo == null)
+            {
+                officeGo = new GameObject("OfficeInstaller");
+                officeGo.AddComponent(officeInstallerType);
+                Debug.Log("[OfficeDI] OfficeInstaller GameObject 생성");
+            }
+
+            // parentReference 설정 (CoreInstaller 타입명으로 부모 탐색)
+            // VContainer ParentReference는 TypeName(string)으로 부모를 찾는 구조
+            var officeInstaller = officeGo.GetComponent<LifetimeScope>();
+            if (officeInstaller != null)
+            {
+                var so = new SerializedObject(officeInstaller);
+                var typeNameProp = so.FindProperty("parentReference.TypeName");
+                if (typeNameProp != null)
+                {
+                    typeNameProp.stringValue = coreInstallerType.FullName;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                    Debug.Log($"[OfficeDI] OfficeInstaller.parentReference.TypeName → {coreInstallerType.FullName}");
+                }
+            }
+
+            // ── Canvas 찾기 ──
+            var canvasGo = GameObject.Find("Canvas_Main") ?? GameObject.Find("Canvas");
+            if (canvasGo == null)
+            {
+                Debug.LogWarning("[OfficeDI] Canvas를 찾을 수 없습니다. UI 컨트롤러 배치를 건너뜁니다.");
+                FinishDI();
+                return;
+            }
+
+            // ── 13개 UI 컨트롤러 MonoBehaviour 배치 ──
+            // 각 컨트롤러를 적절한 GameObject에 추가 (없으면 생성)
+
+            // TopBar
+            EnsureController("OpenDesk.Presentation.UI.TopBar.TopBarController",
+                canvasGo, "TopBar");
+
+            // 터미널 채팅
+            EnsureController("OpenDesk.Presentation.UI.Panels.TerminalChatController",
+                canvasGo, "TerminalChat");
+
+            // 탭
+            EnsureController("OpenDesk.Presentation.UI.Panels.TabController",
+                canvasGo, "TabPanel");
+
+            // 6개 패널
+            EnsureController("OpenDesk.Presentation.UI.Panels.ChannelsPanelController",
+                canvasGo, "Panel_Channels");
+            EnsureController("OpenDesk.Presentation.UI.Panels.ApiKeysPanelController",
+                canvasGo, "Panel_ApiKeys");
+            EnsureController("OpenDesk.Presentation.UI.Panels.RoutingPanelController",
+                canvasGo, "Panel_Routing");
+            EnsureController("OpenDesk.Presentation.UI.Panels.SkillsPanelController",
+                canvasGo, "Panel_Skills");
+            EnsureController("OpenDesk.Presentation.UI.Panels.SecurityPanelController",
+                canvasGo, "Panel_Security");
+            EnsureController("OpenDesk.Presentation.UI.Panels.SettingsPanelController",
+                canvasGo, "Panel_Settings");
+
+            // 모달
+            var modalCanvasGo = GameObject.Find("Canvas_Modal") ?? canvasGo;
+            EnsureController("OpenDesk.Presentation.UI.Modals.ModalDialogController",
+                modalCanvasGo, "ModalDialog");
+
+            // 대시보드 HUD
+            EnsureController("OpenDesk.Presentation.Dashboard.AgenticLoopVisualizer",
+                canvasGo, "HUD_AgenticLoop");
+            EnsureController("OpenDesk.Presentation.Dashboard.ConsoleLogController",
+                canvasGo, "HUD_ConsoleLog");
+            EnsureController("OpenDesk.Presentation.Dashboard.CostHudController",
+                canvasGo, "HUD_CostMonitor");
+
+            // 3D 캐릭터 (Canvas 밖)
+            var charType = System.Type.GetType(
+                "OpenDesk.Presentation.Character.AgentCharacterController, Assembly-CSharp");
+            if (charType != null)
+            {
+                var charGo = FindObjectWithComponent(charType);
+                if (charGo == null)
+                {
+                    charGo = new GameObject("AgentCharacter");
+                    charGo.AddComponent(charType);
+                    Debug.Log("[OfficeDI] AgentCharacter GameObject 생성 (3D 모델은 Inspector에서 할당)");
+                }
+            }
+
+            FinishDI();
+        }
+
+        static void FinishDI()
+        {
+            EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
+            Debug.Log("[OfficeDI] 완료! Inspector에서 SerializeField 연결 후 Ctrl+S로 씬 저장하세요.");
+            Debug.Log("[OfficeDI] 참고: 각 컨트롤러의 SerializeField는 Inspector에서 수동 연결 필요");
+        }
+
+        static void EnsureController(string typeName, GameObject parentCanvasGo, string goName)
+        {
+            var type = System.Type.GetType($"{typeName}, Assembly-CSharp");
+            if (type == null)
+            {
+                Debug.LogWarning($"[OfficeDI] {typeName} 타입 미발견 — 스킵");
+                return;
+            }
+
+            // 이미 씬에 있으면 스킵
+            var existing = FindObjectWithComponent(type);
+            if (existing != null)
+            {
+                Debug.Log($"[OfficeDI] {type.Name} 이미 존재 — 스킵");
+                return;
+            }
+
+            // 이름으로 기존 GO 찾기
+            var targetGo = parentCanvasGo.transform.Find(goName)?.gameObject;
+            if (targetGo == null)
+            {
+                targetGo = new GameObject(goName);
+                targetGo.transform.SetParent(parentCanvasGo.transform, false);
+                targetGo.AddComponent<RectTransform>();
+            }
+
+            targetGo.AddComponent(type);
+            Debug.Log($"[OfficeDI] {type.Name} → {goName} 배치 완료");
+        }
+
+        static GameObject FindObjectWithComponent(System.Type type)
+        {
+            var all = Object.FindObjectsOfType(type, true);
+            return all.Length > 0 ? ((Component)all[0]).gameObject : null;
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  Office UI 전체 자동 바인딩
+        // ═══════════════════════════════════════════════════════
+
+        [MenuItem("OpenDesk/Auto-Bind Office UI (전체 SerializeField 자동 연결)")]
+        public static void AutoBindOfficeUI()
+        {
+            Debug.Log("[AutoBind] Office UI 자동 바인딩 시작...");
+            int totalBound = 0;
+
+            totalBound += BindByName("TerminalChatController", new Dictionary<string, string>
+            {
+                ["_sessionDropdown"] = "SessionDropdown",
+                ["_chatScrollRect"]  = "ChatScroll",
+                ["_chatContent"]     = "ChatScroll/Viewport/Content",
+                ["_chatInputField"]  = "ChatInput",
+                ["_sendButton"]      = "SendBtn",
+                ["_clearButton"]     = "ClearBtn",
+                ["_scrollToBottomButton"] = "ScrollToBottomBtn",
+                ["_typingIndicator"] = "TypingIndicator",
+                ["_typingText"]      = "TypingText",
+            });
+
+            totalBound += BindByName("TopBarController", new Dictionary<string, string>
+            {
+                ["_connectionIcon"] = "StatusIcon",
+                ["_connectionText"] = "StatusText",
+                ["_settingsButton"] = "SettingsButton",
+            });
+
+            totalBound += BindByName("ConsoleLogController", new Dictionary<string, string>
+            {
+                ["_logText"]      = "LogText",
+                ["_scrollRect"]   = "LogScroll",
+                ["_clearButton"]  = "ClearLogsBtn",
+            });
+
+            totalBound += BindByName("CostHudController", new Dictionary<string, string>
+            {
+                ["_costText"]       = "CostText",
+                ["_cpuText"]        = "CpuText",
+                ["_ramText"]        = "RamText",
+                ["_alertText"]      = "AlertText",
+            });
+
+            totalBound += BindByName("AgenticLoopVisualizer", new Dictionary<string, string>
+            {
+                ["_statusText"]    = "StatusText",
+                ["_sessionIdText"] = "SessionText",
+            });
+
+            totalBound += BindByName("SettingsPanelController", new Dictionary<string, string>
+            {
+                ["_gatewayUrlInput"]    = "GatewayUrlInput",
+                ["_gatewayStatusText"]  = "StatusText",
+                ["_debugSessionInput"]  = "DebugSessionInput",
+            });
+
+            EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
+            Debug.Log($"[AutoBind] 완료! {totalBound}개 필드 바인딩됨. Ctrl+S로 씬 저장하세요.");
+        }
+
+        /// <summary>
+        /// 컨트롤러 타입을 씬에서 찾고, 이름 매칭으로 SerializeField를 자동 바인딩
+        /// </summary>
+        static int BindByName(string controllerTypeName, Dictionary<string, string> fieldToGoName)
+        {
+            // 씬 전체에서 해당 컨트롤러를 가진 GameObject 찾기
+            var allGOs = Object.FindObjectsOfType<MonoBehaviour>(true);
+            MonoBehaviour ctrl = null;
+            foreach (var mb in allGOs)
+            {
+                if (mb.GetType().Name == controllerTypeName)
+                {
+                    ctrl = mb;
+                    break;
+                }
+            }
+
+            if (ctrl == null)
+            {
+                Debug.LogWarning($"[AutoBind] {controllerTypeName} — 씬에 없음, 스킵");
+                return 0;
+            }
+
+            var so = new SerializedObject(ctrl);
+            int bound = 0;
+
+            // 씬 전체의 모든 Transform을 이름으로 검색할 수 있게 캐시
+            var allTransforms = Object.FindObjectsOfType<Transform>(true);
+            var nameMap = new Dictionary<string, Transform>();
+            foreach (var t in allTransforms)
+            {
+                if (!nameMap.ContainsKey(t.name))
+                    nameMap[t.name] = t;
+            }
+
+            foreach (var kv in fieldToGoName)
+            {
+                var prop = so.FindProperty(kv.Key);
+                if (prop == null) continue;
+                if (prop.objectReferenceValue != null) { bound++; continue; } // 이미 연결됨
+
+                // 경로에 / 가 있으면 부모/자식 탐색
+                Transform found = null;
+                if (kv.Value.Contains("/"))
+                {
+                    // 첫 번째 이름으로 루트 찾고 나머지 경로 탐색
+                    var parts = kv.Value.Split('/');
+                    if (nameMap.TryGetValue(parts[0], out var root))
+                    {
+                        found = root;
+                        for (int i = 1; i < parts.Length && found != null; i++)
+                            found = found.Find(parts[i]);
+                    }
+                }
+                else
+                {
+                    nameMap.TryGetValue(kv.Value, out found);
+                }
+
+                if (found == null)
+                {
+                    Debug.LogWarning($"[AutoBind] {controllerTypeName}.{kv.Key} → '{kv.Value}' 못 찾음");
+                    continue;
+                }
+
+                // 프로퍼티 타입에 맞는 컴포넌트 찾기
+                Object target = null;
+                var propTypeName = prop.type;
+
+                if (propTypeName.Contains("Button"))
+                    target = found.GetComponent<Button>();
+                else if (propTypeName.Contains("InputField"))
+                    target = found.GetComponent<TMP_InputField>();
+                else if (propTypeName.Contains("Dropdown"))
+                    target = found.GetComponent<TMP_Dropdown>();
+                else if (propTypeName.Contains("ScrollRect"))
+                    target = found.GetComponent<ScrollRect>();
+                else if (propTypeName.Contains("Slider"))
+                    target = found.GetComponent<Slider>();
+                else if (propTypeName.Contains("Image"))
+                    target = found.GetComponent<Image>();
+                else if (propTypeName.Contains("Text") || propTypeName.Contains("TMP"))
+                    target = found.GetComponent<TMP_Text>();
+                else if (propTypeName.Contains("RectTransform"))
+                    target = found.GetComponent<RectTransform>();
+                else if (propTypeName.Contains("GameObject"))
+                    target = found.gameObject;
+                else
+                    target = found.GetComponent(propTypeName) ?? (Object)found.gameObject;
+
+                if (target != null)
+                {
+                    prop.objectReferenceValue = target;
+                    bound++;
+                }
+                else
+                {
+                    Debug.LogWarning($"[AutoBind] {controllerTypeName}.{kv.Key} → '{kv.Value}' 컴포넌트 못 찾음 (type={propTypeName})");
+                }
+            }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+            Debug.Log($"[AutoBind] {controllerTypeName}: {bound}/{fieldToGoName.Count} 바인딩됨");
+            return bound;
         }
     }
 }
