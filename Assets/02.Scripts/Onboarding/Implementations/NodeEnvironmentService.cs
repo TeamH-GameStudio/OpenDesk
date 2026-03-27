@@ -25,6 +25,8 @@ namespace OpenDesk.Onboarding.Implementations
         private readonly ReactiveProperty<float>  _progress   = new(0f);
         private readonly ReactiveProperty<string> _statusText = new("");
 
+        private string _resolvedNodeDir = null;
+
         public NodeEnvironmentService(IAdminPrivilegeService admin)
         {
             _admin = admin;
@@ -42,6 +44,8 @@ namespace OpenDesk.Onboarding.Implementations
             var version = await GetVersionAsync(ct);
             return version != null;
         }
+
+        public string GetNodeBinDirectory() => _resolvedNodeDir ?? "";
 
         public async UniTask<string> GetVersionAsync(CancellationToken ct = default)
         {
@@ -121,6 +125,9 @@ namespace OpenDesk.Onboarding.Implementations
                             if (p.ExitCode == 0 && !string.IsNullOrEmpty(ver))
                             {
                                 Debug.Log($"[NodeEnv] Node.js 발견: {ver} ({candidate})");
+                                // bin 디렉토리 캐시 (PATH 기반이면 빈 문자열 → 런타임에 where/which로 해소)
+                                _resolvedNodeDir = string.IsNullOrEmpty(System.IO.Path.GetDirectoryName(candidate))
+                                    ? "" : System.IO.Path.GetDirectoryName(candidate);
                                 return ver.StartsWith("v") ? ver.Substring(1) : ver;
                             }
                         }

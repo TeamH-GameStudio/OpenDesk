@@ -609,6 +609,91 @@ namespace OpenDesk.Onboarding.Implementations
             return UniTask.CompletedTask;
         }
 
+        // ── Node.js 미설치 — 설치 방법 선택 (UI 액션) ─────────────────
+
+        public async UniTask HandleNodeInstall_Nvm(CancellationToken ct = default)
+        {
+            Debug.Log("[Onboarding] 사용자 선택: nvm 설치");
+            TransitionTo(OnboardingState.InstallingNodeJs);
+
+            if (IsMockMode)
+            {
+                await UniTask.Delay(2000, cancellationToken: ct);
+                await ContinueAfterNodeResolvedAsync(ct);
+                return;
+            }
+
+            var success = await _nodeEnv.InstallViaNvmAsync(ct);
+            if (!success)
+            {
+                Context.LastErrorMessage =
+                    "nvm 설치에 실패했어요.\n\n" +
+                    "• 인터넷 연결을 확인해주세요.\n" +
+                    "• '직접 설치'를 선택해보세요.";
+                TransitionTo(OnboardingState.NodeJsFailed);
+                return;
+            }
+
+            _rollback.RecordInstall(new InstalledItem
+            {
+                Id = "nodejs_nvm", DisplayName = "Node.js (nvm 설치)",
+                PreviousState = "미설치",
+                InstalledState = await _nodeEnv.GetVersionAsync(ct) ?? "24.1.0",
+                Method = "nvm",
+                CanRollback = true,
+                RollbackDescription = "nvm과 Node.js를 제거합니다.",
+            });
+
+            await ContinueAfterNodeResolvedAsync(ct);
+        }
+
+        public async UniTask HandleNodeInstall_Direct(CancellationToken ct = default)
+        {
+            Debug.Log("[Onboarding] 사용자 선택: 직접 설치 (MSI/pkg)");
+            TransitionTo(OnboardingState.InstallingNodeJs);
+
+            if (IsMockMode)
+            {
+                await UniTask.Delay(2000, cancellationToken: ct);
+                await ContinueAfterNodeResolvedAsync(ct);
+                return;
+            }
+
+            var success = await _nodeEnv.InstallAsync(ct);
+            if (!success)
+            {
+                Context.LastErrorMessage =
+                    "직접 설치에 실패했어요.\n\n" +
+                    "• Windows 보안 확인 창에서 '예'를 눌러주세요.\n" +
+                    "• 인터넷 연결을 확인해주세요.";
+                TransitionTo(OnboardingState.NodeJsFailed);
+                return;
+            }
+
+            _rollback.RecordInstall(new InstalledItem
+            {
+                Id = "nodejs", DisplayName = "Node.js (직접 설치)",
+                PreviousState = "미설치",
+                InstalledState = await _nodeEnv.GetVersionAsync(ct) ?? "24.1.0",
+                Method = "msi",
+                CanRollback = true,
+                RollbackDescription = "Node.js를 컴퓨터에서 완전히 제거합니다.",
+            });
+
+            await ContinueAfterNodeResolvedAsync(ct);
+        }
+
+        public async UniTask HandleNodeInstall_Skip(CancellationToken ct = default)
+        {
+            Debug.Log("[Onboarding] 사용자 선택: Node.js 설치 건너뛰기");
+            Context.NodeUpgradeSkipped = true;
+
+            if (IsMockMode)
+                return;
+
+            await ContinueAfterNodeResolvedAsync(ct);
+        }
+
         // ── Node.js 버전 충돌 — 사용자 선택 처리 ──────────────────────
 
         /// <summary>"업그레이드" 선택 — MSI 덮어쓰기 (안전 설치도 동일 경로)</summary>

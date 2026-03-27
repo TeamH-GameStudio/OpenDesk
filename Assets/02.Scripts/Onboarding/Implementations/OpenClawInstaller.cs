@@ -229,10 +229,31 @@ namespace OpenDesk.Onboarding.Implementations
 
         private async UniTask<bool> InstallViaScriptUnixAsync(CancellationToken ct)
         {
-            var result = await _admin.RunElevatedAsync(
+            // osascript do shell script는 실시간 stdout을 스트리밍할 수 없으므로
+            // 대기 중 상태 텍스트를 주기적으로 갱신하여 피드백 제공
+            var installTask = _admin.RunElevatedAsync(
                 "bash",
-                "-c \"curl -fsSL https://openclaw.ai/install.sh | bash\"",
+                "-c 'curl -fsSL https://openclaw.ai/install.sh | bash'",
                 ct);
+
+            var messages = new[]
+            {
+                "관리자 비밀번호를 입력해주세요...",
+                "OpenClaw 다운로드 중...",
+                "설치 스크립트 실행 중...",
+                "설치 진행 중... 잠시만 기다려주세요",
+            };
+
+            int msgIdx = 0;
+            while (!installTask.Status.IsCompleted())
+            {
+                if (msgIdx < messages.Length)
+                    SetProgress(0.25f + 0.1f * msgIdx, messages[msgIdx]);
+                msgIdx = Math.Min(msgIdx + 1, messages.Length - 1);
+                await UniTask.Delay(3000, cancellationToken: ct);
+            }
+
+            var result = await installTask;
             return result.ExitCode == 0;
         }
 

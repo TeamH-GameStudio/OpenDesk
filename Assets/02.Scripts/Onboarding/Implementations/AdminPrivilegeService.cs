@@ -70,6 +70,7 @@ namespace OpenDesk.Onboarding.Implementations
         {
             return await UniTask.RunOnThreadPool(() =>
             {
+                string tempScriptPath = null;
                 try
                 {
                     ProcessStartInfo psi;
@@ -86,18 +87,66 @@ namespace OpenDesk.Onboarding.Implementations
                             CreateNoWindow  = false,
                         };
                     }
-                    else
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                     {
-                        // macOS/Linux: sudo 사용
+                        // macOS: osascript로 네이티브 인증 다이얼로그 표시
+                        // ProcessStartInfo.Arguments 토크나이저가 따옴표 이스케이프를
+                        // 깨뜨리므로, 임시 AppleScript 파일을 생성하여 우회
+                        var shellCmd = $"{command} {arguments}";
+                        // elevated shell은 Unity CWD에 접근 불가 + PATH가 최소한이므로
+                        // cd /tmp 및 PATH 확장을 삽입
+                        var wrappedCmd = "export PATH=/usr/local/bin:/opt/homebrew/bin:$PATH && cd /tmp && " + shellCmd;
+                        var escapedCmd = wrappedCmd
+                            .Replace("\\", "\\\\")
+                            .Replace("\"", "\\\"");
+
+                        tempScriptPath = System.IO.Path.Combine(
+                            System.IO.Path.GetTempPath(),
+                            $"opendesk_admin_{Guid.NewGuid():N}.applescript");
+                        System.IO.File.WriteAllText(tempScriptPath,
+                            $"do shell script \"{escapedCmd}\" with administrator privileges");
+
+                        Debug.Log($"[Admin] osascript 실행: {shellCmd}");
+
                         psi = new ProcessStartInfo
                         {
-                            FileName               = "sudo",
-                            Arguments              = $"{command} {arguments}",
+                            FileName               = "osascript",
+                            Arguments              = tempScriptPath,
                             RedirectStandardOutput = true,
                             RedirectStandardError  = true,
                             UseShellExecute        = false,
                             CreateNoWindow         = true,
                         };
+                    }
+                    else
+                    {
+                        // Linux: pkexec (PolicyKit GUI 인증) → 없으면 sudo 폴백
+                        var pkexecPath = "/usr/bin/pkexec";
+                        if (System.IO.File.Exists(pkexecPath))
+                        {
+                            psi = new ProcessStartInfo
+                            {
+                                FileName               = pkexecPath,
+                                Arguments              = $"{command} {arguments}",
+                                RedirectStandardOutput = true,
+                                RedirectStandardError  = true,
+                                UseShellExecute        = false,
+                                CreateNoWindow         = true,
+                            };
+                        }
+                        else
+                        {
+                            // pkexec 없으면 sudo 폴백 (터미널 환경에서만 동작)
+                            psi = new ProcessStartInfo
+                            {
+                                FileName               = "sudo",
+                                Arguments              = $"{command} {arguments}",
+                                RedirectStandardOutput = true,
+                                RedirectStandardError  = true,
+                                UseShellExecute        = false,
+                                CreateNoWindow         = true,
+                            };
+                        }
                     }
 
                     using var process = Process.Start(psi);
@@ -115,15 +164,29 @@ namespace OpenDesk.Onboarding.Implementations
 
                     process.WaitForExit(ProcessTimeout);
 
-                    return new ProcessOutput
+                    if (tempScriptPath != null)
+                    {
+                        try { System.IO.File.Delete(tempScriptPath); } catch { /* ignore */ }
+                    }
+
+                    var output = new ProcessOutput
                     {
                         ExitCode = process.ExitCode,
                         StdOut   = stdout,
                         StdErr   = stderr,
                     };
+
+                    if (output.ExitCode != 0)
+                        Debug.LogWarning($"[Admin] 관리자 명령 실패 (exit {output.ExitCode}): {output.StdErr}");
+
+                    return output;
                 }
                 catch (Exception ex)
                 {
+                    if (tempScriptPath != null)
+                    {
+                        try { System.IO.File.Delete(tempScriptPath); } catch { /* ignore */ }
+                    }
                     Debug.LogWarning($"[Admin] 관리자 실행 실패: {ex.Message}");
                     return new ProcessOutput
                     {

@@ -133,6 +133,7 @@ namespace OpenDesk.Onboarding.Tests
             public UniTask<System.Collections.Generic.IReadOnlyList<string>> ScanExistingProjectsAsync(System.Threading.CancellationToken ct)
                 => UniTask.FromResult<System.Collections.Generic.IReadOnlyList<string>>(new List<string>());
             public UniTask<bool> InstallViaNvmAsync(System.Threading.CancellationToken ct)   => UniTask.FromResult(InstallOk);
+            public string GetNodeBinDirectory() => "/mock/bin";
         }
 
         private class MockAdmin : IAdminPrivilegeService
