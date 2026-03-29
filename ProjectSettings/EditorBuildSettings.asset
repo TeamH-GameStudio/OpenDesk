@@ -14,6 +14,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/01.Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/01.Scenes/AgentCreationScene.unity
+    guid: 79862e3b24c118b4b8948e16e6112cdb
+  - enabled: 1
+    path: Assets/01.Scenes/AgentOfficeScene.unity
+    guid: ef90f86afb6e3e94da6e3fe012ad96e0
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 7d18bd580c3c7424c838db80cf365d5d, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
