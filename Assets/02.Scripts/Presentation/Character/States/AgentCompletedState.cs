@@ -22,9 +22,11 @@ namespace OpenDesk.Presentation.Character.States
 
         public void Enter()
         {
+            _ctx.StopMoving();
             _ctx.Animation.PlayAnimation("Celebrate", loop: false);
+            _ctx.Expression?.SetExpression("Happy");
             _timer = CompleteDuration;
-            Debug.Log($"[{_ctx.AgentName}] Completed 진입 ");
+            Debug.Log($"[{_ctx.AgentName}] Completed 진입");
         }
 
         public void Update(float deltaTime)

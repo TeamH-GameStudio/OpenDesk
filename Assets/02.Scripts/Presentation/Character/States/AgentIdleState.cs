@@ -1,21 +1,24 @@
 using OpenDesk.Presentation.Character.Context;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace OpenDesk.Presentation.Character.States
 {
     /// <summary>
-    /// 대기 상태 — 커피 마시기, 스트레칭 등 Idle 모션
-    /// 일정 시간마다 랜덤 서브 모션 재생
+    /// 대기 상태 — Idle 모션 + NavMesh 배회.
+    /// 일정 시간 대기 → 랜덤 위치로 걸어감 → 도착 후 Idle.
     /// </summary>
     public class AgentIdleState : IAgentState
     {
         private readonly AgentCharacterContext _ctx;
 
-        // Idle 서브모션 목록 (Mixamo: Sitting Idle, Breathing, Idle)
-        private static readonly string[] IdleVariants = { "Idle", "Idle_Breathing", "Idle_LookAround" };
+        private float _wanderTimer;
+        private bool _isWalking;
 
-        private float _subMotionTimer;
-        private const float SubMotionInterval = 8f; // 8초마다 서브모션
+        // 배회 설정
+        private const float WanderInterval = 6f;     // 대기 후 배회까지 시간
+        private const float WanderRadius = 3f;        // 배회 반경
+        private const int MaxSampleAttempts = 10;     // NavMesh 샘플링 시도 횟수
 
         public string Name => "Idle";
 
@@ -23,32 +26,66 @@ namespace OpenDesk.Presentation.Character.States
 
         public void Enter()
         {
+            _ctx.StopMoving();
             _ctx.Animation.PlayAnimation("Idle", loop: true);
-            _subMotionTimer = SubMotionInterval;
-            Debug.Log($"[{_ctx.AgentName}] Idle 진입");
+            _wanderTimer = WanderInterval + Random.Range(-2f, 2f);
+            _isWalking = false;
         }
 
         public void Update(float deltaTime)
         {
-            _subMotionTimer -= deltaTime;
-            if (_subMotionTimer <= 0f)
+            if (_isWalking)
             {
-                PlayRandomSubMotion();
-                _subMotionTimer = SubMotionInterval;
+                // 도착 체크
+                if (_ctx.HasReachedDestination)
+                {
+                    _isWalking = false;
+                    _ctx.StopMoving();
+                    _ctx.Animation.PlayAnimation("Idle", loop: true);
+                    _wanderTimer = WanderInterval + Random.Range(-2f, 3f);
+                }
+                return;
+            }
+
+            _wanderTimer -= deltaTime;
+            if (_wanderTimer <= 0f)
+            {
+                TryWander();
             }
         }
 
         public void Exit()
         {
-            // 다음 상태 진입 전 클린업 없음
+            _ctx.StopMoving();
+            _isWalking = false;
         }
 
-        private void PlayRandomSubMotion()
+        private void TryWander()
         {
-            var pick = IdleVariants[Random.Range(0, IdleVariants.Length)];
-            _ctx.Animation.PlayAnimation(pick, loop: false);
-            // 완료 후 Idle로 복귀 큐
-            _ctx.Animation.QueueAnimation("Idle", loop: true, delay: _ctx.Animation.GetAnimationDuration(pick));
+            if (_ctx.NavAgent == null || !_ctx.NavAgent.isOnNavMesh)
+            {
+                _wanderTimer = WanderInterval;
+                return;
+            }
+
+            // NavMesh 위 랜덤 포인트 탐색
+            var origin = _ctx.Transform.position;
+            for (int i = 0; i < MaxSampleAttempts; i++)
+            {
+                var randomDir = origin + Random.insideUnitSphere * WanderRadius;
+                randomDir.y = origin.y;
+
+                if (NavMesh.SamplePosition(randomDir, out var hit, WanderRadius, NavMesh.AllAreas))
+                {
+                    _ctx.MoveTo(hit.position);
+                    _ctx.Animation.PlayAnimation("Walk", loop: true);
+                    _isWalking = true;
+                    return;
+                }
+            }
+
+            // 실패 시 다시 대기
+            _wanderTimer = WanderInterval;
         }
     }
 }
