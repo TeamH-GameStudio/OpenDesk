@@ -41,6 +41,7 @@ namespace OpenDesk.Presentation.Character
             public AgentProfileSO Profile;
             public GameObject ModelInstance;
             public AgentHUDController HUD;
+            public AgentAnimationController AnimController;
             public int SpawnPointIndex;
         }
 
@@ -88,14 +89,17 @@ namespace OpenDesk.Presentation.Character
             var modelInstance = Instantiate(prefab, spawnPos, spawnRot);
             modelInstance.name = $"Agent_{profile.AgentName}";
 
-            // 역할별 색상 적용 (MeshRenderer가 있는 경우)
-            var renderer = modelInstance.GetComponentInChildren<MeshRenderer>();
-            if (renderer != null)
-            {
-                var mat = new Material(renderer.sharedMaterial);
-                mat.color = profile.HudColor;
-                renderer.material = mat;
-            }
+            // AgentCharacterController에 identity 전달
+            var charCtrl = modelInstance.GetComponent<AgentCharacterController>();
+            if (charCtrl != null)
+                charCtrl.SetIdentity(profile.SessionId, profile.AgentName);
+
+            // AgentAnimationController (간이 전환용, FSM과 별도)
+            var animator = modelInstance.GetComponentInChildren<Animator>();
+            var animController = modelInstance.GetComponent<AgentAnimationController>();
+            if (animController == null)
+                animController = modelInstance.AddComponent<AgentAnimationController>();
+            animController.Initialize(animator);
 
             // 2) HUD 부착
             AgentHUDController hud = null;
@@ -114,6 +118,7 @@ namespace OpenDesk.Presentation.Character
                 Profile = profile,
                 ModelInstance = modelInstance,
                 HUD = hud,
+                AnimController = animController,
                 SpawnPointIndex = pointIndex
             };
 

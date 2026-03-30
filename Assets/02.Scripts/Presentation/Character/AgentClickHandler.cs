@@ -57,6 +57,11 @@ namespace OpenDesk.Presentation.Character
             // 에이전트 인덱스 찾기 (DataStore 기반)
             int agentIndex = FindAgentDataIndex(spawnedAgent.Profile.AgentName);
 
+            // 디버그: 위저드 세팅값 전체 출력
+            var savedData = AgentDataStore.Load(agentIndex);
+            if (savedData != null)
+                Debug.Log($"[AgentClick] 프로필 상세:\n{savedData.ToDebugString()}");
+
             // 세션이 없으면 자동 생성
             var sessions = AgentSessionStore.LoadByAgent(agentIndex);
             if (sessions.Count == 0)

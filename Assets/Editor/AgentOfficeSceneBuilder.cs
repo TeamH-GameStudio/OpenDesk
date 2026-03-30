@@ -2,9 +2,11 @@ using OpenDesk.AgentCreation.Installers;
 using OpenDesk.Presentation.Character;
 using OpenDesk.Presentation.UI.AgentCreation;
 using OpenDesk.Presentation.UI.Session;
+using Unity.AI.Navigation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.UI;
 using TMPro;
 
@@ -16,10 +18,11 @@ using TMPro;
 /// </summary>
 public static class AgentOfficeSceneBuilder
 {
-    private const string OfficePrefabPath = "Assets/Mnostva_Art/Prefabs/Rooms/Office_35.prefab";
-    private const string CubePrefabPath   = "Assets/05.Prefabs/Agent/AgentCube_Placeholder.prefab";
-    private const string HudPrefabPath    = "Assets/05.Prefabs/Agent/AgentHUD.prefab";
-    private const string FontAssetPath    = "Assets/NotoSansKR-VariableFont_wght.asset";
+    private const string OfficePrefabPath   = "Assets/Mnostva_Art/Prefabs/Rooms/Office_35.prefab";
+    private const string CubePrefabPath    = "Assets/05.Prefabs/Agent/AgentCube_Placeholder.prefab";
+    private const string Agent3DPrefabPath = "Assets/05.Prefabs/Agent/Model_Agent3D.prefab";
+    private const string HudPrefabPath     = "Assets/05.Prefabs/Agent/AgentHUD.prefab";
+    private const string FontAssetPath     = "Assets/NotoSansKR-VariableFont_wght.asset";
 
     private static TMP_FontAsset _font;
 
@@ -71,8 +74,9 @@ public static class AgentOfficeSceneBuilder
         var cam = camObj.AddComponent<Camera>();
         cam.clearFlags = CameraClearFlags.Skybox;
         cam.fieldOfView = 50;
-        camObj.transform.position = new Vector3(4f, 3.5f, -5f);
-        camObj.transform.rotation = Quaternion.Euler(25f, -15f, 0f);
+        // Office 내부를 정면에서 바라보는 위치 (앞쪽에서 안쪽을 봄)
+        camObj.transform.position = new Vector3(1.35f, 5.1f, 6.1f);
+        camObj.transform.rotation = Quaternion.Euler(31.86f, -162f, 0f);
         camObj.AddComponent<AudioListener>();
 
         // ── 라이트 ───────────────────────────────────────────
@@ -97,16 +101,31 @@ public static class AgentOfficeSceneBuilder
         officeInstance.name = "Office_35";
         officeInstance.transform.position = Vector3.zero;
 
-        // ── SpawnPoints ──────────────────────────────────────
+        // Office 바닥에 static Navigation 설정 (NavMesh 베이크용)
+        SetStaticRecursive(officeInstance, true);
+
+        // NavMeshSurface 컴포넌트 추가 (바닥 + 벽 + 사물 인식)
+        var navSurface = officeInstance.AddComponent<NavMeshSurface>();
+        navSurface.collectObjects = CollectObjects.Children;
+        navSurface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
+        navSurface.defaultArea = 0; // Walkable
+        navSurface.agentTypeID = 0; // Humanoid
+        navSurface.BuildNavMesh();
+        Debug.Log("[AgentOfficeSceneBuilder] NavMesh 베이크 완료");
+
+        // ── SpawnPoints (Office 바닥 높이 감지) ──────────────
         var spawnRoot = new GameObject("SpawnPoints");
         spawnRoot.transform.position = Vector3.zero;
 
+        // 바닥 높이 자동 감지 (Floor 메쉬 기준)
+        float floorY = DetectFloorHeight(officeInstance);
+
         var spawnPositions = new Vector3[]
         {
-            new(1.5f, 0f, 1.5f),
-            new(4f,   0f, 1.5f),
-            new(6.5f, 0f, 1.5f),
-            new(4f,   0f, 4f),
+            new(1.5f, floorY, 1.5f),
+            new(4f,   floorY, 1.5f),
+            new(6.5f, floorY, 1.5f),
+            new(4f,   floorY, 4f),
         };
 
         var spawnTransforms = new Transform[spawnPositions.Length];
@@ -143,15 +162,17 @@ public static class AgentOfficeSceneBuilder
         for (int i = 0; i < spawnTransforms.Length; i++)
             spawnPointsProp.GetArrayElementAtIndex(i).objectReferenceValue = spawnTransforms[i];
 
-        spawnerSO.FindProperty("_defaultModelPrefab").objectReferenceValue = cubePrefab;
+        // Model_Agent3D가 있으면 우선 사용, 없으면 큐브 폴백
+        var agent3DPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(Agent3DPrefabPath);
+        spawnerSO.FindProperty("_defaultModelPrefab").objectReferenceValue = agent3DPrefab != null ? agent3DPrefab : cubePrefab;
         spawnerSO.FindProperty("_hudPrefab").objectReferenceValue = hudPrefab;
-        spawnerSO.FindProperty("_hudHeight").floatValue = 1.8f;
+        spawnerSO.FindProperty("_hudHeight").floatValue = 2.2f; // 3D 모델 높이에 맞춤
         spawnerSO.ApplyModifiedPropertiesWithoutUndo();
 
         // ── OrbitCamera ──────────────────────────────────────
         camObj.AddComponent<OrbitCamera>();
         var orbitSO = new SerializedObject(camObj.GetComponent<OrbitCamera>());
-        orbitSO.FindProperty("_targetPoint").vector3Value = new Vector3(4f, 1f, 2f);
+        orbitSO.FindProperty("_targetPoint").vector3Value = new Vector3(3f, 1f, 3f);
         orbitSO.ApplyModifiedPropertiesWithoutUndo();
 
         // ── Bootstrapper (PlayerPrefs → 자동 소환) ──────────
@@ -163,10 +184,16 @@ public static class AgentOfficeSceneBuilder
 
         // 모델 프리팹 매핑 등록
         var prefabsProp = bootSO.FindProperty("_modelPrefabs");
-        prefabsProp.arraySize = 1;
+        prefabsProp.arraySize = agent3DPrefab != null ? 2 : 1;
         var entry0 = prefabsProp.GetArrayElementAtIndex(0);
-        entry0.FindPropertyRelative("PrefabName").stringValue = "AgentCube_Placeholder";
-        entry0.FindPropertyRelative("Prefab").objectReferenceValue = cubePrefab;
+        entry0.FindPropertyRelative("PrefabName").stringValue = "Model_Agent3D";
+        entry0.FindPropertyRelative("Prefab").objectReferenceValue = agent3DPrefab != null ? agent3DPrefab : cubePrefab;
+        if (agent3DPrefab != null)
+        {
+            var entry1 = prefabsProp.GetArrayElementAtIndex(1);
+            entry1.FindPropertyRelative("PrefabName").stringValue = "AgentCube_Placeholder";
+            entry1.FindPropertyRelative("Prefab").objectReferenceValue = cubePrefab;
+        }
         bootSO.ApplyModifiedPropertiesWithoutUndo();
 
         // ── 세션 리스트 UI (Screen Space Overlay) ────────────
@@ -513,6 +540,14 @@ public static class AgentOfficeSceneBuilder
         cpSO.FindProperty("_inputField").objectReferenceValue = chatInputField;
         cpSO.FindProperty("_sendButton").objectReferenceValue = chatSendObj.GetComponent<Button>();
         cpSO.FindProperty("_emptyHint").objectReferenceValue = chatEmptyHint;
+
+        // Claude 미들웨어 컴포넌트 (Office 씬에서 직접 연결)
+        var claudeObj = new GameObject("ClaudeMiddleware");
+        var claudeClient = claudeObj.AddComponent<OpenDesk.Claude.ClaudeWebSocketClient>();
+        var middlewareLauncher = claudeObj.AddComponent<OpenDesk.Claude.MiddlewareLauncher>();
+
+        cpSO.FindProperty("_claudeClient").objectReferenceValue = claudeClient;
+        cpSO.FindProperty("_middlewareLauncher").objectReferenceValue = middlewareLauncher;
         cpSO.ApplyModifiedPropertiesWithoutUndo();
 
         chatPanel.SetActive(false); // 기본 숨김
@@ -756,6 +791,42 @@ public static class AgentOfficeSceneBuilder
         var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
         Object.DestroyImmediate(root);
         return prefab;
+    }
+
+    /// <summary>Office 프리팹에서 바닥(Floor) 메쉬의 Y 높이를 감지</summary>
+    private static float DetectFloorHeight(GameObject officeRoot)
+    {
+        // Floor 오브젝트를 찾아서 상단 Y 좌표 반환
+        foreach (Transform child in officeRoot.transform)
+        {
+            if (!child.name.Contains("Floor")) continue;
+            var renderer = child.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                float topY = renderer.bounds.max.y;
+                Debug.Log($"[AgentOfficeSceneBuilder] 바닥 감지: {child.name} → Y={topY:F2}");
+                return topY;
+            }
+        }
+
+        // Floor를 못 찾으면 Raycast로 탐색
+        if (Physics.Raycast(new Vector3(4f, 10f, 2f), Vector3.down, out var hit, 20f))
+        {
+            Debug.Log($"[AgentOfficeSceneBuilder] Raycast 바닥 감지: Y={hit.point.y:F2}");
+            return hit.point.y;
+        }
+
+        Debug.LogWarning("[AgentOfficeSceneBuilder] 바닥 감지 실패 — Y=0 사용");
+        return 0f;
+    }
+
+    /// <summary>오브젝트와 자식 전체에 Navigation Static 설정</summary>
+    private static void SetStaticRecursive(GameObject obj, bool isStatic)
+    {
+        GameObjectUtility.SetStaticEditorFlags(obj,
+            StaticEditorFlags.NavigationStatic | StaticEditorFlags.BatchingStatic);
+        foreach (Transform child in obj.transform)
+            SetStaticRecursive(child.gameObject, isStatic);
     }
 
     private static void EnsureFolder(string path)
