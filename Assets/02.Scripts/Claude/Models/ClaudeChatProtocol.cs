@@ -30,6 +30,13 @@ namespace OpenDesk.Claude.Models
         public string type = "ping";
     }
 
+    [Serializable]
+    public class ResumeRequest
+    {
+        public string type = "resume";
+        public string conversation; // ConversationFile JSON
+    }
+
     // ── 서버 → Unity 응답 (수신 파싱용) ────────────────────────
 
     [Serializable]

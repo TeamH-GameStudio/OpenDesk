@@ -89,20 +89,31 @@ class ChatSession:
         # 시스템 프롬프트
         if self.system_prompt:
             parts.append(f"[System]\n{self.system_prompt}\n")
+            parts.append("중요: 당신은 채팅 에이전트입니다. 파일 읽기, 코드 실행 등의 도구는 사용하지 마세요. 대화로만 응답하세요.\n")
 
-        # 대화 히스토리
-        if len(self.history) > 1:
-            parts.append("[Conversation History]")
-            # 마지막 메시지(현재 질문)를 제외한 히스토리
-            for msg in self.history[:-1]:
-                role = "User" if msg["role"] == "user" else "Assistant"
-                parts.append(f"{role}: {msg['text']}")
+        # 마지막 user 메시지 찾기
+        last_user_idx = -1
+        for i in range(len(self.history) - 1, -1, -1):
+            if self.history[i]["role"] == "user":
+                last_user_idx = i
+                break
+
+        if last_user_idx < 0:
+            return "안녕하세요"
+
+        # 대화 히스토리 (마지막 user 메시지 제외)
+        if last_user_idx > 0:
+            parts.append("[이전 대화]")
+            for msg in self.history[:last_user_idx]:
+                role = "사용자" if msg["role"] == "user" else "AI"
+                # 히스토리 텍스트는 짧게 자르기 (프롬프트 길이 제한)
+                text = msg["text"][:500]
+                parts.append(f"{role}: {text}")
             parts.append("")
 
         # 현재 메시지
-        current = self.history[-1]["text"] if self.history else ""
-        parts.append(f"User: {current}")
-        parts.append("\nPlease respond to the user's latest message.")
+        current = self.history[last_user_idx]["text"]
+        parts.append(f"[현재 질문]\n{current}")
 
         return "\n".join(parts)
 
@@ -158,6 +169,9 @@ async def handle_client(websocket):
             elif msg_type == "config":
                 _handle_config(session, msg)
                 await _send(websocket, {"type": "config_updated"})
+
+            elif msg_type == "resume":
+                await _handle_resume(websocket, session, msg)
 
             elif msg_type == "ping":
                 await _send(websocket, {"type": "pong"})
@@ -238,6 +252,61 @@ async def _handle_chat(websocket, session: ChatSession, msg: dict):
         logger.debug(f"Status: {text}")
 
     await session.bridge.send_message(prompt, on_delta, on_final, on_error, on_status)
+
+
+async def _handle_resume(websocket, session: ChatSession, msg: dict):
+    """대화 히스토리 JSON을 로드하여 세션에 주입 — 대화 이어나기"""
+    conv_json = msg.get("conversation", "")
+    if not conv_json:
+        await _send(websocket, {
+            "type": "error",
+            "message": "conversation 데이터가 비어있습니다",
+            "code": "empty_resume",
+        })
+        return
+
+    try:
+        conv_data = json.loads(conv_json)
+    except json.JSONDecodeError:
+        await _send(websocket, {
+            "type": "error",
+            "message": "conversation JSON 파싱 실패",
+            "code": "invalid_resume_json",
+        })
+        return
+
+    # 히스토리 클리어 후 JSON에서 복원
+    session.clear()
+
+    messages = conv_data.get("Messages", [])
+    agent_name = conv_data.get("AgentName", "AI 에이전트")
+
+    for m in messages:
+        sender = m.get("Sender", 0)  # 0=User, 1=Agent, 2=System
+        text = m.get("Text", "")
+        if not text:
+            continue
+
+        if sender == 0:  # User
+            session.history.append({"role": "user", "text": text})
+        elif sender == 1:  # Agent
+            session.history.append({"role": "assistant", "text": text})
+        # System 메시지는 히스토리에 포함하지 않음
+
+    # 시스템 프롬프트에 에이전트 이름 반영
+    if agent_name:
+        session.system_prompt = (
+            f"당신은 '{agent_name}'이라는 이름의 AI 에이전트입니다. "
+            f"한국어로 대화하며, 사용자의 요청에 전문적으로 답변합니다. "
+            f"이전 대화 맥락을 이어서 답변해주세요."
+        )
+
+    resumed_count = len(session.history)
+    logger.info(f"Session resumed: {resumed_count} messages, agent='{agent_name}'")
+
+    await _send(websocket, {
+        "type": "config_updated",
+    })
 
 
 def _handle_config(session: ChatSession, msg: dict):

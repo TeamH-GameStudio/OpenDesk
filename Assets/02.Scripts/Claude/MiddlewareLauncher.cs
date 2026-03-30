@@ -23,7 +23,7 @@ namespace OpenDesk.Claude
 
 #if UNITY_EDITOR
         [Header("개발용 (에디터)")]
-        [SerializeField] private string _pythonPath = "python3.12";
+        [SerializeField] private string _pythonPath = "";
         [SerializeField] private string _serverScript = "server.py";
 #endif
 
@@ -72,11 +72,14 @@ namespace OpenDesk.Claude
                 return;
             }
 
+            var pythonExe = ResolvePythonPath();
+            Debug.Log($"[MiddlewareLauncher] Python 경로: {pythonExe}");
+
             _process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName         = _pythonPath,
+                    FileName         = pythonExe,
                     Arguments        = _serverScript,
                     WorkingDirectory = middlewarePath,
                     UseShellExecute  = false,
@@ -130,6 +133,53 @@ namespace OpenDesk.Claude
             };
 
             _process.Start();
+        }
+
+        /// <summary>Python 실행 경로 탐색 — Inspector 지정 > WindowsApps > PATH 순</summary>
+        private string ResolvePythonPath()
+        {
+            // 1) Inspector에서 직접 지정한 경우
+            if (!string.IsNullOrEmpty(_pythonPath) && File.Exists(_pythonPath))
+                return _pythonPath;
+
+            // 2) WindowsApps python3.exe / python.exe 탐색
+            var windowsApps = Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+                "Microsoft", "WindowsApps");
+
+            var candidates = new[] { "python3.exe", "python.exe", "python3.12.exe" };
+            foreach (var name in candidates)
+            {
+                var fullPath = Path.Combine(windowsApps, name);
+                if (File.Exists(fullPath))
+                    return fullPath;
+            }
+
+            // 3) 일반 설치 경로
+            var programPaths = new[]
+            {
+                Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+                    "Programs", "Python"),
+                @"C:\Python312", @"C:\Python311", @"C:\Python310",
+            };
+
+            foreach (var basePath in programPaths)
+            {
+                if (!Directory.Exists(basePath)) continue;
+                // Programs/Python/Python3xx/ 구조
+                foreach (var dir in Directory.GetDirectories(basePath, "Python*"))
+                {
+                    var exe = Path.Combine(dir, "python.exe");
+                    if (File.Exists(exe)) return exe;
+                }
+                // 직접 python.exe
+                var direct = Path.Combine(basePath, "python.exe");
+                if (File.Exists(direct)) return direct;
+            }
+
+            // 4) 폴백: PATH에서 찾기를 기대
+            Debug.LogWarning("[MiddlewareLauncher] Python 경로를 찾을 수 없음 — 'python' 으로 시도");
+            return "python";
         }
 
         private void OnApplicationQuit()

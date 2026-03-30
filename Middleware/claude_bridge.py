@@ -65,6 +65,7 @@ class ClaudeBridge:
                 "-p", prompt,
                 "--output-format", "stream-json",
                 "--verbose",
+                "--tools", "",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=1024 * 1024,  # 1MB — 긴 응답 대응

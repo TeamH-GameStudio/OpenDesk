@@ -169,6 +169,21 @@ namespace OpenDesk.Claude
             await _socket.SendText(JsonUtility.ToJson(new PingRequest()));
         }
 
+        /// <summary>대화 히스토리 JSON을 전송하여 세션 이어나기</summary>
+        public async void SendResume(string conversationJson)
+        {
+            if (!_isConnected || _socket == null)
+            {
+                OnError?.Invoke("서버에 연결되지 않았습니다");
+                return;
+            }
+
+            var req = new ResumeRequest { conversation = conversationJson };
+            var json = JsonUtility.ToJson(req);
+            Debug.Log($"[ClaudeWS] resume 전송: {conversationJson.Length}자");
+            await _socket.SendText(json);
+        }
+
         // ── WebSocket 이벤트 핸들러 ───────────────────────────
 
         private void HandleOpen()
