@@ -132,7 +132,36 @@ namespace OpenDesk.Presentation.UI.AgentCreation
             };
 
             BindButtons();
+            DisableNonClaudeModels();
             TransitionTo(AgentCreationStep.NameInput);
+        }
+
+        /// <summary>Claude 외 모델 카드 비활성화 + Claude 자동 선택</summary>
+        private void DisableNonClaudeModels()
+        {
+            if (_modelCards == null) return;
+            foreach (var card in _modelCards)
+            {
+                if (card.Model == AgentAIModel.ClaudeSonnet) continue;
+
+                // 비활성화 (회색 처리 + 클릭 불가)
+                if (card.Button != null)
+                {
+                    card.Button.interactable = false;
+                    var colors = card.Button.colors;
+                    colors.disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.4f);
+                    card.Button.colors = colors;
+                }
+                if (card.RecommendTag != null) card.RecommendTag.SetActive(false);
+                if (card.DescText != null) card.DescText.text = "(준비 중)";
+            }
+
+            // Claude 자동 선택
+            _data.AIModel = AgentAIModel.ClaudeSonnet;
+
+            // 아바타 카드 1개만 있으면 자동 선택
+            if (_avatarCards != null && _avatarCards.Length == 1)
+                _data.AvatarPrefabName = _avatarCards[0].PrefabName;
         }
 
         private void BindButtons()

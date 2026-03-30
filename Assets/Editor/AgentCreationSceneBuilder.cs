@@ -344,10 +344,10 @@ public static class AgentCreationSceneBuilder
         avatarGridLayout.childAlignment = TextAnchor.MiddleCenter;
         avatarGridLayout.padding = new RectOffset(10, 10, 10, 10);
 
-        // 아바타 카드 (현재 큐브 1종만)
+        // 아바타 카드 (Model_Agent3D 사용)
         var avatarDefs = new (string prefabName, string displayName)[]
         {
-            ("AgentCube_Placeholder", "기본 큐브"),
+            ("Model_Agent3D", "비즈니스맨"),
         };
 
         var avatarCardObjects = new (GameObject obj, Button btn, GameObject indicator, Image preview)[avatarDefs.Length];

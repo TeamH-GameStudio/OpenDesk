@@ -28,6 +28,14 @@ namespace OpenDesk.AgentCreation.Models
             PlayerPrefs.SetString(prefix + "ModelPrefab", modelPrefabName);
             PlayerPrefs.SetString(prefix + "SessionId",   $"agent_{index}_{System.Guid.NewGuid():N}"[..16]);
 
+            // 확장 필드 저장
+            PlayerPrefs.SetString(prefix + "AllowedTools",    string.Join("|", data.AllowedTools));
+            PlayerPrefs.SetString(prefix + "ExecContext",     data.ExecutionContext);
+            PlayerPrefs.SetString(prefix + "ArgHint",         data.ArgumentHint);
+            PlayerPrefs.SetString(prefix + "EquippedSkills",  string.Join("|", data.EquippedSkills));
+            PlayerPrefs.SetString(prefix + "CustomPrompt",    data.CustomPrompt);
+            PlayerPrefs.SetInt(prefix    + "MaxSkillSlots",   data.MaxSkillSlots);
+
             PlayerPrefs.SetInt(KeyCount, index + 1);
             PlayerPrefs.Save();
 
@@ -49,14 +57,23 @@ namespace OpenDesk.AgentCreation.Models
             var name = PlayerPrefs.GetString(prefix + "Name", "");
             if (string.IsNullOrEmpty(name)) return null;
 
+            var toolsRaw = PlayerPrefs.GetString(prefix + "AllowedTools", "");
+            var skillsRaw = PlayerPrefs.GetString(prefix + "EquippedSkills", "");
+
             return new SavedAgentData
             {
-                AgentName      = name,
-                Role           = (AgentRole)PlayerPrefs.GetInt(prefix + "Role", 0),
-                AIModel        = (AgentAIModel)PlayerPrefs.GetInt(prefix + "AIModel", 0),
-                Tone           = (AgentTone)PlayerPrefs.GetInt(prefix + "Tone", 0),
+                AgentName       = name,
+                Role            = (AgentRole)PlayerPrefs.GetInt(prefix + "Role", 0),
+                AIModel         = (AgentAIModel)PlayerPrefs.GetInt(prefix + "AIModel", 0),
+                Tone            = (AgentTone)PlayerPrefs.GetInt(prefix + "Tone", 0),
                 ModelPrefabName = PlayerPrefs.GetString(prefix + "ModelPrefab", ""),
-                SessionId      = PlayerPrefs.GetString(prefix + "SessionId", ""),
+                SessionId       = PlayerPrefs.GetString(prefix + "SessionId", ""),
+                AllowedTools    = string.IsNullOrEmpty(toolsRaw) ? new() : new(toolsRaw.Split('|')),
+                ExecutionContext = PlayerPrefs.GetString(prefix + "ExecContext", ""),
+                ArgumentHint    = PlayerPrefs.GetString(prefix + "ArgHint", ""),
+                EquippedSkills  = string.IsNullOrEmpty(skillsRaw) ? new() : new(skillsRaw.Split('|')),
+                CustomPrompt    = PlayerPrefs.GetString(prefix + "CustomPrompt", ""),
+                MaxSkillSlots   = PlayerPrefs.GetInt(prefix + "MaxSkillSlots", 3),
             };
         }
 
@@ -87,6 +104,12 @@ namespace OpenDesk.AgentCreation.Models
                 PlayerPrefs.DeleteKey(prefix + "Tone");
                 PlayerPrefs.DeleteKey(prefix + "ModelPrefab");
                 PlayerPrefs.DeleteKey(prefix + "SessionId");
+                PlayerPrefs.DeleteKey(prefix + "AllowedTools");
+                PlayerPrefs.DeleteKey(prefix + "ExecContext");
+                PlayerPrefs.DeleteKey(prefix + "ArgHint");
+                PlayerPrefs.DeleteKey(prefix + "EquippedSkills");
+                PlayerPrefs.DeleteKey(prefix + "CustomPrompt");
+                PlayerPrefs.DeleteKey(prefix + "MaxSkillSlots");
             }
             PlayerPrefs.DeleteKey(KeyCount);
             PlayerPrefs.Save();
@@ -104,6 +127,14 @@ namespace OpenDesk.AgentCreation.Models
         public string ModelPrefabName;
         public string SessionId;
 
+        // 확장 필드
+        public System.Collections.Generic.List<string> AllowedTools = new();
+        public string ExecutionContext = "";
+        public string ArgumentHint = "";
+        public System.Collections.Generic.List<string> EquippedSkills = new();
+        public string CustomPrompt = "";
+        public int MaxSkillSlots = 3;
+
         /// <summary>AgentCreationData로 변환</summary>
         public AgentCreationData ToCreationData()
         {
@@ -113,7 +144,21 @@ namespace OpenDesk.AgentCreation.Models
                 Role = Role,
                 AIModel = AIModel,
                 Tone = Tone,
+                AllowedTools = new(AllowedTools),
+                ExecutionContext = ExecutionContext,
+                ArgumentHint = ArgumentHint,
+                EquippedSkills = new(EquippedSkills),
+                CustomPrompt = CustomPrompt,
+                MaxSkillSlots = MaxSkillSlots,
             };
+        }
+
+        /// <summary>디버그 출력용</summary>
+        public string ToDebugString()
+        {
+            var data = ToCreationData();
+            data.AvatarPrefabName = ModelPrefabName;
+            return data.ToDebugString() + $"\n  SessionId: {SessionId}";
         }
     }
 }
