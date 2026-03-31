@@ -4,6 +4,8 @@ using OpenDesk.AgentCreation.Models;
 using OpenDesk.Claude;
 using OpenDesk.Core.Models;
 using OpenDesk.Presentation.Character;
+using OpenDesk.Pipeline;
+using OpenDesk.SkillDiskette;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -215,15 +217,50 @@ namespace OpenDesk.Presentation.UI.Session
             if (convFile == null || convFile.Messages.Count == 0)
             {
                 _claudeClient.SendClear();
-                var roleName = RoleNames.GetValueOrDefault(_currentRole, "에이전트");
-                _claudeClient.SendConfig(
-                    $"당신은 '{_currentAgentName}'이라는 이름의 {roleName} 전문 에이전트입니다. " +
-                    "한국어로 대화하며, 사용자의 요청에 전문적으로 답변합니다.");
+                ApplySystemPrompt();
                 return;
             }
 
             var historyJson = JsonUtility.ToJson(convFile);
             _claudeClient.SendResume(historyJson);
+        }
+
+        /// <summary>
+        /// 장착 디스켓 + In-box 파일 기반 system prompt 합성 및 적용.
+        /// 디스켓이 없으면 기본 프로필로 fallback.
+        /// </summary>
+        private void ApplySystemPrompt()
+        {
+            if (_claudeClient == null || !_claudeClient.IsConnected) return;
+
+            var equipment = _linkedCharCtrl?.Equipment;
+            if (equipment != null)
+            {
+                // 에이전트 프로필 설정 (위저드 데이터 반영)
+                var roleName = RoleNames.GetValueOrDefault(_currentRole, "에이전트");
+                var toneName = _currentRole.ToString();
+                equipment.SetAgentProfile(_currentAgentName, roleName, toneName);
+
+                // 파이프라인 매니저가 있으면 파일 컨텍스트도 포함
+                var pipeline = FindFirstObjectByType<OfficePipelineManager>();
+                var prompt = pipeline != null
+                    ? pipeline.BuildFullSystemPrompt(equipment)
+                    : equipment.BuildSystemPrompt();
+
+                if (!string.IsNullOrEmpty(prompt))
+                {
+                    _claudeClient.SendConfig(prompt);
+                    var fileCount = pipeline?.Inbox?.FilePaths?.Count ?? 0;
+                    Debug.Log($"[ChatPanel] System prompt 적용 ({prompt.Length}자, 디스켓 {equipment.EquippedDisks.Count}개, 파일 {fileCount}개)");
+                    return;
+                }
+            }
+
+            // fallback: 디스켓 없을 때 기본 프롬프트
+            var fallbackRole = RoleNames.GetValueOrDefault(_currentRole, "에이전트");
+            _claudeClient.SendConfig(
+                $"당신은 '{_currentAgentName}'이라는 이름의 {fallbackRole} 전문 에이전트입니다. " +
+                "한국어로 대화하며, 사용자의 요청에 전문적으로 답변합니다.");
         }
 
         // ================================================================
@@ -257,6 +294,9 @@ namespace OpenDesk.Presentation.UI.Session
             // ★ 에이전트 상태: Thinking (의자로 이동 + 생각 모션)
             SetAgentState(AgentActionType.Thinking);
             UpdateSubtitle("생각 중...");
+
+            // 장착 디스켓 변경 반영 (매 메시지마다 최신 prompt 적용)
+            ApplySystemPrompt();
 
             if (_claudeClient != null && _claudeClient.IsConnected)
             {
@@ -315,6 +355,15 @@ namespace OpenDesk.Presentation.UI.Session
             // ★ 에이전트 상태: Completed (환호 → 3초 후 Idle로 자동 복귀)
             SetAgentState(AgentActionType.ChatFinal);
             UpdateSubtitle("응답 완료");
+
+            // Out-box 연동: In-box에 파일이 있었으면 결과도 저장
+            var pipeline = FindFirstObjectByType<OfficePipelineManager>();
+            if (pipeline?.Outbox != null && pipeline.Inbox != null
+                && pipeline.Inbox.FilePaths.Count > 0
+                && !string.IsNullOrEmpty(finalText))
+            {
+                pipeline.Outbox.ReceiveResult(finalText);
+            }
 
             // 3초 후 서브타이틀 복귀
             RestoreSubtitleAfterDelay().Forget();

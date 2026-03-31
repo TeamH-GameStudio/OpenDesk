@@ -1,3 +1,7 @@
+using OpenDesk.Claude;
+using OpenDesk.Core.Implementations;
+using OpenDesk.Core.Services;
+using OpenDesk.Pipeline;
 using OpenDesk.Presentation.Character;
 using OpenDesk.Presentation.UI.Session;
 using UnityEngine;
@@ -21,6 +25,9 @@ namespace OpenDesk.AgentCreation.Installers
             builder.RegisterComponentInHierarchy<SessionListController>();
             builder.RegisterComponentInHierarchy<ChatPanelController>();
             builder.RegisterComponentInHierarchy<AgentClickHandler>();
+            builder.RegisterComponentInHierarchy<ClaudeWebSocketClient>();
+            builder.Register<ClaudeService>(Lifetime.Scoped).As<IClaudeService>();
+            builder.RegisterComponentInHierarchy<DiskettePrinterController>();
 
             Debug.Log("[VContainer] AgentOfficeInstaller.Configure() 완료");
         }
