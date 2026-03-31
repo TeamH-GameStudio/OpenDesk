@@ -3,6 +3,7 @@ using OpenDesk.Core.Models;
 using OpenDesk.Core.Services;
 using OpenDesk.Presentation.Character.Context;
 using OpenDesk.Presentation.Character.States;
+using OpenDesk.SkillDiskette;
 using R3;
 using UnityEngine;
 using UnityEngine.AI;
@@ -57,6 +58,9 @@ namespace OpenDesk.Presentation.Character
         public string SessionId => _sessionId;
         public string AgentName => _agentName;
 
+        /// <summary>디스켓 장착 관리자 (같은 GameObject 또는 자식에 부착)</summary>
+        public AgentEquipmentManager Equipment { get; private set; }
+
         private bool _initialized;
 
         /// <summary>외부에서 세션/이름 설정 후 FSM 초기화 (Spawner에서 호출)</summary>
@@ -74,6 +78,13 @@ namespace OpenDesk.Presentation.Character
         private void Awake()
         {
             SetupNavMeshAgent();
+
+            // EquipmentManager 탐색 (같은 GO 또는 자식)
+            Equipment = GetComponent<AgentEquipmentManager>();
+            if (Equipment == null)
+                Equipment = GetComponentInChildren<AgentEquipmentManager>();
+            if (Equipment == null)
+                Equipment = gameObject.AddComponent<AgentEquipmentManager>();
         }
 
         private void Start()
