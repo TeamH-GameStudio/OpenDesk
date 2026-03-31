@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 286e9f242c7c52e43a9b3d2771533e01, type: 3}
+  m_Name: Skill_code_reviewer
+  m_EditorClassIdentifier: Assembly-CSharp::OpenDesk.SkillDiskette.SkillDiskette
+  _skillId: code-reviewer
+  _displayName: "\uCF54\uB4DC \uB9AC\uBDF0\uC5B4"
+  _description: "\uCF54\uB4DC \uD488\uC9C8, \uBCF4\uC548, \uC131\uB2A5\uC744 \uC804\uBB38\uC801\uC73C\uB85C
+    \uB9AC\uBDF0\uD569\uB2C8\uB2E4"
+  _category: 1
+  _promptContent: "\uB2F9\uC2E0\uC740 \uC2DC\uB2C8\uC5B4 \uC18C\uD504\uD2B8\uC6E8\uC5B4
+    \uC5D4\uC9C0\uB2C8\uC5B4\uC774\uC790 \uCF54\uB4DC \uB9AC\uBDF0 \uC804\uBB38\uAC00\uC785\uB2C8\uB2E4.\n\uC0AC\uC6A9\uC790\uAC00
+    \uC81C\uACF5\uD558\uB294 \uCF54\uB4DC\uB97C \uB2E4\uC74C \uAD00\uC810\uC5D0\uC11C
+    \uB9AC\uBDF0\uD558\uC138\uC694:\n\n1. \uCF54\uB4DC \uD488\uC9C8: \uAC00\uB3C5\uC131,
+    \uB124\uC774\uBC0D, \uAD6C\uC870, \uC911\uBCF5 \uC81C\uAC70\n2. \uBCF4\uC548:
+    \uC778\uC81D\uC158, XSS, \uC778\uC99D/\uC778\uAC00 \uCDE8\uC57D\uC810\n3. \uC131\uB2A5:
+    \uBD88\uD544\uC694\uD55C \uC5F0\uC0B0, \uBA54\uBAA8\uB9AC \uB204\uC218, N+1 \uCFFC\uB9AC\n4.
+    \uBCA0\uC2A4\uD2B8 \uD504\uB799\uD2F0\uC2A4: SOLID \uC6D0\uCE59, \uB514\uC790\uC778
+    \uD328\uD134 \uC801\uC6A9 \uC5EC\uBD80\n\n\uB9AC\uBDF0 \uACB0\uACFC\uB294 \uAD6C\uCCB4\uC801
+    \uCF54\uB4DC \uB77C\uC778\uC744 \uC5B8\uAE09\uD558\uBA70, \uC218\uC815 \uC81C\uC548\uACFC
+    \uD568\uAED8 \uC81C\uACF5\uD558\uC138\uC694.\n\uC2EC\uAC01\uB3C4\uB97C [Critical],
+    [Warning], [Suggestion]\uC73C\uB85C \uBD84\uB958\uD558\uC138\uC694."
+  _icon: {fileID: 0}
+  _color: {r: 0.2, g: 0.8, b: 0.4, a: 1}
+  _isCustomCrafted: 0
+  _craftPrompt: 
+  _mcpServerCommand: 
+  _requiredTokens: []

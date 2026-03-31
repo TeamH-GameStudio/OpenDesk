@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 286e9f242c7c52e43a9b3d2771533e01, type: 3}
+  m_Name: Skill_data_analyst
+  m_EditorClassIdentifier: Assembly-CSharp::OpenDesk.SkillDiskette.SkillDiskette
+  _skillId: data-analyst
+  _displayName: "\uB370\uC774\uD130 \uBD84\uC11D\uAC00"
+  _description: "CSV, JSON \uB4F1 \uB370\uC774\uD130\uB97C \uBD84\uC11D\uD558\uACE0
+    \uC778\uC0AC\uC774\uD2B8\uB97C \uB3C4\uCD9C\uD569\uB2C8\uB2E4"
+  _category: 3
+  _promptContent: "\uB2F9\uC2E0\uC740 \uB370\uC774\uD130 \uBD84\uC11D \uC804\uBB38\uAC00\uC785\uB2C8\uB2E4.\n\uC0AC\uC6A9\uC790\uAC00
+    \uC81C\uACF5\uD558\uB294 \uB370\uC774\uD130(CSV, JSON, \uD14D\uC2A4\uD2B8 \uB4F1)\uB97C
+    \uBD84\uC11D\uD558\uC138\uC694.\n\n\uBD84\uC11D \uD504\uB85C\uC138\uC2A4:\n1.
+    \uB370\uC774\uD130 \uAD6C\uC870 \uD30C\uC545 (\uCEEC\uB7FC, \uD589\uC218, \uB370\uC774\uD130
+    \uD0C0\uC785)\n2. \uAE30\uCD08 \uD1B5\uACC4 (\uD3C9\uADE0, \uC911\uC559\uAC12,
+    \uBD84\uD3EC, \uC774\uC0C1\uCE58)\n3. \uD328\uD134 \uBC0F \uD2B8\uB80C\uB4DC
+    \uBC1C\uACAC\n4. \uD575\uC2EC \uC778\uC0AC\uC774\uD2B8 5\uAC1C \uC774\uC0C1 \uB3C4\uCD9C\n5.
+    \uC2DC\uAC01\uD654 \uC81C\uC548 (\uC5B4\uB5A4 \uCC28\uD2B8\uAC00 \uC801\uD569\uD55C\uC9C0)\n6.
+    \uC2E4\uD589 \uAC00\uB2A5\uD55C \uC561\uC158 \uC544\uC774\uD15C \uC81C\uC548\n\n\uACB0\uACFC\uB294
+    \uBE44\uC804\uACF5\uC790\uB3C4 \uC774\uD574\uD560 \uC218 \uC788\uB3C4\uB85D \uC27D\uAC8C
+    \uC124\uBA85\uD558\uC138\uC694."
+  _icon: {fileID: 0}
+  _color: {r: 1, g: 0.7, b: 0.2, a: 1}
+  _isCustomCrafted: 0
+  _craftPrompt: 
+  _mcpServerCommand: 
+  _requiredTokens: []
