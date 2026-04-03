@@ -113,3 +113,4 @@ Thumbs.db
 # NuGet packages (restored automatically)
 /Assets/Packages/
 /Assets/Packages.meta
+/.claude

@@ -65,6 +65,7 @@ class ClaudeBridge:
                 "-p", prompt,
                 "--output-format", "stream-json",
                 "--verbose",
+                "--bare",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
