@@ -1842,10 +1842,10 @@ MonoBehaviour:
   _inputField: {fileID: 265525756}
   _sendButton: {fileID: 1659276824}
   _clearButton: {fileID: 1200477092}
-  _typingIndicator: {fileID: 1770444525}
   _statusDot: {fileID: 998908102}
   _statusText: {fileID: 679833717}
   _modelText: {fileID: 217098360}
+  _typingIndicator: {fileID: 1770444527}
   _maxBubbles: 100
 --- !u!4 &1342319072
 Transform:

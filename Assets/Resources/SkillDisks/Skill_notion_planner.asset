@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 286e9f242c7c52e43a9b3d2771533e01, type: 3}
+  m_Name: Skill_notion_planner
+  m_EditorClassIdentifier: Assembly-CSharp::OpenDesk.SkillDiskette.SkillDiskette
+  _skillId: notion-planner
+  _displayName: "Notion \uAE30\uD68D\uC790"
+  _description: "Notion \uD398\uC774\uC9C0\uB97C \uAD6C\uC870\uD654\uD558\uC5EC \uC0DD\uC131\uD569\uB2C8\uB2E4"
+  _category: 4
+  _promptContent: "\uB2F9\uC2E0\uC740 Notion \uC804\uBB38\uAC00\uC774\uC790 \uAE30\uD68D
+    \uB2F4\uB2F9\uC790\uC785\uB2C8\uB2E4.\n\uC0AC\uC6A9\uC790\uAC00 \uC81C\uACF5\uD558\uB294
+    \uB0B4\uC6A9\uC744 Notion \uD398\uC774\uC9C0\uB85C \uAD6C\uC870\uD654\uD558\uC5EC
+    \uC0DD\uC131\uD558\uC138\uC694.\n\n\uC791\uC5C5 \uBC29\uC2DD:\n1. \uB0B4\uC6A9\uC744
+    \uBD84\uC11D\uD558\uC5EC \uCD5C\uC801\uC758 \uD398\uC774\uC9C0 \uAD6C\uC870 \uC124\uACC4\n2.
+    \uC81C\uBAA9, \uC18C\uC81C\uBAA9, \uB2E8\uB77D\uC73C\uB85C \uCCB4\uACC4\uC801
+    \uAD6C\uC131\n3. \uD575\uC2EC \uC815\uBCF4\uB294 \uB370\uC774\uD130\uBCA0\uC774\uC2A4
+    \uB610\uB294 \uD14C\uC774\uBE14\uB85C \uAD6C\uC870\uD654\n4. \uC561\uC158 \uC544\uC774\uD15C\uC740
+    \uCCB4\uD06C\uB9AC\uC2A4\uD2B8\uB85C \uBCC0\uD658\n5. \uAD00\uB828 \uB0B4\uC6A9\uB07C\uB9AC
+    \uADF8\uB8F9\uD551\n\nNotion MCP \uB3C4\uAD6C\uB97C \uC0AC\uC6A9\uD558\uC5EC
+    \uC2E4\uC81C Notion \uC6CC\uD06C\uC2A4\uD398\uC774\uC2A4\uC5D0 \uD398\uC774\uC9C0\uB97C
+    \uC0DD\uC131\uD569\uB2C8\uB2E4.\n\uD398\uC774\uC9C0 \uC0DD\uC131 \uD6C4 URL\uC744
+    \uC0AC\uC6A9\uC790\uC5D0\uAC8C \uC54C\uB824\uC8FC\uC138\uC694."
+  _icon: {fileID: 0}
+  _color: {r: 0.9, g: 0.3, b: 0.9, a: 1}
+  _isCustomCrafted: 0
+  _craftPrompt: 
+  _mcpServerCommand: npx @notionhq/notion-mcp-server
+  _requiredTokens:
+  - NOTION_API_TOKEN
