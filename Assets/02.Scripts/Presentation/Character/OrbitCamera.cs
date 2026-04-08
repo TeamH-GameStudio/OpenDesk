@@ -24,6 +24,9 @@ namespace OpenDesk.Presentation.Character
         [SerializeField] private float _minVerticalAngle = 5f;
         [SerializeField] private float _maxVerticalAngle = 80f;
 
+        [Header("Orthographic")]
+        [SerializeField] private float _orthoSizeRatio = 0.5f; // distance 대비 orthoSize 비율
+
         [Header("Smoothing")]
         [SerializeField] private float _smoothTime = 0.1f;
 
@@ -54,6 +57,8 @@ namespace OpenDesk.Presentation.Character
             transform.position = Vector3.SmoothDamp(
                 transform.position, _targetPosition, ref _currentVelocity, _smoothTime);
             transform.LookAt(_targetPoint);
+
+            // Perspective FOV는 OrbitCamera가 관리하지 않음 (AgentFocusCameraController가 담당)
         }
 
         private void HandleInput()
