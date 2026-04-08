@@ -7,13 +7,16 @@ using UnityEngine.UI;
 namespace OpenDesk.Claude
 {
     /// <summary>
-    /// Claude 채팅 UI 관리 — TestChattingScene 전용.
-    /// 메시지 버블 생성, 스트리밍 텍스트 업데이트, 상태 표시.
+    /// Claude 채팅 UI 관리 -- TestChattingScene 전용.
+    /// 멀티 에이전트 프로토콜 대응 -- Inspector에서 테스트 대상 agent_id 지정.
     /// </summary>
     public class ClaudeChatManager : MonoBehaviour
     {
         [Header("WebSocket 클라이언트")]
         [SerializeField] private ClaudeWebSocketClient _client;
+
+        [Header("에이전트 설정")]
+        [SerializeField] private string _targetAgentId = "researcher";
 
         [Header("채팅 영역")]
         [SerializeField] private ScrollRect    _scrollRect;
@@ -31,9 +34,9 @@ namespace OpenDesk.Claude
 
         [Header("상태 표시")]
         [SerializeField] private Image      _statusDot;
-        [SerializeField] private TMP_Text   _statusText;          // "연결됨" / "연결 끊김"
+        [SerializeField] private TMP_Text   _statusText;
         [SerializeField] private TMP_Text   _modelText;
-        [SerializeField] private TMP_Text   _typingIndicator;     // "대기 중" / "응답 중..." 등
+        [SerializeField] private TMP_Text   _typingIndicator;
 
         [Header("설정")]
         [SerializeField] private int _maxBubbles = 100;
@@ -50,30 +53,28 @@ namespace OpenDesk.Claude
 
         private void Start()
         {
-            // 이벤트 구독
             if (_client != null)
             {
-                _client.OnDelta             += HandleDelta;
-                _client.OnFinal             += HandleFinal;
-                _client.OnError             += HandleError;
+                _client.OnAgentDelta      += HandleDelta;
+                _client.OnAgentMessage    += HandleMessage;
+                _client.OnAgentError      += HandleError;
+                _client.OnAgentState      += HandleState;
+                _client.OnAgentThinking   += HandleThinking;
+                _client.OnAgentAction     += HandleAction;
                 _client.OnConnectionChanged += HandleConnectionChanged;
-                _client.OnCleared           += HandleCleared;
-                _client.OnStatus            += HandleStatus;
+                _client.OnSessionSwitched += HandleSessionSwitched;
             }
 
-            // 버튼 리스너
             if (_sendButton != null)
                 _sendButton.onClick.AddListener(OnSendClicked);
 
             if (_clearButton != null)
                 _clearButton.onClick.AddListener(OnClearClicked);
 
-            // Enter → 전송 (Input System 호환)
             if (_inputField != null)
                 _inputField.onSubmit.AddListener(_ => OnSendClicked());
 
-            // 초기 상태
-            SetConnectionUI(false, "");
+            SetConnectionUI(false);
             CreateSystemBubble("서버에 연결 중...");
         }
 
@@ -81,12 +82,14 @@ namespace OpenDesk.Claude
         {
             if (_client != null)
             {
-                _client.OnDelta             -= HandleDelta;
-                _client.OnFinal             -= HandleFinal;
-                _client.OnError             -= HandleError;
+                _client.OnAgentDelta      -= HandleDelta;
+                _client.OnAgentMessage    -= HandleMessage;
+                _client.OnAgentError      -= HandleError;
+                _client.OnAgentState      -= HandleState;
+                _client.OnAgentThinking   -= HandleThinking;
+                _client.OnAgentAction     -= HandleAction;
                 _client.OnConnectionChanged -= HandleConnectionChanged;
-                _client.OnCleared           -= HandleCleared;
-                _client.OnStatus            -= HandleStatus;
+                _client.OnSessionSwitched -= HandleSessionSwitched;
             }
         }
 
@@ -99,30 +102,21 @@ namespace OpenDesk.Claude
             var text = _inputField.text.Trim();
             if (string.IsNullOrEmpty(text)) return;
 
-            if (_isStreaming)
-            {
-                // 이전 응답 대기 중
-                return;
-            }
+            if (_isStreaming) return;
 
-            // User 버블 생성
             CreateUserBubble(text);
+            _client?.SendChatMessage(_targetAgentId, text);
 
-            // 서버로 전송
-            _client?.SendChat(text);
-
-            // 입력란 초기화 + 포커스
             _inputField.text = "";
             _inputField.ActivateInputField();
 
-            // 상태: 응답 대기
             _isStreaming = true;
             SetAgentStatus("응답 대기 중...");
         }
 
         private void OnClearClicked()
         {
-            _client?.SendClear();
+            _client?.SendChatClear(_targetAgentId);
             DestroyAllBubbles();
             _currentStreamingBubble = null;
             _currentStreamingTMP    = null;
@@ -133,20 +127,20 @@ namespace OpenDesk.Claude
 
         // ── 서버 이벤트 핸들러 ──────────────────────────────
 
-        private void HandleDelta(string text)
+        private void HandleDelta(string agentId, string text)
         {
+            if (agentId != _targetAgentId) return;
+
             SetAgentStatus("응답 중...");
 
             if (_currentStreamingBubble == null)
             {
-                // 첫 delta — 새 AI 버블 생성
                 _currentStreamingBubble = CreateBubble(_aiBubblePrefab, text);
                 _currentStreamingTMP    = _currentStreamingBubble?.GetComponentInChildren<TMP_Text>();
                 _streamingText          = text;
             }
             else
             {
-                // 기존 버블에 append
                 _streamingText += text;
                 if (_currentStreamingTMP != null)
                     _currentStreamingTMP.text = _streamingText;
@@ -155,45 +149,39 @@ namespace OpenDesk.Claude
             AutoScroll();
         }
 
-        private void HandleFinal(string text, float cost)
+        private void HandleMessage(string agentId, string message)
         {
+            if (agentId != _targetAgentId) return;
+
             if (_currentStreamingBubble != null)
             {
-                // 최종 텍스트로 교체 (포매팅 적용됨)
-                if (_currentStreamingTMP != null && !string.IsNullOrEmpty(text))
-                    _currentStreamingTMP.text = text;
+                if (_currentStreamingTMP != null && !string.IsNullOrEmpty(message))
+                    _currentStreamingTMP.text = message;
             }
-            else if (!string.IsNullOrEmpty(text))
+            else if (!string.IsNullOrEmpty(message))
             {
-                // delta 없이 final만 온 경우
-                CreateAIBubble(text);
+                CreateAIBubble(message);
             }
 
-            // 스트리밍 종료
             _currentStreamingBubble = null;
             _currentStreamingTMP    = null;
             _streamingText          = "";
             _isStreaming             = false;
             SetAgentStatus("대기 중");
 
-            if (cost > 0f)
-                Debug.Log($"[Claude] 비용: ${cost:F4}");
-
             AutoScroll();
         }
 
-        private void HandleError(string message)
+        private void HandleError(string agentId, string error, string message)
         {
-            CreateSystemBubble($"오류: {message}");
+            if (agentId != _targetAgentId && !string.IsNullOrEmpty(agentId)) return;
 
-            // 스트리밍 중이었으면 중단
+            CreateSystemBubble($"오류 [{error}]: {message}");
+
             if (_isStreaming)
             {
                 if (_currentStreamingBubble != null && _currentStreamingTMP != null)
-                {
-                    // 마지막 delta 텍스트 유지하고 중단 표시
                     _currentStreamingTMP.text = _streamingText + "\n<color=#F44336><i>(응답 중단됨)</i></color>";
-                }
 
                 _currentStreamingBubble = null;
                 _currentStreamingTMP    = null;
@@ -203,24 +191,49 @@ namespace OpenDesk.Claude
             }
         }
 
-        private void HandleConnectionChanged(bool connected, string model)
+        private void HandleState(string agentId, string state, string tool)
         {
-            SetConnectionUI(connected, model);
+            if (agentId != _targetAgentId) return;
+
+            var statusText = state switch
+            {
+                "thinking" => "사고 중...",
+                "working"  => string.IsNullOrEmpty(tool) ? "작업 중..." : $"도구 실행: {tool}",
+                "complete" => "응답 완료",
+                "idle"     => "대기 중",
+                _          => state
+            };
+            SetAgentStatus(statusText);
+        }
+
+        private void HandleThinking(string agentId, string thinking)
+        {
+            if (agentId != _targetAgentId) return;
+            // thinking 내용을 상태에 요약 표시
+            var preview = thinking.Length > 30 ? thinking[..30] + "..." : thinking;
+            SetAgentStatus($"사고 중: {preview}");
+        }
+
+        private void HandleAction(string agentId, string action)
+        {
+            if (agentId != _targetAgentId) return;
+            Debug.Log($"[ClaudeChatManager] 액션 수신: {action}");
+        }
+
+        private void HandleConnectionChanged(bool connected)
+        {
+            SetConnectionUI(connected);
 
             if (connected)
-                CreateSystemBubble("Claude 채팅 준비 완료");
+                CreateSystemBubble($"서버 연결 완료 -- 에이전트: {_targetAgentId}");
             else
                 CreateSystemBubble("서버 연결 끊김 - 재연결 시도 중...");
         }
 
-        private void HandleStatus(string text)
+        private void HandleSessionSwitched(string agentId, string sessionId, Models.ChatHistoryEntry[] history)
         {
-            SetAgentStatus(text);
-        }
-
-        private void HandleCleared()
-        {
-            CreateSystemBubble("대화가 초기화되었습니다");
+            if (agentId != _targetAgentId) return;
+            CreateSystemBubble($"세션 전환: {sessionId}");
         }
 
         // ── UI 헬퍼 ─────────────────────────────────────────
@@ -231,12 +244,12 @@ namespace OpenDesk.Claude
                 _typingIndicator.text = text;
         }
 
-        private void SetConnectionUI(bool connected, string model)
+        private void SetConnectionUI(bool connected)
         {
             if (_statusDot != null)
                 _statusDot.color = connected
-                    ? new Color32(76, 175, 80, 255)    // #4CAF50 초록
-                    : new Color32(244, 67, 54, 255);   // #F44336 빨강
+                    ? new Color32(76, 175, 80, 255)
+                    : new Color32(244, 67, 54, 255);
 
             if (_statusText != null)
                 _statusText.text = connected ? "연결됨" : "연결 끊김";
@@ -244,7 +257,7 @@ namespace OpenDesk.Claude
             SetAgentStatus(connected ? "대기 중" : "연결 끊김");
 
             if (_modelText != null)
-                _modelText.text = model ?? "";
+                _modelText.text = connected ? _targetAgentId : "";
         }
 
         // ── 버블 생성 ───────────────────────────────────────
@@ -278,7 +291,6 @@ namespace OpenDesk.Claude
 
             _activeBubbles.Add(obj);
 
-            // 오래된 버블 제거
             while (_activeBubbles.Count > _maxBubbles)
             {
                 var oldest = _activeBubbles[0];
@@ -300,7 +312,6 @@ namespace OpenDesk.Claude
 
         private void AutoScroll()
         {
-            // 다음 프레임에서 스크롤 (레이아웃 계산 후)
             Canvas.ForceUpdateCanvases();
             if (_scrollRect != null)
                 _scrollRect.verticalNormalizedPosition = 0f;

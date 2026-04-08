@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using OpenDesk.Claude;
+using OpenDesk.Claude.Models;
 using OpenDesk.Core.Services;
 using OpenDesk.SkillDiskette.Models;
 using UnityEngine;
@@ -13,7 +14,7 @@ namespace OpenDesk.Core.Implementations
 {
     /// <summary>
     /// IClaudeService 구현체.
-    /// 씬의 ClaudeWebSocketClient를 래핑하여 이벤트 중계 + 크래프팅 기능 제공.
+    /// ClaudeWebSocketClient를 래핑하여 이벤트 중계 + 크래프팅 기능 제공.
     /// </summary>
     public class ClaudeService : IClaudeService, IDisposable
     {
@@ -24,67 +25,59 @@ namespace OpenDesk.Core.Implementations
 
         // ── 이벤트 ──
 
-        public event Action<string> OnDelta;
-        public event Action<string, float> OnFinal;
-        public event Action<string> OnError;
-        public event Action<string> OnStatus;
-        public event Action<bool, string> OnConnectionChanged;
-        public event Action OnCleared;
+        public event Action<string, string, string> OnAgentState;
+        public event Action<string, string> OnAgentThinking;
+        public event Action<string, string> OnAgentDelta;
+        public event Action<string, string> OnAgentMessage;
+        public event Action<string, string> OnAgentAction;
+        public event Action<string, string, string> OnAgentError;
+        public event Action<string, string, SessionInfo[]> OnSessionList;
+        public event Action<string, string, ChatHistoryEntry[]> OnSessionSwitched;
+        public event Action<bool> OnConnectionChanged;
 
         [Inject]
         public ClaudeService(ClaudeWebSocketClient client)
         {
             _client = client;
 
-            _client.OnDelta += HandleDelta;
-            _client.OnFinal += HandleFinal;
-            _client.OnError += HandleError;
-            _client.OnStatus += HandleStatus;
-            _client.OnConnectionChanged += HandleConnectionChanged;
-            _client.OnCleared += HandleCleared;
+            _client.OnAgentState      += (a, s, t) => OnAgentState?.Invoke(a, s, t);
+            _client.OnAgentThinking   += (a, t) => OnAgentThinking?.Invoke(a, t);
+            _client.OnAgentDelta      += (a, t) => OnAgentDelta?.Invoke(a, t);
+            _client.OnAgentMessage    += (a, m) => OnAgentMessage?.Invoke(a, m);
+            _client.OnAgentAction     += (a, act) => OnAgentAction?.Invoke(a, act);
+            _client.OnAgentError      += (a, e, m) => OnAgentError?.Invoke(a, e, m);
+            _client.OnSessionList     += (a, c, s) => OnSessionList?.Invoke(a, c, s);
+            _client.OnSessionSwitched += (a, s, h) => OnSessionSwitched?.Invoke(a, s, h);
+            _client.OnConnectionChanged += c => OnConnectionChanged?.Invoke(c);
         }
 
         // ── 기본 통신 ──
 
-        public void SetSystemPrompt(string systemPrompt)
-        {
-            if (_client == null || !_client.IsConnected) return;
-            _client.SendConfig(systemPrompt);
-            Debug.Log($"[ClaudeService] System prompt 설정 ({systemPrompt.Length}자)");
-        }
+        public void SendMessage(string agentId, string message)
+            => _client.SendChatMessage(agentId, message);
 
-        public void SendMessage(string message)
-        {
-            _client.SendChat(message);
-        }
+        public void ClearHistory(string agentId)
+            => _client.SendChatClear(agentId);
 
-        public void ResumeSession(string conversationJson)
-        {
-            _client.SendResume(conversationJson);
-        }
+        public void RequestStatus()
+            => _client.SendStatusRequest();
 
-        public void ClearHistory()
-        {
-            _client.SendClear();
-        }
+        public void RequestSessionList(string agentId)
+            => _client.SendSessionList(agentId);
 
-        public void SendMcpConfig(string mcpConfigJson)
-        {
-            if (_client == null || !_client.IsConnected || string.IsNullOrEmpty(mcpConfigJson))
-                return;
+        public void CreateSession(string agentId)
+            => _client.SendSessionNew(agentId);
 
-            // config 메시지에 mcpConfig 필드를 추가하여 전송
-            // 기존 ConfigRequest에는 mcpConfig 필드가 없으므로 수동 JSON 구성
-            var json = $"{{\"type\":\"config\",\"mcpConfig\":{mcpConfigJson}}}";
-            // 직접 SendText가 불가하므로 SendConfig를 확장하거나 별도 처리
-            // 당장은 Debug.Log로 표시 — Day 9에서 프로토콜 확장 시 구현
-            Debug.Log($"[ClaudeService] MCP config 전달 예약 ({mcpConfigJson.Length}자)");
-        }
+        public void SwitchSession(string agentId, string sessionId)
+            => _client.SendSessionSwitch(agentId, sessionId);
+
+        public void DeleteSession(string agentId, string sessionId)
+            => _client.SendSessionDelete(agentId, sessionId);
 
         // ── 크래프팅 ──
 
         public async UniTask<CraftResult> CraftDisketteAsync(
-            string naturalLanguagePrompt, CancellationToken ct)
+            string agentId, string naturalLanguagePrompt, CancellationToken ct)
         {
             if (_client == null || !_client.IsConnected)
                 throw new InvalidOperationException("Claude 서버에 연결되지 않았습니다");
@@ -93,24 +86,31 @@ namespace OpenDesk.Core.Implementations
             var tcs = new UniTaskCompletionSource<string>();
             var accumulated = new StringBuilder();
 
-            void OnDeltaHandler(string text) => accumulated.Append(text);
-
-            void OnFinalHandler(string text, float cost)
+            void OnDeltaHandler(string aId, string text)
             {
-                var result = string.IsNullOrEmpty(text) ? accumulated.ToString() : text;
+                if (aId == agentId) accumulated.Append(text);
+            }
+
+            void OnMessageHandler(string aId, string message)
+            {
+                if (aId != agentId) return;
+                var result = string.IsNullOrEmpty(message) ? accumulated.ToString() : message;
                 tcs.TrySetResult(result);
             }
 
-            void OnErrorHandler(string err) =>
-                tcs.TrySetException(new Exception($"크래프팅 실패: {err}"));
+            void OnErrorHandler(string aId, string err, string msg)
+            {
+                if (aId != agentId) return;
+                tcs.TrySetException(new Exception($"크래프팅 실패: {err} - {msg}"));
+            }
 
-            _client.OnDelta += OnDeltaHandler;
-            _client.OnFinal += OnFinalHandler;
-            _client.OnError += OnErrorHandler;
+            _client.OnAgentDelta   += OnDeltaHandler;
+            _client.OnAgentMessage += OnMessageHandler;
+            _client.OnAgentError   += OnErrorHandler;
 
             try
             {
-                _client.SendChat(metaPrompt);
+                _client.SendChatMessage(agentId, metaPrompt);
                 var response = await tcs.Task.AttachExternalCancellation(ct);
                 var craftResult = ParseCraftResult(response);
 
@@ -125,21 +125,11 @@ namespace OpenDesk.Core.Implementations
             }
             finally
             {
-                _client.OnDelta -= OnDeltaHandler;
-                _client.OnFinal -= OnFinalHandler;
-                _client.OnError -= OnErrorHandler;
+                _client.OnAgentDelta   -= OnDeltaHandler;
+                _client.OnAgentMessage -= OnMessageHandler;
+                _client.OnAgentError   -= OnErrorHandler;
             }
         }
-
-        // ── 이벤트 핸들러 (중계) ──
-
-        private void HandleDelta(string text) => OnDelta?.Invoke(text);
-        private void HandleFinal(string text, float cost) => OnFinal?.Invoke(text, cost);
-        private void HandleError(string err) => OnError?.Invoke(err);
-        private void HandleStatus(string status) => OnStatus?.Invoke(status);
-        private void HandleConnectionChanged(bool connected, string model)
-            => OnConnectionChanged?.Invoke(connected, model);
-        private void HandleCleared() => OnCleared?.Invoke();
 
         // ── 크래프팅 유틸 ──
 
@@ -178,19 +168,13 @@ $@"다음 요청을 분석하여 AI 에이전트 스킬을 정의해주세요.
         {
             if (string.IsNullOrEmpty(text)) return null;
 
-            // 1. TMP 리치텍스트 태그 제거 (formatter.py가 주입한 <color=...>, </color>, <b>, </b> 등)
             var cleaned = Regex.Replace(text, @"<[^>]+>", "");
-
-            // 2. "--- json ---" 같은 코드블록 라벨 제거
             cleaned = Regex.Replace(cleaned, @"---\s*\w+\s*---", "");
 
-            // 3. { ... } 추출
             var braces = Regex.Match(cleaned, @"\{[\s\S]*\}");
             if (!braces.Success) return null;
 
             var json = braces.Value.Trim();
-
-            // 4. 줄바꿈/탭 정리
             json = Regex.Replace(json, @"[\r\n]+\s*", "\n");
 
             return json;
@@ -202,16 +186,7 @@ $@"다음 요청을 분석하여 AI 에이전트 스킬을 정의해주세요.
         {
             if (_disposed) return;
             _disposed = true;
-
-            if (_client != null)
-            {
-                _client.OnDelta -= HandleDelta;
-                _client.OnFinal -= HandleFinal;
-                _client.OnError -= HandleError;
-                _client.OnStatus -= HandleStatus;
-                _client.OnConnectionChanged -= HandleConnectionChanged;
-                _client.OnCleared -= HandleCleared;
-            }
+            // 람다 이벤트는 client 파괴 시 자동 해제
         }
     }
 }

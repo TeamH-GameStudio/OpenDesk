@@ -339,7 +339,7 @@ public static class AgentOfficeSceneBuilder
         slSO.FindProperty("_listContent").objectReferenceValue = listContentRT;
         slSO.FindProperty("_sessionItemPrefab").objectReferenceValue = sessionItemPrefab;
         slSO.FindProperty("_emptyState").objectReferenceValue = emptyState;
-        // _chatPanel은 아래에서 생성 후 바인딩
+        // _chatPanel, _claudeClient는 아래에서 생성 후 바인딩
 
         // ── 채팅 패널 UI ────────────────────────────────────
         var chatBubbles = BuildChatBubblePrefabs();
@@ -525,6 +525,11 @@ public static class AgentOfficeSceneBuilder
         chatSendRT.offsetMin = new Vector2(-58, 8);
         chatSendRT.offsetMax = new Vector2(-8, -8);
 
+        // Claude 미들웨어 컴포넌트 (ChatPanel + SessionList 공유)
+        var claudeObj = new GameObject("ClaudeMiddleware");
+        var claudeClient = claudeObj.AddComponent<OpenDesk.Claude.ClaudeWebSocketClient>();
+        claudeObj.AddComponent<OpenDesk.Claude.MiddlewareLauncher>();
+
         // ChatPanelController 부착 + 바인딩
         var chatCtrl = chatPanel.AddComponent<ChatPanelController>();
         var cpSO = new SerializedObject(chatCtrl);
@@ -540,20 +545,14 @@ public static class AgentOfficeSceneBuilder
         cpSO.FindProperty("_inputField").objectReferenceValue = chatInputField;
         cpSO.FindProperty("_sendButton").objectReferenceValue = chatSendObj.GetComponent<Button>();
         cpSO.FindProperty("_emptyHint").objectReferenceValue = chatEmptyHint;
-
-        // Claude 미들웨어 컴포넌트 (Office 씬에서 직접 연결)
-        var claudeObj = new GameObject("ClaudeMiddleware");
-        var claudeClient = claudeObj.AddComponent<OpenDesk.Claude.ClaudeWebSocketClient>();
-        var middlewareLauncher = claudeObj.AddComponent<OpenDesk.Claude.MiddlewareLauncher>();
-
         cpSO.FindProperty("_claudeClient").objectReferenceValue = claudeClient;
-        cpSO.FindProperty("_middlewareLauncher").objectReferenceValue = middlewareLauncher;
         cpSO.ApplyModifiedPropertiesWithoutUndo();
 
         chatPanel.SetActive(false); // 기본 숨김
 
-        // SessionListController에 chatPanel 바인딩
+        // SessionListController에 chatPanel + claudeClient 바인딩
         slSO.FindProperty("_chatPanel").objectReferenceValue = chatCtrl;
+        slSO.FindProperty("_claudeClient").objectReferenceValue = claudeClient;
         slSO.ApplyModifiedPropertiesWithoutUndo();
 
         // ── AgentClickHandler ───────────────────────────────
@@ -577,21 +576,49 @@ public static class AgentOfficeSceneBuilder
             es.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
         }
 
+        // ── .env 파일 확인 ───────────────────────────────────
+        EnsureEnvFile();
+
         // ── 씬 저장 ─────────────────────────────────────────
-        var scenePath = "Assets/01.Scenes/AgentOfficeScene.unity";
+        var scenePath = "Assets/01.Scenes/AgentProtocolTestScene.unity";
+        EnsureFolder("Assets/01.Scenes");
         EditorSceneManager.SaveScene(scene, scenePath);
         AssetDatabase.Refresh();
 
         Debug.Log($"[AgentOfficeSceneBuilder] 씬 생성 완료: {scenePath}");
         EditorUtility.DisplayDialog("완료",
-            "AgentOfficeScene이 생성되었습니다.\n\n" +
-            "• Office_35 프리팹 배치\n" +
-            "• SpawnPoint 4개\n" +
-            "• AgentSpawner + HUD 프리팹 연결\n" +
-            "• OrbitCamera (우클릭 회전, 휠 줌, 미들 팬)\n" +
-            "• Bootstrapper (PlayerPrefs 자동 소환)\n\n" +
-            "AgentCreationScene에서 에이전트 생성 후 자동으로 이 씬에서 소환됩니다.",
+            "AgentProtocolTestScene이 생성되었습니다.\n\n" +
+            "• Office_35 + NavMesh + SpawnPoint 4개\n" +
+            "• AgentSpawner + HUD 프리팹\n" +
+            "• ClaudeWebSocketClient + MiddlewareLauncher\n" +
+            "• SessionListController + ChatPanelController\n" +
+            "• AgentClickHandler (에이전트 클릭 -> 세션 패널)\n\n" +
+            "사용법:\n" +
+            "1. Middleware/.env에 ANTHROPIC_API_KEY 설정\n" +
+            "2. Unity Play (서버 자동 실행)\n" +
+            "3. 에이전트 클릭 -> 세션 -> 채팅",
             "OK");
+    }
+
+    /// <summary>.env 파일이 없으면 템플릿 생성</summary>
+    private static void EnsureEnvFile()
+    {
+        var projectRoot = System.IO.Path.GetFullPath(
+            System.IO.Path.Combine(Application.dataPath, ".."));
+        var envPath = System.IO.Path.Combine(projectRoot, "Middleware", ".env");
+
+        if (System.IO.File.Exists(envPath))
+        {
+            Debug.Log($"[AgentOfficeSceneBuilder] .env 존재: {envPath}");
+            return;
+        }
+
+        System.IO.File.WriteAllText(envPath,
+            "# OpenDesk Middleware\n" +
+            "ANTHROPIC_API_KEY=your-api-key-here\n" +
+            "# BRAVE_API_KEY=your-brave-key-here\n");
+
+        Debug.LogWarning($"[AgentOfficeSceneBuilder] .env 생성됨 — ANTHROPIC_API_KEY 설정 필요: {envPath}");
     }
 
     // ================================================================

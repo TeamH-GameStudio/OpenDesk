@@ -24,7 +24,7 @@ namespace OpenDesk.Claude
 #if UNITY_EDITOR
         [Header("개발용 (에디터)")]
         [SerializeField] private string _pythonPath = "";
-        [SerializeField] private string _serverScript = "server.py";
+        [SerializeField] private string _serverScript = "main.py";
 #endif
 
         private Process _process;

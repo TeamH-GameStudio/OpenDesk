@@ -8,7 +8,7 @@ namespace OpenDesk.Claude
 {
     /// <summary>
     /// Python 미들웨어 서버와 WebSocket 통신 전담.
-    /// 연결/재연결/프로토콜 메시지 송수신 처리.
+    /// 멀티 에이전트 프로토콜 — 모든 메시지에 agent_id 포함.
     /// </summary>
     public class ClaudeWebSocketClient : MonoBehaviour
     {
@@ -21,33 +21,40 @@ namespace OpenDesk.Claude
         private bool      _isConnected;
         private bool      _intentionalDisconnect;
         private int       _reconnectAttempts;
-        private string    _currentModel = "";
         private CancellationTokenSource _cts;
 
         // ── 공개 프로퍼티 ──────────────────────────────────────
 
-        public bool   IsConnected  => _isConnected;
-        public string CurrentModel => _currentModel;
+        public bool IsConnected => _isConnected;
 
-        // ── 이벤트 ────────────────────────────────────────────
+        // ── 이벤트 (멀티 에이전트 프로토콜) ──────────────────────
 
-        /// <summary>스트리밍 텍스트 청크 수신</summary>
-        public event Action<string> OnDelta;
+        /// <summary>에이전트 상태 변화 (agentId, state, tool)</summary>
+        public event Action<string, string, string> OnAgentState;
 
-        /// <summary>최종 완성 응답 + 비용</summary>
-        public event Action<string, float> OnFinal;
+        /// <summary>AI 추론 과정 스트리밍 (agentId, thinking)</summary>
+        public event Action<string, string> OnAgentThinking;
 
-        /// <summary>에러 메시지</summary>
-        public event Action<string> OnError;
+        /// <summary>응답 텍스트 delta (agentId, text)</summary>
+        public event Action<string, string> OnAgentDelta;
 
-        /// <summary>연결 상태 변경 (connected, modelName)</summary>
-        public event Action<bool, string> OnConnectionChanged;
+        /// <summary>최종 완성 응답 (agentId, message)</summary>
+        public event Action<string, string> OnAgentMessage;
 
-        /// <summary>히스토리 초기화 완료</summary>
-        public event Action OnCleared;
+        /// <summary>캐릭터 액션 (agentId, action)</summary>
+        public event Action<string, string> OnAgentAction;
 
-        /// <summary>에이전트 상태 변화 ("💭 사고 중...", "🔧 도구 호출: xxx" 등)</summary>
-        public event Action<string> OnStatus;
+        /// <summary>에러 (agentId, error, message)</summary>
+        public event Action<string, string, string> OnAgentError;
+
+        /// <summary>세션 목록 (agentId, currentSessionId, sessions)</summary>
+        public event Action<string, string, SessionInfo[]> OnSessionList;
+
+        /// <summary>세션 전환 완료 (agentId, sessionId, chatHistory)</summary>
+        public event Action<string, string, ChatHistoryEntry[]> OnSessionSwitched;
+
+        /// <summary>WebSocket 연결 상태 변경 (connected)</summary>
+        public event Action<bool> OnConnectionChanged;
 
         // ── 생명주기 ──────────────────────────────────────────
 
@@ -73,7 +80,7 @@ namespace OpenDesk.Claude
             {
                 _socket.OnOpen    -= HandleOpen;
                 _socket.OnMessage -= HandleMessage;
-                _socket.OnError   -= HandleError;
+                _socket.OnError   -= HandleSocketError;
                 _socket.OnClose   -= HandleClose;
 
                 try { _ = _socket.Close(); }
@@ -101,12 +108,11 @@ namespace OpenDesk.Claude
 
         private async Cysharp.Threading.Tasks.UniTask CreateAndConnect()
         {
-            // 기존 소켓 정리
             if (_socket != null)
             {
                 _socket.OnOpen    -= HandleOpen;
                 _socket.OnMessage -= HandleMessage;
-                _socket.OnError   -= HandleError;
+                _socket.OnError   -= HandleSocketError;
                 _socket.OnClose   -= HandleClose;
                 try { _ = _socket.Close(); } catch { }
             }
@@ -114,14 +120,13 @@ namespace OpenDesk.Claude
             _socket = new WebSocket(_serverUrl);
             _socket.OnOpen    += HandleOpen;
             _socket.OnMessage += HandleMessage;
-            _socket.OnError   += HandleError;
+            _socket.OnError   += HandleSocketError;
             _socket.OnClose   += HandleClose;
 
             Debug.Log($"[ClaudeWS] 연결 시도: {_serverUrl}");
 
             try
             {
-                // NativeWebSocket.Connect()는 연결 종료까지 반환하지 않으므로 fire-and-forget
                 _socket.Connect().ContinueWith(
                     _ => { },
                     System.Threading.Tasks.TaskContinuationOptions.ExecuteSynchronously
@@ -133,125 +138,161 @@ namespace OpenDesk.Claude
             }
         }
 
-        // ── 전송 메서드 ───────────────────────────────────────
+        // ══════════════════════════════════════════════════════
+        //  전송 메서드 (Unity -> Middleware)
+        // ══════════════════════════════════════════════════════
 
-        public async void SendChat(string message)
+        /// <summary>채팅 메시지 전송</summary>
+        public async void SendChatMessage(string agentId, string message)
         {
             if (!_isConnected || _socket == null)
             {
-                OnError?.Invoke("서버에 연결되지 않았습니다");
+                OnAgentError?.Invoke(agentId, "not_connected", "서버에 연결되지 않았습니다");
                 return;
             }
 
-            var req = new ChatRequest { message = message };
+            var req = new ChatMessageRequest { agent_id = agentId, message = message };
             var json = JsonUtility.ToJson(req);
-            Debug.Log($"[ClaudeWS] 전송: {message.Substring(0, Math.Min(message.Length, 50))}...");
+            Debug.Log($"[ClaudeWS] chat -> {agentId}: {message[..Math.Min(message.Length, 50)]}...");
             await _socket.SendText(json);
         }
 
-        public async void SendClear()
+        /// <summary>대화 초기화 (새 세션 생성)</summary>
+        public async void SendChatClear(string agentId)
         {
             if (!_isConnected || _socket == null) return;
-            var json = JsonUtility.ToJson(new ClearRequest());
-            await _socket.SendText(json);
+            await _socket.SendText(JsonUtility.ToJson(new ChatClearRequest { agent_id = agentId }));
         }
 
-        public async void SendConfig(string systemPrompt)
+        /// <summary>전체 에이전트 상태 조회</summary>
+        public async void SendStatusRequest()
         {
             if (!_isConnected || _socket == null) return;
-            var req = new ConfigRequest { systemPrompt = systemPrompt };
-            await _socket.SendText(JsonUtility.ToJson(req));
+            await _socket.SendText(JsonUtility.ToJson(new StatusRequest()));
         }
 
-        public async void SendPing()
+        /// <summary>세션 목록 조회</summary>
+        public async void SendSessionList(string agentId)
         {
             if (!_isConnected || _socket == null) return;
-            await _socket.SendText(JsonUtility.ToJson(new PingRequest()));
+            await _socket.SendText(JsonUtility.ToJson(new SessionListRequest { agent_id = agentId }));
         }
 
-        /// <summary>대화 히스토리 JSON을 전송하여 세션 이어나기</summary>
-        public async void SendResume(string conversationJson)
+        /// <summary>새 세션 생성</summary>
+        public async void SendSessionNew(string agentId)
         {
-            if (!_isConnected || _socket == null)
-            {
-                OnError?.Invoke("서버에 연결되지 않았습니다");
-                return;
-            }
-
-            var req = new ResumeRequest { conversation = conversationJson };
-            var json = JsonUtility.ToJson(req);
-            Debug.Log($"[ClaudeWS] resume 전송: {conversationJson.Length}자");
-            await _socket.SendText(json);
+            if (!_isConnected || _socket == null) return;
+            await _socket.SendText(JsonUtility.ToJson(new SessionNewRequest { agent_id = agentId }));
         }
 
-        // ── WebSocket 이벤트 핸들러 ───────────────────────────
+        /// <summary>세션 전환</summary>
+        public async void SendSessionSwitch(string agentId, string sessionId)
+        {
+            if (!_isConnected || _socket == null) return;
+            await _socket.SendText(JsonUtility.ToJson(
+                new SessionSwitchRequest { agent_id = agentId, session_id = sessionId }));
+        }
+
+        /// <summary>세션 삭제</summary>
+        public async void SendSessionDelete(string agentId, string sessionId)
+        {
+            if (!_isConnected || _socket == null) return;
+            await _socket.SendText(JsonUtility.ToJson(
+                new SessionDeleteRequest { agent_id = agentId, session_id = sessionId }));
+        }
+
+        // ══════════════════════════════════════════════════════
+        //  WebSocket 이벤트 핸들러
+        // ══════════════════════════════════════════════════════
 
         private void HandleOpen()
         {
             Debug.Log("[ClaudeWS] WebSocket 연결됨");
+            _isConnected = true;
             _reconnectAttempts = 0;
-            // connected 메시지는 서버가 보내줌 → HandleMessage에서 처리
+            OnConnectionChanged?.Invoke(true);
+
+            // 연결 직후 전체 에이전트 상태 조회
+            SendStatusRequest();
         }
 
         private void HandleMessage(byte[] data)
         {
             var json = System.Text.Encoding.UTF8.GetString(data);
 
-            // type 필드 먼저 파싱
             var baseMsg = JsonUtility.FromJson<ServerMessage>(json);
             if (baseMsg == null || string.IsNullOrEmpty(baseMsg.type))
             {
-                Debug.LogWarning($"[ClaudeWS] 알 수 없는 메시지: {json.Substring(0, Math.Min(json.Length, 100))}");
+                Debug.LogWarning($"[ClaudeWS] 알 수 없는 메시지: {json[..Math.Min(json.Length, 100)]}");
                 return;
             }
 
             switch (baseMsg.type)
             {
-                case "connected":
-                    var connMsg = JsonUtility.FromJson<ConnectedMessage>(json);
-                    _currentModel = connMsg?.model ?? "";
-                    _isConnected = true;
-                    Debug.Log($"[ClaudeWS] 서버 연결 확인: model={_currentModel}");
-                    OnConnectionChanged?.Invoke(true, _currentModel);
-                    break;
+                case "agent_state":
+                {
+                    var msg = JsonUtility.FromJson<AgentStateMessage>(json);
+                    if (msg == null) break;
 
-                case "delta":
-                    var deltaMsg = JsonUtility.FromJson<DeltaMessage>(json);
-                    if (deltaMsg != null && !string.IsNullOrEmpty(deltaMsg.text))
-                        OnDelta?.Invoke(deltaMsg.text);
+                    if (msg.state == "error")
+                    {
+                        Debug.LogWarning($"[ClaudeWS] 에이전트 에러 [{msg.agent_id}]: {msg.error} - {msg.message}");
+                        OnAgentError?.Invoke(msg.agent_id, msg.error ?? "", msg.message ?? "");
+                    }
+                    else
+                    {
+                        OnAgentState?.Invoke(msg.agent_id, msg.state ?? "", msg.tool ?? "");
+                    }
                     break;
+                }
 
-                case "final":
-                    var finalMsg = JsonUtility.FromJson<FinalMessage>(json);
-                    if (finalMsg != null)
-                        OnFinal?.Invoke(finalMsg.text ?? "", finalMsg.cost);
+                case "agent_thinking":
+                {
+                    var msg = JsonUtility.FromJson<AgentThinkingMessage>(json);
+                    if (msg != null && !string.IsNullOrEmpty(msg.thinking))
+                        OnAgentThinking?.Invoke(msg.agent_id, msg.thinking);
                     break;
+                }
 
-                case "error":
-                    var errorMsg = JsonUtility.FromJson<ErrorMessage>(json);
-                    var errText = errorMsg?.message ?? "알 수 없는 에러";
-                    Debug.LogWarning($"[ClaudeWS] 서버 에러 [{errorMsg?.code}]: {errText}");
-                    OnError?.Invoke(errText);
+                case "agent_delta":
+                {
+                    var msg = JsonUtility.FromJson<AgentDeltaMessage>(json);
+                    if (msg != null && !string.IsNullOrEmpty(msg.text))
+                        OnAgentDelta?.Invoke(msg.agent_id, msg.text);
                     break;
+                }
 
-                case "cleared":
-                    Debug.Log("[ClaudeWS] 히스토리 초기화 완료");
-                    OnCleared?.Invoke();
+                case "agent_message":
+                {
+                    var msg = JsonUtility.FromJson<AgentMessageResponse>(json);
+                    if (msg != null)
+                        OnAgentMessage?.Invoke(msg.agent_id, msg.message ?? "");
                     break;
+                }
 
-                case "status":
-                    var statusMsg = JsonUtility.FromJson<StatusMessage>(json);
-                    if (statusMsg != null && !string.IsNullOrEmpty(statusMsg.text))
-                        OnStatus?.Invoke(statusMsg.text);
+                case "agent_action":
+                {
+                    var msg = JsonUtility.FromJson<AgentActionMessage>(json);
+                    if (msg != null && !string.IsNullOrEmpty(msg.action))
+                        OnAgentAction?.Invoke(msg.agent_id, msg.action);
                     break;
+                }
 
-                case "pong":
-                    // 하트비트 응답 — 무시
+                case "session_list_response":
+                {
+                    var msg = JsonUtility.FromJson<SessionListResponse>(json);
+                    if (msg != null)
+                        OnSessionList?.Invoke(msg.agent_id, msg.current_session_id ?? "", msg.sessions ?? Array.Empty<SessionInfo>());
                     break;
+                }
 
-                case "config_updated":
-                    Debug.Log("[ClaudeWS] 설정 업데이트 완료");
+                case "session_switched":
+                {
+                    var msg = JsonUtility.FromJson<SessionSwitchedMessage>(json);
+                    if (msg != null)
+                        OnSessionSwitched?.Invoke(msg.agent_id, msg.session_id ?? "", msg.chat_history ?? Array.Empty<ChatHistoryEntry>());
                     break;
+                }
 
                 default:
                     Debug.Log($"[ClaudeWS] 미처리 메시지 타입: {baseMsg.type}");
@@ -259,7 +300,7 @@ namespace OpenDesk.Claude
             }
         }
 
-        private void HandleError(string errorMsg)
+        private void HandleSocketError(string errorMsg)
         {
             Debug.LogError($"[ClaudeWS] WebSocket 오류: {errorMsg}");
         }
@@ -272,7 +313,7 @@ namespace OpenDesk.Claude
             if (wasConnected)
             {
                 Debug.LogWarning($"[ClaudeWS] 연결 끊김 (code: {code})");
-                OnConnectionChanged?.Invoke(false, "");
+                OnConnectionChanged?.Invoke(false);
             }
 
             if (!_intentionalDisconnect)
@@ -287,7 +328,7 @@ namespace OpenDesk.Claude
             if (_reconnectAttempts >= _maxReconnectAttempts)
             {
                 Debug.LogWarning($"[ClaudeWS] 최대 재연결 시도 횟수 도달 ({_maxReconnectAttempts}회)");
-                OnError?.Invoke("서버에 연결할 수 없습니다. 서버 실행 상태를 확인해주세요.");
+                OnAgentError?.Invoke("", "reconnect_failed", "서버에 연결할 수 없습니다. 서버 실행 상태를 확인해주세요.");
                 return;
             }
 

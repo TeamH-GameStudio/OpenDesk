@@ -31,6 +31,8 @@ namespace OpenDesk.Presentation.Character
         [Header("에이전트 정보")]
         [SerializeField] private string _sessionId = "main";
         [SerializeField] private string _agentName = "팀장";
+        [Tooltip("미들웨어 에이전트 ID (researcher/writer/analyst)")]
+        [SerializeField] private string _agentId = "";
 
         [Header("오프라인 비주얼")]
         [SerializeField] private Renderer[] _renderers;
@@ -58,6 +60,8 @@ namespace OpenDesk.Presentation.Character
 
         public string SessionId => _sessionId;
         public string AgentName => _agentName;
+        /// <summary>미들웨어 에이전트 ID (researcher/writer/analyst)</summary>
+        public string AgentId => _agentId;
 
         /// <summary>디스켓 장착 관리자 (같은 GameObject 또는 자식에 부착)</summary>
         public AgentEquipmentManager Equipment { get; private set; }
@@ -70,11 +74,13 @@ namespace OpenDesk.Presentation.Character
         /// <summary>프로필 SO 설정 (Spawner에서 호출)</summary>
         public void SetProfile(AgentProfileSO profile) => Profile = profile;
 
-        /// <summary>외부에서 세션/이름 설정 후 FSM 초기화 (Spawner에서 호출)</summary>
-        public void SetIdentity(string sessionId, string agentName)
+        /// <summary>외부에서 세션/이름/에이전트ID 설정 후 FSM 초기화 (Spawner에서 호출)</summary>
+        public void SetIdentity(string sessionId, string agentName, string agentId = "")
         {
             _sessionId = sessionId;
             _agentName = agentName;
+            if (!string.IsNullOrEmpty(agentId))
+                _agentId = agentId;
 
             // SetIdentity 이후 FSM 초기화 (Awake 타이밍 문제 회피)
             InitializeFSM();

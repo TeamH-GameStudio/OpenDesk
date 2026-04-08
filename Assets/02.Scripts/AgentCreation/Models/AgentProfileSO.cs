@@ -29,6 +29,8 @@ namespace OpenDesk.AgentCreation.Models
         // ── Session ─────────────────────────────────────────
         [Header("Session")]
         [SerializeField] private string _sessionId = "";
+        [Tooltip("미들웨어 에이전트 ID (researcher/writer/analyst)")]
+        [SerializeField] private string _agentId = "";
 
         // ── Properties ──────────────────────────────────────
         public string AgentName       => _agentName;
@@ -38,6 +40,8 @@ namespace OpenDesk.AgentCreation.Models
         public GameObject ModelPrefab => _modelPrefab;
         public Color HudColor         => _hudColor;
         public string SessionId       => _sessionId;
+        /// <summary>미들웨어 에이전트 ID (researcher/writer/analyst)</summary>
+        public string AgentId         => _agentId;
 
         public bool IsValid =>
             !string.IsNullOrWhiteSpace(_agentName) &&

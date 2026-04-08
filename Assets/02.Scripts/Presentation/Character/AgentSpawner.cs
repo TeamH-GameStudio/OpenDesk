@@ -94,7 +94,7 @@ namespace OpenDesk.Presentation.Character
             if (charCtrl != null)
             {
                 charCtrl.SetProfile(profile);
-                charCtrl.SetIdentity(profile.SessionId, profile.AgentName);
+                charCtrl.SetIdentity(profile.SessionId, profile.AgentName, profile.AgentId);
             }
 
             // AgentAnimationController (간이 전환용, FSM과 별도)

@@ -128,7 +128,8 @@ namespace OpenDesk.Pipeline
             try
             {
                 var ct = this.GetCancellationTokenOnDestroy();
-                var result = await _claudeService.CraftDisketteAsync(prompt, ct);
+                // writer 에이전트로 크래프팅 (문서/스킬 생성 전담)
+                var result = await _claudeService.CraftDisketteAsync("writer", prompt, ct);
 
                 if (result != null && result.IsValid)
                 {
