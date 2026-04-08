@@ -8,7 +8,7 @@ namespace OpenDesk.Claude
 {
     /// <summary>
     /// 미들웨어 서버 자동 시작/종료.
-    /// - 에디터: python server.py 직접 실행
+    /// - 에디터: python main.py 직접 실행 (Anthropic SDK 에이전트 서버)
     /// - 빌드: StreamingAssets/Middleware/Middleware.exe 실행
     /// </summary>
     public class MiddlewareLauncher : MonoBehaviour
@@ -24,7 +24,7 @@ namespace OpenDesk.Claude
 #if UNITY_EDITOR
         [Header("개발용 (에디터)")]
         [SerializeField] private string _pythonPath = "";
-        [SerializeField] private string _serverScript = "server.py";
+        [SerializeField] private string _serverScript = "main.py";
 #endif
 
         private Process _process;
