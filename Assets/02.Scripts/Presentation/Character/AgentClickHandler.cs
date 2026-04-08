@@ -1,4 +1,6 @@
 using OpenDesk.AgentCreation.Models;
+using OpenDesk.Presentation.Camera;
+using OpenDesk.Presentation.UI;
 using OpenDesk.Presentation.UI.Session;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -6,7 +8,7 @@ using UnityEngine.InputSystem;
 namespace OpenDesk.Presentation.Character
 {
     /// <summary>
-    /// 3D 에이전트 클릭 감지 -> SessionListController 오픈.
+    /// 3D 에이전트 클릭 감지 -> SessionListController 오픈 + 카메라 포커스.
     /// agent_id 기반 멀티 에이전트 라우팅.
     /// AgentCharacterController에서 AgentId를 읽어 미들웨어 에이전트와 매핑.
     /// </summary>
@@ -15,7 +17,14 @@ namespace OpenDesk.Presentation.Character
         [Header("References")]
         [SerializeField] private AgentSpawner _spawner;
         [SerializeField] private SessionListController _sessionList;
-        [SerializeField] private Camera _mainCamera;
+        [SerializeField] private UnityEngine.Camera _mainCamera;
+        [SerializeField] private AgentFocusCameraController _focusCamera;
+
+        [Header("이소메트릭 카메라 (새 프로토콜 씬용)")]
+        [SerializeField] private IsometricCameraController _isometricCamera;
+
+        [Header("패널 토글")]
+        [SerializeField] private LeftPanelToggle _leftPanelToggle;
 
         [Header("Settings")]
         [SerializeField] private float _maxRayDistance = 100f;
@@ -24,7 +33,7 @@ namespace OpenDesk.Presentation.Character
         private void Start()
         {
             if (_mainCamera == null)
-                _mainCamera = Camera.main;
+                _mainCamera = UnityEngine.Camera.main;
         }
 
         private void Update()
@@ -62,6 +71,15 @@ namespace OpenDesk.Presentation.Character
             }
 
             Debug.Log($"[AgentClick] 에이전트 클릭: {agentName} (id: {agentId})");
+
+            // 카메라 포커스
+            if (_isometricCamera != null)
+                _isometricCamera.FocusOnAgent(agentRoot.transform);
+            else
+                _focusCamera?.FocusOnAgent(agentRoot.transform);
+
+            // 우측 세션+채팅 패널 활성화
+            _leftPanelToggle?.Show();
 
             // 세션 리스트 패널 오픈 (agent_id 기반)
             if (_sessionList != null)

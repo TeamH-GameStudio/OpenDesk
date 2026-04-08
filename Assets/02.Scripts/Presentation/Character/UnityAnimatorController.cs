@@ -16,15 +16,24 @@ namespace OpenDesk.Presentation.Character
         private static readonly int StateParam = Animator.StringToHash("State");
 
         // 애니메이션 이름 → State int 매핑
+        // 0=Idle, 1=Typing, 2=Walk, 3=Cheering, 4=Thinking(Drinking), 5=Sleeping
+        // 6=StandToSit, 7=SitToStand, 8=SitToType, 9=TypeToSit, 10=Error
         private static readonly Dictionary<string, int> StateMap = new()
         {
             { "Idle", 0 },
             { "Typing", 1 },
             { "Walk", 2 },
             { "Cheering", 3 },
-            { "Celebrate", 3 },   // alias
-            { "Thinking", 0 },    // Thinking 전용 클립 없으면 Idle
-            { "LookUp", 0 },      // fallback
+            { "Celebrate", 3 },     // alias
+            { "Thinking", 4 },      // Drinking 모션
+            { "Drinking", 4 },      // alias
+            { "Sleeping", 5 },
+            { "StandToSit", 6 },
+            { "SitToStand", 7 },
+            { "SitToType", 8 },
+            { "TypeToSit", 9 },
+            { "Error", 10 },        // Female Standing Pose
+            { "LookUp", 0 },        // fallback
         };
 
         public UnityAnimatorController(Animator animator, string ownerName)
@@ -35,16 +44,26 @@ namespace OpenDesk.Presentation.Character
 
         public void PlayAnimation(string animationName, bool loop)
         {
-            if (_animator == null || _animator.runtimeAnimatorController == null) return;
+            if (_animator == null)
+            {
+                Debug.LogWarning($"[AnimCtrl:{_ownerName}] Animator is NULL -- {animationName} 무시됨");
+                return;
+            }
+            if (_animator.runtimeAnimatorController == null)
+            {
+                Debug.LogWarning($"[AnimCtrl:{_ownerName}] RuntimeAnimatorController is NULL -- {animationName} 무시됨");
+                return;
+            }
 
             if (StateMap.TryGetValue(animationName, out int stateValue))
             {
                 _animator.SetInteger(StateParam, stateValue);
+                Debug.Log($"[AnimCtrl:{_ownerName}] PlayAnimation({animationName}) -> State={stateValue}");
             }
             else
             {
-                // 매핑에 없는 이름이면 직접 Play 시도
                 _animator.Play(animationName, 0, 0f);
+                Debug.Log($"[AnimCtrl:{_ownerName}] PlayAnimation({animationName}) -> Direct Play");
             }
         }
 

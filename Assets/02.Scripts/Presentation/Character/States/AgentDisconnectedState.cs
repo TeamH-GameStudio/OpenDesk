@@ -17,8 +17,8 @@ namespace OpenDesk.Presentation.Character.States
 
         public void Enter()
         {
-            // 애니메이션 속도 0 (정지)
             _ctx.Animation.SetAnimationTimeScale(0f);
+            _ctx.Expression?.SetExpression("Sad");
             Debug.Log($"[{_ctx.AgentName}] Disconnected — 오프라인");
         }
 
@@ -26,8 +26,8 @@ namespace OpenDesk.Presentation.Character.States
 
         public void Exit()
         {
-            // 재연결 시 정상 속도 복귀
             _ctx.Animation.SetAnimationTimeScale(1f);
+            _ctx.Expression?.SetExpression("Neutral");
         }
     }
 }

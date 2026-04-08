@@ -24,9 +24,15 @@ namespace OpenDesk.Presentation.Character.Context
         public string SessionId { get; }
         public string AgentName { get; }
 
-        // ── 확장 슬롯 (추후 표정/이펙트/사운드 등) ──────────────
-        /// <summary>표정 변화 컨트롤러 (추후 연결)</summary>
+        // ── 확장 슬롯 ──────────────────────────────────────────
+        /// <summary>표정 변화 컨트롤러</summary>
         public IExpressionController Expression { get; set; }
+
+        /// <summary>카메라가 이 에이전트를 포커스 중인지 (포커스 중이면 배회 안 함)</summary>
+        public bool IsFocused { get; set; }
+
+        /// <summary>HUD 상태 텍스트 직접 업데이트 (FSM 서브상태용)</summary>
+        public System.Action<string> OnHUDStatusChanged { get; set; }
 
         public AgentCharacterContext(
             IAnimationController animation,
