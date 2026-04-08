@@ -278,9 +278,10 @@ public static class AgentProtocolTestSceneBuilder
         // ─── Manager 오브젝트 ──────────────────────────────
         var wsClientObj = new GameObject("ClaudeWebSocketClient");
         var wsClient = wsClientObj.AddComponent<OpenDesk.Claude.ClaudeWebSocketClient>();
-        var wsSo = new SerializedObject(wsClient);
-        wsSo.FindProperty("_autoConnect").boolValue = false;
-        wsSo.ApplyModifiedPropertiesWithoutUndo();
+
+        // MiddlewareLauncher — Python 서버 자동 실행
+        var launcherObj = new GameObject("MiddlewareLauncher");
+        launcherObj.AddComponent<OpenDesk.Claude.MiddlewareLauncher>();
 
         var managerObj = new GameObject("AgentProtocolTestManager");
         var manager = managerObj.AddComponent<OpenDesk.Claude.AgentProtocolTestManager>();
@@ -370,6 +371,19 @@ public static class AgentProtocolTestSceneBuilder
             es.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
         }
 
+        // .env 파일 자동 생성
+        var projectRoot = System.IO.Path.GetFullPath(
+            System.IO.Path.Combine(Application.dataPath, ".."));
+        var envPath = System.IO.Path.Combine(projectRoot, "Middleware", ".env");
+        if (!System.IO.File.Exists(envPath))
+        {
+            System.IO.File.WriteAllText(envPath,
+                "# OpenDesk Middleware\n" +
+                "ANTHROPIC_API_KEY=your-api-key-here\n" +
+                "# BRAVE_API_KEY=your-brave-key-here\n");
+            Debug.LogWarning($"[ProtocolTestBuilder] .env 생성됨 — ANTHROPIC_API_KEY 설정 필요: {envPath}");
+        }
+
         // 씬 저장
         var scenePath = "Assets/01.Scenes/AgentProtocolTestScene.unity";
         EditorSceneManager.SaveScene(scene, scenePath);
@@ -378,10 +392,11 @@ public static class AgentProtocolTestSceneBuilder
         Debug.Log($"[ProtocolTestBuilder] 씬 생성 완료: {scenePath}");
         EditorUtility.DisplayDialog("완료",
             "AgentProtocolTestScene 생성 완료!\n\n" +
-            "1. Play → 에이전트가 오피스에서 배회\n" +
-            "2. 에이전트 클릭 → 좌측 패널 활성화\n" +
-            "3. Mock 버튼으로 프로토콜 테스트\n" +
-            "4. 미들웨어 연결 시 실제 대화 가능", "OK");
+            "1. Middleware/.env에 ANTHROPIC_API_KEY 설정\n" +
+            "2. Play → 서버 자동 실행 + 에이전트 배회\n" +
+            "3. 에이전트 클릭 → 좌측 패널 활성화\n" +
+            "4. Mock 버튼으로 프로토콜 테스트\n" +
+            "5. 입력란에 메시지 → Enter로 실제 대화", "OK");
     }
 
     // ══════════════════════════════════════════════════════

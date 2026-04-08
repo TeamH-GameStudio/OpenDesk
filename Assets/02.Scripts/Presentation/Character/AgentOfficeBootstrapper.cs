@@ -64,7 +64,14 @@ namespace OpenDesk.Presentation.Character
             CurrentAgent = _spawner.SpawnAgent(profile);
 
             if (CurrentAgent != null)
-                Debug.Log($"[OfficeBootstrapper] 소환 완료: {latest.AgentName}");
+            {
+                // 미들웨어 agentId 기본 설정 (프로토콜 테스트용)
+                var charCtrl = CurrentAgent.ModelInstance?.GetComponent<AgentCharacterController>();
+                if (charCtrl != null && string.IsNullOrEmpty(charCtrl.AgentId))
+                    charCtrl.SetIdentity(profile.SessionId, profile.AgentName, "researcher");
+
+                Debug.Log($"[OfficeBootstrapper] 소환 완료: {latest.AgentName} (agentId={charCtrl?.AgentId})");
+            }
             else
                 Debug.LogWarning($"[OfficeBootstrapper] 소환 실패: {latest.AgentName}");
         }

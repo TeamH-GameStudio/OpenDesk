@@ -1,6 +1,5 @@
 using Cysharp.Threading.Tasks;
 using OpenDesk.Claude;
-using OpenDesk.Claude.Models;
 using TMPro;
 using UnityEngine;
 
@@ -94,27 +93,24 @@ namespace OpenDesk.Presentation.UI
             FadeOut().Forget();
         }
 
-        // ── 이벤트 핸들러 ──────────────────────────────────
+        // ── 이벤트 핸들러 (agentId, value 시그니처) ─────────
 
-        private void HandleThinking(AgentThinkingMessage msg)
+        private void HandleThinking(string agentId, string thinking)
         {
-            if (!string.IsNullOrEmpty(_currentAgentId) && msg.agent_id != _currentAgentId) return;
-            Show(msg.thinking);
+            if (!string.IsNullOrEmpty(_currentAgentId) && agentId != _currentAgentId) return;
+            Show(thinking);
         }
 
-        private void HandleDelta(AgentDeltaMessage msg)
+        private void HandleDelta(string agentId, string text)
         {
-            // 응답 시작 시 생각 말풍선 숨김
-            if (!string.IsNullOrEmpty(_currentAgentId) && msg.agent_id != _currentAgentId) return;
+            if (!string.IsNullOrEmpty(_currentAgentId) && agentId != _currentAgentId) return;
             Hide();
         }
 
-        private void HandleState(AgentStateMessage msg)
+        private void HandleState(string agentId, string state, string tool)
         {
-            if (!string.IsNullOrEmpty(_currentAgentId) && msg.agent_id != _currentAgentId) return;
-
-            // idle이면 즉시 숨김
-            if (msg.state == "idle")
+            if (!string.IsNullOrEmpty(_currentAgentId) && agentId != _currentAgentId) return;
+            if (state == "idle")
                 Hide();
         }
 
@@ -126,7 +122,6 @@ namespace OpenDesk.Presentation.UI
 
             transform.position = _followTarget.position + Vector3.up * _yOffset;
 
-            // 카메라 빌보드
             var cam = UnityEngine.Camera.main;
             if (cam != null)
                 transform.rotation = Quaternion.LookRotation(transform.position - cam.transform.position);

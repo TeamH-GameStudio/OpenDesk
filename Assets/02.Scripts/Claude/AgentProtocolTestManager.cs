@@ -131,13 +131,14 @@ namespace OpenDesk.Claude
             });
 
             // WebSocket 이벤트 구독
+            InitEventWrappers();
             _wsClient.OnConnectionChanged += HandleConnectionChanged;
-            _wsClient.OnAgentState += HandleAgentState;
-            _wsClient.OnAgentDelta += HandleAgentDelta;
-            _wsClient.OnAgentMessage += HandleAgentMessage;
-            _wsClient.OnAgentThinking += HandleAgentThinking;
-            _wsClient.OnSessionListResponse += HandleSessionList;
-            _wsClient.OnSessionSwitched += HandleSessionSwitched;
+            _wsClient.OnAgentState += _handleAgentState;
+            _wsClient.OnAgentDelta += _handleAgentDelta;
+            _wsClient.OnAgentMessage += _handleAgentMessage;
+            _wsClient.OnAgentThinking += _handleAgentThinking;
+            _wsClient.OnSessionList += _handleSessionList;
+            _wsClient.OnSessionSwitched += _handleSessionSwitched;
 
             // Mock 테스트 버튼
             _btnMockThinking?.onClick.AddListener(MockThinking);
@@ -178,12 +179,12 @@ namespace OpenDesk.Claude
             if (_wsClient != null)
             {
                 _wsClient.OnConnectionChanged -= HandleConnectionChanged;
-                _wsClient.OnAgentState -= HandleAgentState;
-                _wsClient.OnAgentDelta -= HandleAgentDelta;
-                _wsClient.OnAgentMessage -= HandleAgentMessage;
-                _wsClient.OnAgentThinking -= HandleAgentThinking;
-                _wsClient.OnSessionListResponse -= HandleSessionList;
-                _wsClient.OnSessionSwitched -= HandleSessionSwitched;
+                _wsClient.OnAgentState -= _handleAgentState;
+                _wsClient.OnAgentDelta -= _handleAgentDelta;
+                _wsClient.OnAgentMessage -= _handleAgentMessage;
+                _wsClient.OnAgentThinking -= _handleAgentThinking;
+                _wsClient.OnSessionList -= _handleSessionList;
+                _wsClient.OnSessionSwitched -= _handleSessionSwitched;
             }
         }
 
@@ -226,15 +227,7 @@ namespace OpenDesk.Claude
         private void InjectFsmState(string state, string message = null, string tool = null)
         {
             // UI 핸들러 호출
-            HandleAgentState(new AgentStateMessage
-            {
-                type = "agent_state",
-                agent_id = _currentAgentId,
-                state = state,
-                message = message,
-                tool = tool,
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-            });
+            HandleAgentState(_currentAgentId, state, tool ?? "");
 
             // 3D 에이전트 FSM도 연동
             var actionType = state switch
@@ -312,49 +305,67 @@ namespace OpenDesk.Claude
             AddLog(connected ? "<- 연결됨" : "<- 연결 끊김");
         }
 
-        private void HandleAgentState(AgentStateMessage msg)
+        // ── 이벤트 래퍼 (새 시그니처 -> 기존 핸들러 연결) ──
+        private System.Action<string, string, string> _handleAgentState;
+        private System.Action<string, string> _handleAgentDelta;
+        private System.Action<string, string> _handleAgentMessage;
+        private System.Action<string, string> _handleAgentThinking;
+        private System.Action<string, string, SessionInfo[]> _handleSessionList;
+        private System.Action<string, string, ChatHistoryEntry[]> _handleSessionSwitched;
+
+        private void InitEventWrappers()
         {
-            // 상태 텍스트 갱신
-            var stateKr = msg.state switch
+            _handleAgentState = (agentId, state, tool) =>
+                HandleAgentState(agentId, state, tool);
+            _handleAgentDelta = (agentId, text) =>
+                HandleAgentDelta(agentId, text);
+            _handleAgentMessage = (agentId, message) =>
+                HandleAgentMessage(agentId, message);
+            _handleAgentThinking = (agentId, thinking) =>
+                HandleAgentThinking(agentId, thinking);
+            _handleSessionList = (agentId, currentSessionId, sessions) =>
+                HandleSessionList(agentId, currentSessionId, sessions);
+            _handleSessionSwitched = (agentId, sessionId, history) =>
+                HandleSessionSwitched(agentId, sessionId, history);
+        }
+
+        private void HandleAgentState(string agentId, string state, string tool)
+        {
+            var stateKr = state switch
             {
                 "thinking" => "생각 중...",
-                "working"  => $"도구 사용 중: {msg.tool}",
+                "working"  => $"도구 사용 중: {tool}",
                 "idle"     => "대기 중",
-                "error"    => $"오류: {msg.message}",
-                _          => msg.state
+                "error"    => "오류 발생",
+                _          => state
             };
 
             if (_statusText != null)
-                _statusText.SetText($"[{msg.agent_id}] {stateKr}");
+                _statusText.SetText($"[{agentId}] {stateKr}");
 
-            // 3D 에이전트 HUD 버블 갱신
             var agentHud = FindAgentHUD();
             if (agentHud != null)
             {
-                if (msg.state == "working" && !string.IsNullOrEmpty(msg.tool))
+                if (state == "working" && !string.IsNullOrEmpty(tool))
                 {
-                    var toolKr = msg.tool switch
+                    var toolKr = tool switch
                     {
                         "web_search"  => "웹 검색 중...",
                         "read_file"   => "파일 읽는 중...",
                         "write_file"  => "파일 작성 중...",
                         "bash"        => "명령 실행 중...",
                         "list_files"  => "파일 탐색 중...",
-                        _             => $"{msg.tool} 사용 중..."
+                        _             => $"{tool} 사용 중..."
                     };
                     agentHud.ShowBubbleMessage(toolKr);
                 }
-                else if (msg.state == "idle")
+                else if (state == "idle")
                 {
                     agentHud.HideBubble();
                 }
             }
 
-            if (msg.state == "error" && !string.IsNullOrEmpty(msg.message))
-                SpawnBubble(_systemBubblePrefab, $"[오류] {msg.message}");
-
-            // 3D 에이전트 FSM 연동
-            var actionType = msg.state switch
+            var actionType = state switch
             {
                 "idle"     => Core.Models.AgentActionType.Idle,
                 "thinking" => Core.Models.AgentActionType.Thinking,
@@ -368,34 +379,32 @@ namespace OpenDesk.Claude
                 charCtrl?.ForceState(actionType.Value);
             }
 
-            AddLog($"<- agent_state: {msg.agent_id} = {msg.state} {msg.tool}");
+            AddLog($"<- agent_state: {agentId} = {state} {tool}");
         }
 
-        private void HandleAgentThinking(AgentThinkingMessage msg)
+        private void HandleAgentThinking(string agentId, string thinking)
         {
-            if (msg.agent_id != _currentAgentId) return;
+            if (agentId != _currentAgentId) return;
 
-            // Thinking 텍스트 UI 표시
             if (_thinkingText != null)
             {
-                var preview = msg.thinking?.Length > 80
-                    ? msg.thinking.Substring(0, 80) + "..."
-                    : msg.thinking;
+                var preview = thinking?.Length > 80
+                    ? thinking.Substring(0, 80) + "..."
+                    : thinking;
                 _thinkingText.SetText(preview ?? "");
                 _thinkingText.gameObject.SetActive(true);
             }
 
-            // 3D 에이전트 HUD 버블에도 표시
             var agentHud = FindAgentHUD();
             if (agentHud != null)
             {
-                var bubblePreview = msg.thinking?.Length > 40
-                    ? msg.thinking.Substring(0, 40) + "..."
-                    : msg.thinking;
+                var bubblePreview = thinking?.Length > 40
+                    ? thinking.Substring(0, 40) + "..."
+                    : thinking;
                 agentHud.ShowBubbleMessage(bubblePreview);
             }
 
-            AddLog($"<- agent_thinking: {msg.agent_id} ({msg.thinking?.Length ?? 0}자)");
+            AddLog($"<- agent_thinking: {agentId} ({thinking?.Length ?? 0}자)");
         }
 
         /// <summary>씬에서 현재 에이전트의 HUD 찾기</summary>
@@ -404,9 +413,9 @@ namespace OpenDesk.Claude
             return UnityEngine.Object.FindFirstObjectByType<OpenDesk.Presentation.Character.AgentHUDController>();
         }
 
-        private void HandleAgentDelta(AgentDeltaMessage msg)
+        private void HandleAgentDelta(string agentId, string text)
         {
-            if (msg.agent_id != _currentAgentId) return;
+            if (agentId != _currentAgentId) return;
 
             if (!_isStreaming)
             {
@@ -414,52 +423,47 @@ namespace OpenDesk.Claude
                 _streamingBuffer.Clear();
                 _streamingBubble = SpawnBubble(_aiBubblePrefab, "");
 
-                // 첫 delta → Chatting FSM (타이핑 모션)
                 var charCtrl = UnityEngine.Object.FindFirstObjectByType<Presentation.Character.AgentCharacterController>();
                 charCtrl?.ForceState(Core.Models.AgentActionType.ChatDelta);
             }
 
-            _streamingBuffer.Append(msg.text);
+            _streamingBuffer.Append(text);
             UpdateBubbleText(_streamingBubble, _streamingBuffer.ToString());
         }
 
-        private void HandleAgentMessage(AgentMessageMessage msg)
+        private void HandleAgentMessage(string agentId, string message)
         {
-            if (msg.agent_id != _currentAgentId) return;
+            if (agentId != _currentAgentId) return;
 
             if (_isStreaming)
             {
-                UpdateBubbleText(_streamingBubble, msg.message);
+                UpdateBubbleText(_streamingBubble, message);
                 _isStreaming = false;
                 _streamingBubble = null;
             }
             else
             {
-                SpawnBubble(_aiBubblePrefab, msg.message);
+                SpawnBubble(_aiBubblePrefab, message);
             }
 
-            // Completed FSM (응답 완료)
             var charCtrl = UnityEngine.Object.FindFirstObjectByType<Presentation.Character.AgentCharacterController>();
             charCtrl?.ForceState(Core.Models.AgentActionType.ChatFinal);
 
-            // 세션 기록에 저장
-            SaveToSessionHistory(false, msg.message);
+            SaveToSessionHistory(false, message);
 
-            AddLog($"<- agent_message: {msg.agent_id} ({msg.message?.Length ?? 0}자)");
+            AddLog($"<- agent_message: {agentId} ({message?.Length ?? 0}자)");
         }
 
-        private void HandleSessionList(SessionListResponse msg)
+        private void HandleSessionList(string agentId, string currentSessionId, SessionInfo[] sessions)
         {
-            if (msg.agent_id != _currentAgentId) return;
+            if (agentId != _currentAgentId) return;
 
-            // 세션 목록 UI 갱신
             ClearSessionList();
-            if (msg.sessions != null)
+            if (sessions != null)
             {
-                foreach (var session in msg.sessions)
+                foreach (var session in sessions)
                 {
-                    var item = SpawnSessionItem(session, session.session_id == msg.current_session_id);
-                    // 클릭 시 세션 전환
+                    var item = SpawnSessionItem(session, session.session_id == currentSessionId);
                     var sid = session.session_id;
                     var btn = item.GetComponent<Button>();
                     if (btn != null)
@@ -471,24 +475,35 @@ namespace OpenDesk.Claude
                 }
             }
 
-            AddLog($"<- session_list: {msg.sessions?.Length ?? 0}개");
+            AddLog($"<- session_list: {sessions?.Length ?? 0}개");
         }
 
-        private void HandleSessionSwitched(SessionSwitchedMessage msg)
+        private void HandleSessionSwitched(string agentId, string sessionId, ChatHistoryEntry[] history)
         {
-            if (msg.agent_id != _currentAgentId) return;
+            if (agentId != _currentAgentId) return;
+
+            _currentSessionId = sessionId;
+            if (!_sessionHistories.ContainsKey(sessionId))
+                _sessionHistories[sessionId] = new System.Collections.Generic.List<(bool, string)>();
+
+            // 세션 목록 -> 채팅 뷰 전환
+            if (_sessionView != null) _sessionView.SetActive(false);
+            if (_chatView != null) _chatView.SetActive(true);
 
             ClearChat();
-            if (msg.chat_history != null)
+            if (history != null)
             {
-                foreach (var entry in msg.chat_history)
+                foreach (var entry in history)
                 {
                     var prefab = entry.role == "user" ? _userBubblePrefab : _aiBubblePrefab;
                     SpawnBubble(prefab, entry.text);
                 }
             }
 
-            AddLog($"<- session_switched: {msg.session_id} ({msg.chat_history?.Length ?? 0}개 메시지)");
+            // 세션 목록도 갱신 요청
+            _wsClient?.SendSessionList(_currentAgentId);
+
+            AddLog($"<- session_switched: {sessionId} ({history?.Length ?? 0}개 메시지)");
         }
 
         // ── UI 유틸 ────────────────────────────────────────────
@@ -589,13 +604,8 @@ namespace OpenDesk.Claude
 
         private void MockThinking()
         {
-            HandleAgentThinking(new AgentThinkingMessage
-            {
-                type = "agent_thinking",
-                agent_id = _currentAgentId,
-                thinking = "사용자가 AI 트렌드를 물어봤으니 검색해봐야겠다. 최근 2026년 자료를 중심으로 찾아보자.",
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-            });
+            HandleAgentThinking(_currentAgentId,
+                "사용자가 AI 트렌드를 물어봤으니 검색해봐야겠다. 최근 2026년 자료를 중심으로 찾아보자.");
             AddLog("[MOCK] agent_thinking 주입");
         }
 
@@ -603,121 +613,73 @@ namespace OpenDesk.Claude
         {
             var chunks = new[] { "안녕하세요! ", "AI 에이전트 ", "시장에 대해 ", "알려드릴게요." };
             foreach (var chunk in chunks)
-            {
-                HandleAgentDelta(new AgentDeltaMessage
-                {
-                    type = "agent_delta",
-                    agent_id = _currentAgentId,
-                    text = chunk,
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-                });
-            }
+                HandleAgentDelta(_currentAgentId, chunk);
             AddLog("[MOCK] agent_delta x4 주입");
         }
 
         private void MockMessage()
         {
-            HandleAgentMessage(new AgentMessageMessage
-            {
-                type = "agent_message",
-                agent_id = _currentAgentId,
-                message = "<b>AI 에이전트 시장 동향</b>\n\n2026년 AI 에이전트 시장은 전년 대비 45% 성장하여 약 120억 달러 규모에 도달했습니다.\n\n주요 트렌드:\n1. 멀티에이전트 협업\n2. 자율적 도구 사용\n3. 장기 기억 시스템",
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-            });
+            HandleAgentMessage(_currentAgentId,
+                "<b>AI 에이전트 시장 동향</b>\n\n2026년 AI 에이전트 시장은 전년 대비 45% 성장하여 약 120억 달러 규모에 도달했습니다.\n\n주요 트렌드:\n1. 멀티에이전트 협업\n2. 자율적 도구 사용\n3. 장기 기억 시스템");
             AddLog("[MOCK] agent_message 주입 (TMP 포매팅)");
         }
 
         private void MockStateSequence()
         {
-            var states = new[] { "thinking", "working", "idle" };
-            foreach (var state in states)
-            {
-                HandleAgentState(new AgentStateMessage
-                {
-                    type = "agent_state",
-                    agent_id = _currentAgentId,
-                    state = state,
-                    tool = state == "working" ? "web_search" : null,
-                    tool_input = state == "working" ? "AI agent market 2026" : null,
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-                });
-            }
+            HandleAgentState(_currentAgentId, "thinking", "");
+            HandleAgentState(_currentAgentId, "working", "web_search");
+            HandleAgentState(_currentAgentId, "idle", "");
             AddLog("[MOCK] agent_state 시퀀스 (thinking -> working -> idle)");
         }
 
         private void MockSessionList()
         {
-            HandleSessionList(new SessionListResponse
+            HandleSessionList(_currentAgentId, "s_mock001", new[]
             {
-                type = "session_list_response",
-                agent_id = _currentAgentId,
-                current_session_id = "s_mock001",
-                sessions = new[]
-                {
-                    new SessionInfo { session_id = "s_mock001", title = "AI 시장 분석", updated_at = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), message_count = 5 },
-                    new SessionInfo { session_id = "s_mock002", title = "경쟁사 조사", updated_at = DateTimeOffset.UtcNow.AddHours(-2).ToUnixTimeSeconds(), message_count = 12 },
-                    new SessionInfo { session_id = "s_mock003", title = "기술 트렌드 보고서", updated_at = DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds(), message_count = 3 },
-                }
+                new SessionInfo { session_id = "s_mock001", title = "AI 시장 분석", updated_at = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), message_count = 5 },
+                new SessionInfo { session_id = "s_mock002", title = "경쟁사 조사", updated_at = DateTimeOffset.UtcNow.AddHours(-2).ToUnixTimeSeconds(), message_count = 12 },
+                new SessionInfo { session_id = "s_mock003", title = "기술 트렌드 보고서", updated_at = DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds(), message_count = 3 },
             });
             AddLog("[MOCK] session_list_response 주입 (3개 세션)");
         }
 
-        /// <summary>전체 대화 흐름을 시뮬레이션 (thinking → delta x N → message)</summary>
+        /// <summary>전체 대화 흐름을 시뮬레이션 (thinking -> delta x N -> message)</summary>
         private async UniTaskVoid MockFullFlow()
         {
             AddLog("[MOCK] === 전체 흐름 시작 ===");
 
-            // 1. 유저 메시지 버블
             SpawnBubble(_userBubblePrefab, "AI 에이전트 시장 트렌드 알려줘");
             AddLog("[MOCK] 유저 메시지");
 
-            // 2. thinking 상태
-            HandleAgentState(new AgentStateMessage { type = "agent_state", agent_id = _currentAgentId, state = "thinking" });
+            HandleAgentState(_currentAgentId, "thinking", "");
             await UniTask.Delay(800, cancellationToken: destroyCancellationToken);
 
-            // 3. thinking 내용
-            HandleAgentThinking(new AgentThinkingMessage
-            {
-                type = "agent_thinking", agent_id = _currentAgentId,
-                thinking = "AI 에이전트 시장 트렌드를 찾아봐야겠다. 웹 검색을 해보자."
-            });
+            HandleAgentThinking(_currentAgentId, "AI 에이전트 시장 트렌드를 찾아봐야겠다. 웹 검색을 해보자.");
             await UniTask.Delay(600, cancellationToken: destroyCancellationToken);
 
-            // 4. 중간 메시지 + working
-            HandleAgentDelta(new AgentDeltaMessage { type = "agent_delta", agent_id = _currentAgentId, text = "검색해볼게요!" });
-            HandleAgentMessage(new AgentMessageMessage { type = "agent_message", agent_id = _currentAgentId, message = "검색해볼게요!" });
+            HandleAgentDelta(_currentAgentId, "검색해볼게요!");
+            HandleAgentMessage(_currentAgentId, "검색해볼게요!");
             await UniTask.Delay(300, cancellationToken: destroyCancellationToken);
 
-            HandleAgentState(new AgentStateMessage { type = "agent_state", agent_id = _currentAgentId, state = "working", tool = "web_search", tool_input = "AI agent market 2026" });
+            HandleAgentState(_currentAgentId, "working", "web_search");
             await UniTask.Delay(1500, cancellationToken: destroyCancellationToken);
 
-            // 5. 다시 thinking
-            HandleAgentState(new AgentStateMessage { type = "agent_state", agent_id = _currentAgentId, state = "thinking" });
-            HandleAgentThinking(new AgentThinkingMessage
-            {
-                type = "agent_thinking", agent_id = _currentAgentId,
-                thinking = "검색 결과를 정리해서 알려줘야겠다."
-            });
+            HandleAgentState(_currentAgentId, "thinking", "");
+            HandleAgentThinking(_currentAgentId, "검색 결과를 정리해서 알려줘야겠다.");
             await UniTask.Delay(500, cancellationToken: destroyCancellationToken);
 
-            // 6. 스트리밍 delta
             var chunks = new[] { "3가지 ", "주요 자료를 ", "찾았어요!\n\n", "1. ", "멀티에이전트 ", "협업 ", "시장 ", "급성장\n", "2. ", "자율 도구 ", "사용 ", "확대\n", "3. ", "장기 기억 ", "시스템 ", "도입" };
             foreach (var chunk in chunks)
             {
-                HandleAgentDelta(new AgentDeltaMessage { type = "agent_delta", agent_id = _currentAgentId, text = chunk });
+                HandleAgentDelta(_currentAgentId, chunk);
                 await UniTask.Delay(100, cancellationToken: destroyCancellationToken);
             }
 
-            // 7. 최종 메시지 (TMP 포매팅)
             await UniTask.Delay(200, cancellationToken: destroyCancellationToken);
-            HandleAgentMessage(new AgentMessageMessage
-            {
-                type = "agent_message", agent_id = _currentAgentId,
-                message = "<b>3가지 주요 자료를 찾았어요!</b>\n\n1. <color=#4FC3F7>멀티에이전트 협업</color> 시장 급성장\n2. <color=#4FC3F7>자율 도구 사용</color> 확대\n3. <color=#4FC3F7>장기 기억 시스템</color> 도입"
-            });
+            HandleAgentMessage(_currentAgentId,
+                "<b>3가지 주요 자료를 찾았어요!</b>\n\n1. <color=#4FC3F7>멀티에이전트 협업</color> 시장 급성장\n2. <color=#4FC3F7>자율 도구 사용</color> 확대\n3. <color=#4FC3F7>장기 기억 시스템</color> 도입");
 
-            // 8. idle
-            HandleAgentState(new AgentStateMessage { type = "agent_state", agent_id = _currentAgentId, state = "idle" });
+            HandleAgentState(_currentAgentId, "idle", "");
 
             AddLog("[MOCK] === 전체 흐름 완료 ===");
         }
