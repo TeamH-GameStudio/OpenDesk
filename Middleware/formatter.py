@@ -113,3 +113,34 @@ def _escape_tmp_tags(text: str) -> str:
     text = text.replace("<", "\u2039")   # ‹
     text = text.replace(">", "\u203A")   # ›
     return text
+
+
+# ── 액션 태그 파싱 ──
+
+_ACTION_RE = re.compile(r"\[ACTION:(\w+)\]\s*$")
+
+VALID_ACTIONS = {
+    "idle", "typing", "walk", "cheering",
+    "sitting", "drinking", "dancing",
+}
+
+
+def extract_action(text: str) -> tuple[str, str | None]:
+    """응답 텍스트에서 [ACTION:xxx] 태그를 추출하고 제거.
+
+    Returns:
+        (clean_text, action) — action이 없으면 None
+    """
+    if not text:
+        return text, None
+
+    m = _ACTION_RE.search(text)
+    if not m:
+        return text, None
+
+    action = m.group(1).lower()
+    if action not in VALID_ACTIONS:
+        return text, None
+
+    clean = text[:m.start()].rstrip()
+    return clean, action

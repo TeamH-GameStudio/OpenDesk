@@ -236,10 +236,11 @@ namespace OpenDesk.Presentation.UI.Session
             var equipment = _linkedCharCtrl?.Equipment;
             if (equipment != null)
             {
-                // 에이전트 프로필 설정 (위저드 데이터 반영)
-                var roleName = RoleNames.GetValueOrDefault(_currentRole, "에이전트");
-                var toneName = _currentRole.ToString();
-                equipment.SetAgentProfile(_currentAgentName, roleName, toneName);
+                // 에이전트 프로필 + Soul 자동 로드
+                var tone = _linkedCharCtrl.Profile != null
+                    ? _linkedCharCtrl.Profile.Tone
+                    : AgentTone.None;
+                equipment.SetAgentProfile(_currentAgentName, _currentRole, tone);
 
                 // 파이프라인 매니저가 있으면 파일 컨텍스트도 포함
                 var pipeline = FindFirstObjectByType<OfficePipelineManager>();

@@ -1,4 +1,5 @@
 using System;
+using OpenDesk.AgentCreation.Models;
 using OpenDesk.Core.Models;
 using OpenDesk.Core.Services;
 using OpenDesk.Presentation.Character.Context;
@@ -61,7 +62,13 @@ namespace OpenDesk.Presentation.Character
         /// <summary>디스켓 장착 관리자 (같은 GameObject 또는 자식에 부착)</summary>
         public AgentEquipmentManager Equipment { get; private set; }
 
+        /// <summary>에이전트 프로필 SO (Spawner에서 설정)</summary>
+        public AgentProfileSO Profile { get; private set; }
+
         private bool _initialized;
+
+        /// <summary>프로필 SO 설정 (Spawner에서 호출)</summary>
+        public void SetProfile(AgentProfileSO profile) => Profile = profile;
 
         /// <summary>외부에서 세션/이름 설정 후 FSM 초기화 (Spawner에서 호출)</summary>
         public void SetIdentity(string sessionId, string agentName)

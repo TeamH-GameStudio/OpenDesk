@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using OpenDesk.AgentCreation.Models;
 using OpenDesk.Core.Services;
 using R3;
 using UnityEngine;
@@ -46,6 +47,7 @@ namespace OpenDesk.SkillDiskette
         private string _agentName;
         private string _agentRole;
         private string _agentTone;
+        private AgentSoul _soul;
 
         /// <summary>에이전트 기본 프로필 설정 (위저드 데이터에서)</summary>
         public void SetAgentProfile(string name, string role, string tone)
@@ -54,6 +56,24 @@ namespace OpenDesk.SkillDiskette
             _agentRole = role;
             _agentTone = tone;
         }
+
+        /// <summary>에이전트 프로필 + Soul 자동 로드</summary>
+        public void SetAgentProfile(string name, AgentRole role, AgentTone tone)
+        {
+            _agentName = name;
+            _agentRole = RoleToKorean(role);
+            _agentTone = ToneToKorean(tone);
+            _soul = AgentSoul.LoadFor(role, tone);
+
+            if (_soul != null)
+                Debug.Log($"[Equipment] Soul 로드: {_soul.name} ({role}/{tone})");
+        }
+
+        /// <summary>Soul을 직접 설정 (커스텀 Soul 사용 시)</summary>
+        public void SetSoul(AgentSoul soul) => _soul = soul;
+
+        /// <summary>현재 로드된 Soul</summary>
+        public AgentSoul Soul => _soul;
 
         // ══════════════════════════════════════════════
         //  장착 / 해제
@@ -116,7 +136,7 @@ namespace OpenDesk.SkillDiskette
         // ══════════════════════════════════════════════
 
         /// <summary>
-        /// 기본 프로필 + 장착 디스켓 promptContent를 합성한 system prompt 반환.
+        /// 기본 프로필 + Soul + 장착 디스켓 promptContent를 합성한 system prompt 반환.
         /// </summary>
         public string BuildSystemPrompt()
         {
@@ -134,7 +154,13 @@ namespace OpenDesk.SkillDiskette
                 sb.AppendLine();
             }
 
-            // 2. 장착 디스켓 주입
+            // 2. Soul — 성격, 행동 원칙, 전문성 등 깊은 인격 레이어
+            if (_soul != null)
+            {
+                sb.AppendLine(_soul.ToSystemPromptBlock());
+            }
+
+            // 3. 장착 디스켓 주입
             if (_equippedDisks.Count > 0)
             {
                 sb.AppendLine("다음 스킬이 장착되어 있습니다. 각 스킬의 지시사항을 따르세요:");
@@ -187,6 +213,29 @@ namespace OpenDesk.SkillDiskette
         {
             _equippedNames = _equippedDisks.Select(d => d.DisplayName).ToList();
         }
+
+        private static string RoleToKorean(AgentRole role) => role switch
+        {
+            AgentRole.Planning    => "기획",
+            AgentRole.Development => "개발",
+            AgentRole.Design      => "디자인",
+            AgentRole.Legal       => "법률",
+            AgentRole.Marketing   => "마케팅",
+            AgentRole.Research    => "리서치",
+            AgentRole.Support     => "고객지원",
+            AgentRole.Finance     => "재무",
+            _                     => "에이전트",
+        };
+
+        private static string ToneToKorean(AgentTone tone) => tone switch
+        {
+            AgentTone.Friendly => "친절한",
+            AgentTone.Logical  => "논리적인",
+            AgentTone.Humorous => "유머러스한",
+            AgentTone.Formal   => "격식체",
+            AgentTone.Casual   => "편안한",
+            _                  => "",
+        };
 
         private void OnDestroy()
         {

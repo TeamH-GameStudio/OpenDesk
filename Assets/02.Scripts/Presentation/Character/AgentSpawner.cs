@@ -89,10 +89,13 @@ namespace OpenDesk.Presentation.Character
             var modelInstance = Instantiate(prefab, spawnPos, spawnRot);
             modelInstance.name = $"Agent_{profile.AgentName}";
 
-            // AgentCharacterController에 identity 전달
+            // AgentCharacterController에 identity + profile 전달
             var charCtrl = modelInstance.GetComponent<AgentCharacterController>();
             if (charCtrl != null)
+            {
+                charCtrl.SetProfile(profile);
                 charCtrl.SetIdentity(profile.SessionId, profile.AgentName);
+            }
 
             // AgentAnimationController (간이 전환용, FSM과 별도)
             var animator = modelInstance.GetComponentInChildren<Animator>();
