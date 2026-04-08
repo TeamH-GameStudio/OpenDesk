@@ -525,6 +525,16 @@ public static class AgentOfficeSceneBuilder
         chatSendRT.offsetMin = new Vector2(-58, 8);
         chatSendRT.offsetMax = new Vector2(-8, -8);
 
+        // "작업 완료" 버튼 (Send 버튼 왼쪽, 기본 숨김)
+        var dismissObj = CreateStyledButton("DismissBtn", chatInputAreaRT, "작업 완료", new Color32(60, 180, 100, 255), 14);
+        var dismissRT = dismissObj.GetComponent<RectTransform>();
+        dismissRT.anchorMin = new Vector2(1, 0);
+        dismissRT.anchorMax = new Vector2(1, 1);
+        dismissRT.pivot = new Vector2(1, 0.5f);
+        dismissRT.offsetMin = new Vector2(-140, 8);
+        dismissRT.offsetMax = new Vector2(-64, -8);
+        dismissObj.SetActive(false); // 기본 숨김 — 응답 완료 시에만 표시
+
         // ChatPanelController 부착 + 바인딩
         var chatCtrl = chatPanel.AddComponent<ChatPanelController>();
         var cpSO = new SerializedObject(chatCtrl);
@@ -539,6 +549,7 @@ public static class AgentOfficeSceneBuilder
         cpSO.FindProperty("_systemBubblePrefab").objectReferenceValue = chatBubbles.system;
         cpSO.FindProperty("_inputField").objectReferenceValue = chatInputField;
         cpSO.FindProperty("_sendButton").objectReferenceValue = chatSendObj.GetComponent<Button>();
+        cpSO.FindProperty("_dismissButton").objectReferenceValue = dismissObj.GetComponent<Button>();
         cpSO.FindProperty("_emptyHint").objectReferenceValue = chatEmptyHint;
 
         // Claude 미들웨어 컴포넌트 (Office 씬에서 직접 연결)
@@ -548,6 +559,11 @@ public static class AgentOfficeSceneBuilder
 
         cpSO.FindProperty("_claudeClient").objectReferenceValue = claudeClient;
         cpSO.FindProperty("_middlewareLauncher").objectReferenceValue = middlewareLauncher;
+
+        // SessionListController 참조 (뒤로가기 시 세션 목록 복귀용)
+        if (sessionListCtrl != null)
+            cpSO.FindProperty("_sessionList").objectReferenceValue = sessionListCtrl;
+
         cpSO.ApplyModifiedPropertiesWithoutUndo();
 
         chatPanel.SetActive(false); // 기본 숨김
