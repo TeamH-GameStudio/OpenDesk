@@ -1156,6 +1156,7 @@ GameObject:
   - component: {fileID: 4344794180350217920}
   - component: {fileID: 5844609255133000565}
   - component: {fileID: 4382202096155748416}
+  - component: {fileID: 3778408195896736844}
   m_Layer: 0
   m_Name: Model_Agent3D
   m_TagString: Untagged
@@ -1244,6 +1245,25 @@ CapsuleCollider:
   m_Height: 1.8
   m_Direction: 1
   m_Center: {x: 0, y: 0.9, z: 0}
+--- !u!114 &3778408195896736844
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9026149196868162009}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cbb2556afab90eb40a459fb2967b8731, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OpenDesk.Presentation.Character.FaceSwapController
+  _targetRenderer: {fileID: 8267677631787176718}
+  _faceMaterialIndex: 0
+  _faceDefault: {fileID: 0}
+  _faceSmile: {fileID: 2800000, guid: e9a54940b32194d1796e863342d917ce, type: 3}
+  _faceError: {fileID: 2800000, guid: fbf88105f84f140eb90c345711c45dd7, type: 3}
+  _faceSad: {fileID: 2800000, guid: 7be17ccdb5013453e8d585b922e1623a, type: 3}
+  _faceSleeping: {fileID: 2800000, guid: 194b74c80fc29487eb1f34d0b5768f7a, type: 3}
 --- !u!1 &9188392113524474089
 GameObject:
   m_ObjectHideFlags: 0
