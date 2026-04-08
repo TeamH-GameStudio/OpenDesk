@@ -21,6 +21,11 @@ namespace OpenDesk.Presentation.Character
         [SerializeField] private Slider _statusBar;
         [SerializeField] private Image _statusBarFill;
 
+        [Header("버블 UI (상태 표시용)")]
+        [SerializeField] private GameObject _bubbleRoot;
+        [SerializeField] private TMP_Text _bubbleText;
+        [SerializeField] private Image _bubbleBg;
+
         [Header("Settings")]
         [SerializeField] private float _pulseSpeed = 1.5f;
 
@@ -29,7 +34,7 @@ namespace OpenDesk.Presentation.Character
         private Color _hudColor;
         private AgentActionType _currentAction = AgentActionType.Idle;
         private bool _isPulsing;
-        private Camera _mainCamera;
+        private UnityEngine.Camera _mainCamera;
         private IAgentStateService _stateService;
         private System.IDisposable _subscription;
 
@@ -58,7 +63,7 @@ namespace OpenDesk.Presentation.Character
             _sessionId = profile.SessionId;
             _hudColor = profile.HudColor;
             _stateService = stateService;
-            _mainCamera = Camera.main;
+            _mainCamera = UnityEngine.Camera.main;
 
             if (_nameText != null)
             {
@@ -117,10 +122,61 @@ namespace OpenDesk.Presentation.Character
 
             if (!pulse && _statusBar != null)
                 _statusBar.value = fillValue;
+
+            // 버블 모드: Idle/Connected 이외 → HUD 숨기고 버블 표시
+            var showBubble = action != AgentActionType.Idle
+                          && action != AgentActionType.Connected;
+            SetBubbleMode(showBubble, text, color);
+        }
+
+        /// <summary>버블 모드 전환 — HUD 바 숨기고 말풍선 표시</summary>
+        private void SetBubbleMode(bool showBubble, string text, Color color)
+        {
+            // HUD 요소 숨기기/보이기
+            if (_nameText != null) _nameText.gameObject.SetActive(!showBubble);
+            if (_statusBar != null) _statusBar.gameObject.SetActive(!showBubble);
+            if (_statusText != null && !showBubble) _statusText.gameObject.SetActive(true);
+
+            // 버블 표시
+            if (_bubbleRoot != null)
+            {
+                _bubbleRoot.SetActive(showBubble);
+                if (showBubble)
+                {
+                    if (_bubbleText != null)
+                        _bubbleText.text = text;
+                    if (_bubbleBg != null)
+                        _bubbleBg.color = new Color(color.r, color.g, color.b, 0.85f);
+                }
+            }
+        }
+
+        /// <summary>생각/도구 사용 등 상세 텍스트를 버블에 표시</summary>
+        public void ShowBubbleMessage(string message)
+        {
+            if (_bubbleRoot != null) _bubbleRoot.SetActive(true);
+            if (_bubbleText != null) _bubbleText.text = message;
+            if (_nameText != null) _nameText.gameObject.SetActive(false);
+            if (_statusBar != null) _statusBar.gameObject.SetActive(false);
+        }
+
+        /// <summary>버블 숨기고 HUD 복원</summary>
+        public void HideBubble()
+        {
+            if (_bubbleRoot != null) _bubbleRoot.SetActive(false);
+            if (_nameText != null) _nameText.gameObject.SetActive(true);
+            if (_statusBar != null) _statusBar.gameObject.SetActive(true);
         }
 
         /// <summary>디버그/테스트용 — 외부에서 직접 상태 설정</summary>
         public void ForceState(AgentActionType action) => ApplyState(action);
+
+        /// <summary>FSM 서브상태용 — 상태 텍스트만 직접 변경</summary>
+        public void ForceStatusText(string text)
+        {
+            if (_statusText != null)
+                _statusText.text = text;
+        }
 
         public AgentActionType CurrentAction => _currentAction;
 

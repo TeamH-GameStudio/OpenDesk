@@ -173,6 +173,39 @@ public static class AgentPrefabBuilder
         statusObj.alignment = TextAlignmentOptions.Center;
         if (font != null) statusObj.font = font;
 
+        // ── 버블 UI (상태 표시용, 타원형, 기본 숨김) ──────────
+        var bubbleRoot = new GameObject("BubbleRoot");
+        bubbleRoot.transform.SetParent(root.transform, false);
+        var bubbleRootRT = bubbleRoot.AddComponent<RectTransform>();
+        // HUD 영역보다 위에 위치 (이름+상태바와 겹치지 않게)
+        bubbleRootRT.anchorMin = new Vector2(0.5f, 1f);
+        bubbleRootRT.anchorMax = new Vector2(0.5f, 1f);
+        bubbleRootRT.pivot = new Vector2(0.5f, 0f);
+        bubbleRootRT.anchoredPosition = new Vector2(0, 5);
+        bubbleRootRT.sizeDelta = new Vector2(240, 50);
+
+        var bubbleBgImg = bubbleRoot.AddComponent<Image>();
+        bubbleBgImg.color = new Color32(255, 235, 59, 210);
+        // 타원형: 런타임에서 Ellipse 스프라이트 생성
+        bubbleBgImg.sprite = CreateEllipseSprite(128, 64);
+        bubbleBgImg.type = Image.Type.Sliced;
+        bubbleBgImg.pixelsPerUnitMultiplier = 1f;
+
+        var bubbleTextObj = CreateChild<TextMeshProUGUI>(bubbleRoot.transform, "BubbleText");
+        StretchFull(bubbleTextObj.rectTransform);
+        bubbleTextObj.rectTransform.offsetMin = new Vector2(16, 6);
+        bubbleTextObj.rectTransform.offsetMax = new Vector2(-16, -6);
+        bubbleTextObj.text = "";
+        bubbleTextObj.fontSize = 16;
+        bubbleTextObj.color = new Color32(30, 30, 30, 255);
+        bubbleTextObj.alignment = TextAlignmentOptions.Center;
+        bubbleTextObj.fontStyle = FontStyles.Bold;
+        bubbleTextObj.enableWordWrapping = true;
+        bubbleTextObj.overflowMode = TextOverflowModes.Ellipsis;
+        if (font != null) bubbleTextObj.font = font;
+
+        bubbleRoot.SetActive(false); // 초기 숨김
+
         // ── AgentHUDController 부착 ─────────────────────────
         var hud = root.AddComponent<OpenDesk.Presentation.Character.AgentHUDController>();
 
@@ -182,6 +215,9 @@ public static class AgentPrefabBuilder
         so.FindProperty("_statusText").objectReferenceValue = statusObj;
         so.FindProperty("_statusBar").objectReferenceValue = slider;
         so.FindProperty("_statusBarFill").objectReferenceValue = fillImg;
+        so.FindProperty("_bubbleRoot").objectReferenceValue = bubbleRoot;
+        so.FindProperty("_bubbleText").objectReferenceValue = bubbleTextObj;
+        so.FindProperty("_bubbleBg").objectReferenceValue = bubbleBgImg;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         // 저장
@@ -224,5 +260,36 @@ public static class AgentPrefabBuilder
                 AssetDatabase.CreateFolder(current, parts[i]);
             current = next;
         }
+    }
+
+    /// <summary>타원형 스프라이트를 프로그래매틱으로 생성</summary>
+    private static Sprite CreateEllipseSprite(int width, int height)
+    {
+        var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        var cx = width / 2f;
+        var cy = height / 2f;
+        var rx = cx - 1;
+        var ry = cy - 1;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                var dx = (x - cx) / rx;
+                var dy = (y - cy) / ry;
+                var dist = dx * dx + dy * dy;
+                // 안티앨리어싱: 경계 부근 알파 부드럽게
+                var alpha = Mathf.Clamp01(1f - (dist - 0.9f) / 0.1f);
+                tex.SetPixel(x, y, new Color(1, 1, 1, alpha));
+            }
+        }
+
+        tex.Apply();
+        tex.filterMode = FilterMode.Bilinear;
+
+        // 4방향 border로 Sliced 모드 지원
+        var border = new Vector4(width * 0.3f, height * 0.3f, width * 0.3f, height * 0.3f);
+        return Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100, 0,
+            SpriteMeshType.FullRect, border);
     }
 }
