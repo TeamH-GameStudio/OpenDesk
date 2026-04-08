@@ -52,8 +52,8 @@ namespace OpenDesk.Presentation.Character
                 return;
             }
 
-            // 3) 이전 에이전트 데이터 + 세션 전부 정리 (최신 1개만 유지)
-            CleanupOldData(count, latest);
+            // 3) 에이전트 데이터 정리 (세션/채팅 기록은 보존)
+            CleanupOldAgentData(count, latest);
 
             // 4) 소환
             var prefab = FindPrefab(latest.ModelPrefabName);
@@ -69,26 +69,16 @@ namespace OpenDesk.Presentation.Character
                 Debug.LogWarning($"[OfficeBootstrapper] 소환 실패: {latest.AgentName}");
         }
 
-        /// <summary>모든 이전 데이터 정리 — 항상 깨끗한 상태에서 시작</summary>
-        private static void CleanupOldData(int totalCount, SavedAgentData keepData)
+        /// <summary>에이전트 데이터만 정리 (세션/채팅 기록은 보존)</summary>
+        private static void CleanupOldAgentData(int totalCount, SavedAgentData keepData)
         {
-            // 모든 세션의 대화 JSON 파일 삭제
-            var allSessions = AgentSessionStore.LoadAll();
-            foreach (var s in allSessions)
-                ChatMessageStore.Clear(s.SessionId);
-
-            // 전체 세션 + 에이전트 데이터 초기화
-            AgentSessionStore.ClearAll();
+            // 에이전트 데이터만 초기화 후 최신 1개 재저장
+            // 세션과 채팅 기록은 보존하여 대화 이어나기 가능
             AgentDataStore.ClearAll();
 
-            // 최신 에이전트만 다시 저장
             var data = keepData.ToCreationData();
             data.AvatarPrefabName = keepData.ModelPrefabName;
             AgentDataStore.Save(data, keepData.ModelPrefabName);
-
-            int cleaned = allSessions.Count;
-            if (cleaned > 0)
-                Debug.Log($"[OfficeBootstrapper] 이전 세션 {cleaned}개 + 대화 기록 정리 완료");
         }
 
         private GameObject FindPrefab(string prefabName)

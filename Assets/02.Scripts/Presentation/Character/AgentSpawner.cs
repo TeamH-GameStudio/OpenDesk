@@ -89,6 +89,12 @@ namespace OpenDesk.Presentation.Character
             var modelInstance = Instantiate(prefab, spawnPos, spawnRot);
             modelInstance.name = $"Agent_{profile.AgentName}";
 
+            Debug.Log($"[AgentSpawner] 프리팹: {prefab.name}, profile.ModelPrefab={(profile.ModelPrefab != null ? profile.ModelPrefab.name : "null")}");
+
+            // Animator Controller 확인
+            var spawnedAnimator = modelInstance.GetComponentInChildren<Animator>();
+            Debug.Log($"[AgentSpawner] Animator: {(spawnedAnimator != null ? "있음" : "없음")}, Controller: {(spawnedAnimator?.runtimeAnimatorController != null ? spawnedAnimator.runtimeAnimatorController.name : "NULL")}");
+
             // AgentCharacterController에 identity 전달
             var charCtrl = modelInstance.GetComponent<AgentCharacterController>();
             if (charCtrl != null)

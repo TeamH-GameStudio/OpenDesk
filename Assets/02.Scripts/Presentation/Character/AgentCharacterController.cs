@@ -52,6 +52,7 @@ namespace OpenDesk.Presentation.Character
         // ── 내부 ─────────────────────────────────────────────────────────────
         private AgentStateMachine _fsm;
         private AgentCompletedState _completedState;
+        private AgentErrorState _errorState;
         private IDisposable _subscription;
         private NavMeshAgent _navAgent;
 
@@ -62,6 +63,13 @@ namespace OpenDesk.Presentation.Character
         public AgentEquipmentManager Equipment { get; private set; }
 
         private bool _initialized;
+        private AgentCharacterContext _ctx;
+
+        /// <summary>카메라 포커스 상태 설정 — 포커스 중이면 배회 중지</summary>
+        public void SetFocused(bool focused)
+        {
+            if (_ctx != null) _ctx.IsFocused = focused;
+        }
 
         /// <summary>외부에서 세션/이름 설정 후 FSM 초기화 (Spawner에서 호출)</summary>
         public void SetIdentity(string sessionId, string agentName)
@@ -69,15 +77,24 @@ namespace OpenDesk.Presentation.Character
             _sessionId = sessionId;
             _agentName = agentName;
 
-            // SetIdentity 이후 FSM 초기화 (Awake 타이밍 문제 회피)
-            InitializeFSM();
+            // Instantiate 직후에는 Animator Controller가 아직 로드 안 됐을 수 있음
+            // Start()에서 초기화하도록 플래그만 설정
+            _identitySet = true;
         }
+
+        private bool _identitySet;
 
         // ── 초기화 ───────────────────────────────────────────────────────────
 
         private void Awake()
         {
+            // 스케일 보존 (NavMeshAgent 추가 시 리셋 방지)
+            var savedScale = transform.localScale;
+
             SetupNavMeshAgent();
+
+            // 스케일 복원
+            transform.localScale = savedScale;
 
             // EquipmentManager 탐색 (같은 GO 또는 자식)
             Equipment = GetComponent<AgentEquipmentManager>();
@@ -89,7 +106,8 @@ namespace OpenDesk.Presentation.Character
 
         private void Start()
         {
-            // SetIdentity가 호출 안 된 경우 (Inspector 기본값으로 초기화)
+            // SetIdentity가 호출됐든 안 됐든 Start에서 초기화
+            // (Instantiate 직후 Animator Controller 로드 타이밍 보장)
             if (!_initialized)
                 InitializeFSM();
         }
@@ -100,12 +118,53 @@ namespace OpenDesk.Presentation.Character
             _initialized = true;
 
             var animator = GetComponentInChildren<Animator>();
+
+            // Controller가 null이면 Resources 또는 직접 경로에서 로드 시도
+            if (animator != null && animator.runtimeAnimatorController == null)
+            {
+                var ctrl = Resources.Load<RuntimeAnimatorController>("AgentAnimatorController");
+                if (ctrl == null)
+                {
+                    // Addressables/Resources에 없으면 에디터에서만 로드
+#if UNITY_EDITOR
+                    ctrl = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(
+                        "Assets/05.Prefabs/Agent/AgentAnimatorController.controller");
+#endif
+                }
+                if (ctrl != null)
+                {
+                    animator.runtimeAnimatorController = ctrl;
+                    Debug.Log($"[{_agentName}] Animator Controller 런타임 할당 완료");
+                }
+                else
+                {
+                    Debug.LogError($"[{_agentName}] Animator Controller를 찾을 수 없습니다!");
+                }
+            }
+
             var animCtrl = new UnityAnimatorController(animator, _agentName);
-            var ctx = new AgentCharacterContext(
+            _ctx = new AgentCharacterContext(
                 animCtrl, _sessionId, _agentName,
                 _navAgent, transform);
 
-            BuildFSM(ctx);
+            // FaceSwapController 연결 (IExpressionController 구현체)
+            var faceSwap = GetComponentInChildren<FaceSwapController>();
+            if (faceSwap != null)
+                _ctx.Expression = faceSwap;
+
+            // HUD 상태 텍스트 콜백 연결
+            var hud = GetComponentInChildren<AgentHUDController>();
+            if (hud != null)
+            {
+                _ctx.OnHUDStatusChanged = (text) =>
+                {
+                    var so = hud;
+                    // HUD의 상태 텍스트를 직접 업데이트
+                    so.ForceStatusText(text);
+                };
+            }
+
+            BuildFSM(_ctx);
 
             // IAgentStateService 구독
             if (_agentStateService != null)
@@ -144,16 +203,28 @@ namespace OpenDesk.Presentation.Character
             var typingState = new AgentTypingState(ctx);
             var thinkingState = new AgentThinkingState(ctx);
             _completedState = new AgentCompletedState(ctx);
+            _completedState.SetThinkingState(thinkingState);
+            _errorState = new AgentErrorState(ctx);
             var disconnectedState = new AgentDisconnectedState(ctx);
             var chattingState = new AgentChattingState(ctx);
 
-            // 완료 모션 끝 → Idle 자동 복귀
-            _completedState.OnCompletionAnimDone += () => _fsm.TransitionTo<AgentIdleState>();
+            // 완료 모션 끝 → Idle 자동 복귀 + 카메라 Office 복귀
+            _completedState.OnCompletionAnimDone += () =>
+            {
+                thinkingState.ResetSeated();
+                _fsm.TransitionTo<AgentIdleState>();
+
+                var focusCam = FindFirstObjectByType<Presentation.Camera.AgentFocusCameraController>();
+                if (focusCam != null) focusCam.ReturnToOffice();
+            };
+            // 에러 3초 후 → Idle 자동 복귀
+            _errorState.OnErrorAnimDone += () => _fsm.TransitionTo<AgentIdleState>();
 
             _fsm.AddState(idleState);
             _fsm.AddState(typingState);
             _fsm.AddState(thinkingState);
             _fsm.AddState(_completedState);
+            _fsm.AddState(_errorState);
             _fsm.AddState(disconnectedState);
             _fsm.AddState(chattingState);
 
@@ -202,7 +273,7 @@ namespace OpenDesk.Presentation.Character
                     break;
 
                 case AgentActionType.TaskFailed:
-                    _fsm.TransitionTo<AgentCompletedState>();
+                    _fsm.TransitionTo<AgentErrorState>();
                     break;
 
                 case AgentActionType.Disconnected:
@@ -221,6 +292,15 @@ namespace OpenDesk.Presentation.Character
         public void ForceState(AgentActionType actionType)
         {
             OnAgentStateChanged(actionType);
+        }
+
+        /// <summary>"작업 완료" 버튼 — 앉아있는 에이전트를 일어나게 하고 Idle로 복귀</summary>
+        public void DismissFromWork()
+        {
+            if (_fsm != null && _fsm.IsInState<AgentCompletedState>())
+                _completedState.DismissAgent();
+            else
+                _fsm?.TransitionTo<AgentIdleState>();
         }
 
         // ── Unity 루프 ───────────────────────────────────────────────────────
@@ -276,6 +356,8 @@ namespace OpenDesk.Presentation.Character
         private void DbgTyping() => OnAgentStateChanged(AgentActionType.TaskStarted);
         [ContextMenu("Test: Thinking")]
         private void DbgThink() => OnAgentStateChanged(AgentActionType.Thinking);
+        [ContextMenu("Test: Error")]
+        private void DbgError() => OnAgentStateChanged(AgentActionType.TaskFailed);
 #endif
     }
 }

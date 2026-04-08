@@ -5,93 +5,146 @@ using UnityEngine;
 
 /// <summary>
 /// 에이전트 3D 모델용 Animator Controller 자동 생성.
-/// FBX 애니메이션 클립(Idle/Typing/Walk/Cheering)을 State 파라미터로 전환.
+/// SD_Maneqquin + Businessman 애니메이션 클립을 State int 파라미터로 전환.
+/// State: 0=Idle, 1=Typing, 2=Walk, 3=Cheering, 4=Thinking(Drinking), 5=Sleeping,
+///        6=StandToSit, 7=SitToStand, 8=SitToType, 9=TypeToSit, 10=Error(FemaleStandingPose)
 /// 메뉴: Tools → OpenDesk → Build Agent Animator Controller
 /// </summary>
 public static class AgentAnimatorBuilder
 {
-    private const string AnimDir = "Assets/03.Models/Businessman";
+    private const string SDAnimDir = "Assets/03.Models/SD_Maneqquin/Animations";
+    private const string BizAnimDir = "Assets/03.Models/Businessman";
     private const string OutputDir = "Assets/05.Prefabs/Agent";
     private const string OutputPath = OutputDir + "/AgentAnimatorController.controller";
-    private const string Agent3DPrefabPath = "Assets/05.Prefabs/Agent/Model_Agent3D.prefab";
+    private const string Agent3DPrefabPath = "Assets/03.Models/SD_Maneqquin/SD_ManeequinPrefab.prefab";
 
     [MenuItem("Tools/OpenDesk/Build Agent Animator Controller", false, 125)]
     public static void Build()
     {
         EnsureFolder(OutputDir);
 
-        // FBX에서 AnimationClip 로드
-        var idleClip = LoadClipFromFbx($"{AnimDir}/Idle.fbx");
-        var typingClip = LoadClipFromFbx($"{AnimDir}/Typing.fbx");
-        var walkClip = LoadClipFromFbx($"{AnimDir}/Standard Walk.fbx");
-        var cheerClip = LoadClipFromFbx($"{AnimDir}/Cheering.fbx");
+        // Businessman 클립 (FBX 모델 교체 완료 — Avatar 호환)
+        var idleClip = LoadClipFromFbx($"{BizAnimDir}/Idle.fbx");
+        var cheerClip = LoadClipFromFbx($"{BizAnimDir}/Cheering.fbx");
+        var errorClip = LoadClipFromFbx($"{SDAnimDir}/Female Standing Pose.fbx"); // 에러용
+
+        // SD_Maneqquin 클립 (타이핑/의자 계열)
+        var typingClip = LoadClipFromFbx($"{SDAnimDir}/Typing.fbx");
+        var walkClip = LoadClipFromFbx($"{SDAnimDir}/Walking.fbx");
+        var thinkingClip = LoadClipFromFbx($"{SDAnimDir}/Drinking.fbx"); // 고민 → Drinking
+        var sleepingClip = LoadClipFromFbx($"{SDAnimDir}/Sitting.fbx");
+
+        // 전환 애니메이션 (원샷)
+        var standToSitClip = LoadClipFromFbx($"{SDAnimDir}/Stand To Sit.fbx");
+        var sitToStandClip = LoadClipFromFbx($"{SDAnimDir}/Sit To Stand.fbx");
+        var sitToTypeClip = LoadClipFromFbx($"{SDAnimDir}/Sit To Type.fbx");
+        var typeToSitClip = LoadClipFromFbx($"{SDAnimDir}/Type To Sit.fbx");
 
         if (idleClip == null)
         {
             EditorUtility.DisplayDialog("오류",
-                $"Idle.fbx 애니메이션을 찾을 수 없습니다.\n{AnimDir}/Idle.fbx", "OK");
+                $"Idle 애니메이션을 찾을 수 없습니다.\n{SDAnimDir}/Female Standing Pose.fbx", "OK");
             return;
         }
 
-        // Animator Controller 생성
+        // 기존 Controller 삭제 후 재생성
+        if (AssetDatabase.LoadAssetAtPath<AnimatorController>(OutputPath) != null)
+            AssetDatabase.DeleteAsset(OutputPath);
+
         var controller = AnimatorController.CreateAnimatorControllerAtPath(OutputPath);
 
-        // 파라미터 추가
         controller.AddParameter("State", AnimatorControllerParameterType.Int);
         controller.AddParameter("MoveSpeed", AnimatorControllerParameterType.Float);
 
         var rootLayer = controller.layers[0];
-        var stateMachine = rootLayer.stateMachine;
+        var sm = rootLayer.stateMachine;
 
-        // 상태 생성 (0=Idle, 1=Typing, 2=Walk, 3=Cheering)
-        var stIdle = stateMachine.AddState("Idle", new Vector3(300, 100, 0));
+        // ── 루프 상태 (0~5) ─────────────────────────────────────
+        var stIdle = sm.AddState("Idle", new Vector3(300, 100, 0));
         stIdle.motion = idleClip;
 
-        var stTyping = stateMachine.AddState("Typing", new Vector3(300, 200, 0));
+        var stTyping = sm.AddState("Typing", new Vector3(300, 200, 0));
         stTyping.motion = typingClip ?? idleClip;
 
-        var stWalk = stateMachine.AddState("Walk", new Vector3(300, 300, 0));
+        var stWalk = sm.AddState("Walk", new Vector3(300, 300, 0));
         stWalk.motion = walkClip ?? idleClip;
 
-        var stCheer = stateMachine.AddState("Cheering", new Vector3(300, 400, 0));
+        var stCheer = sm.AddState("Cheering", new Vector3(300, 400, 0));
         stCheer.motion = cheerClip ?? idleClip;
 
-        // 기본 상태 = Idle
-        stateMachine.defaultState = stIdle;
+        var stThinking = sm.AddState("Thinking", new Vector3(300, 500, 0));
+        stThinking.motion = thinkingClip ?? idleClip;
 
-        // Any State → 각 상태 전환 (State 파라미터 기반)
-        AddTransitionFromAny(stateMachine, stIdle, 0);
-        AddTransitionFromAny(stateMachine, stTyping, 1);
-        AddTransitionFromAny(stateMachine, stWalk, 2);
-        AddTransitionFromAny(stateMachine, stCheer, 3);
+        var stSleeping = sm.AddState("Sleeping", new Vector3(300, 600, 0));
+        stSleeping.motion = sleepingClip ?? idleClip;
+
+        // ── 전환 원샷 상태 (6~9) ────────────────────────────────
+        var stStandToSit = sm.AddState("StandToSit", new Vector3(550, 200, 0));
+        stStandToSit.motion = standToSitClip ?? idleClip;
+
+        var stSitToStand = sm.AddState("SitToStand", new Vector3(550, 300, 0));
+        stSitToStand.motion = sitToStandClip ?? idleClip;
+
+        var stSitToType = sm.AddState("SitToType", new Vector3(550, 400, 0));
+        stSitToType.motion = sitToTypeClip ?? idleClip;
+
+        var stTypeToSit = sm.AddState("TypeToSit", new Vector3(550, 500, 0));
+        stTypeToSit.motion = typeToSitClip ?? idleClip;
+
+        // Error 전용 (Female Standing Pose)
+        var stError = sm.AddState("Error", new Vector3(550, 600, 0));
+        stError.motion = errorClip ?? idleClip;
+
+        sm.defaultState = stIdle;
+
+        // ── Any State → 각 상태 전환 ────────────────────────────
+        AddTransitionFromAny(sm, stIdle, 0);
+        AddTransitionFromAny(sm, stTyping, 1);
+        AddTransitionFromAny(sm, stWalk, 2);
+        AddTransitionFromAny(sm, stCheer, 3);
+        AddTransitionFromAny(sm, stThinking, 4);
+        AddTransitionFromAny(sm, stSleeping, 5);
+        AddTransitionFromAny(sm, stStandToSit, 6);
+        AddTransitionFromAny(sm, stSitToStand, 7);
+        AddTransitionFromAny(sm, stSitToType, 8);
+        AddTransitionFromAny(sm, stTypeToSit, 9);
+        AddTransitionFromAny(sm, stError, 10);
+
+        // Cheering 종료 후 Idle 복귀 (Animator 레벨 자동 전환)
+        var cheerToIdle = stCheer.AddTransition(stIdle);
+        cheerToIdle.hasExitTime = true;
+        cheerToIdle.exitTime = 1f;
+        cheerToIdle.duration = 0.25f;
+        cheerToIdle.hasFixedDuration = true;
 
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssets();
 
-        // Model_Agent3D 프리팹에 Animator Controller 할당
         AssignToAgent3DPrefab(controller);
-
         AssetDatabase.Refresh();
 
-        var clipInfo = $"Idle: {(idleClip != null ? "OK" : "X")}\n" +
-                       $"Typing: {(typingClip != null ? "OK" : "X")}\n" +
-                       $"Walk: {(walkClip != null ? "OK" : "X")}\n" +
-                       $"Cheering: {(cheerClip != null ? "OK" : "X")}";
+        var names = new[] { "Idle", "Typing", "Walk", "Cheering", "Thinking(Drinking)", "Sleeping",
+                            "StandToSit", "SitToStand", "SitToType", "TypeToSit", "Error(FemaleStandingPose)" };
+        var clips = new AnimationClip[] { idleClip, typingClip, walkClip, cheerClip,
+                                          thinkingClip, sleepingClip,
+                                          standToSitClip, sitToStandClip, sitToTypeClip, typeToSitClip, errorClip };
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < names.Length; i++)
+            sb.AppendLine($"  {i}={names[i]}: {(clips[i] != null ? "OK" : "X")}");
 
+        var clipInfo = sb.ToString();
         Debug.Log($"[AgentAnimatorBuilder] Animator Controller 생성 완료\n{clipInfo}");
         EditorUtility.DisplayDialog("완료",
-            $"AgentAnimatorController 생성 완료.\n\n{clipInfo}\n\n" +
-            $"위치: {OutputPath}\n\n" +
-            "State 파라미터: 0=Idle, 1=Typing, 2=Walk, 3=Cheering",
-            "OK");
+            $"AgentAnimatorController 생성 완료.\n\n{clipInfo}\n위치: {OutputPath}", "OK");
     }
 
-    private static void AddTransitionFromAny(AnimatorStateMachine sm, AnimatorState target, int stateValue)
+    private static void AddTransitionFromAny(AnimatorStateMachine sm, AnimatorState target,
+        int stateValue, bool hasExitTime = false)
     {
         var transition = sm.AddAnyStateTransition(target);
         transition.AddCondition(AnimatorConditionMode.Equals, stateValue, "State");
-        transition.hasExitTime = false;
-        transition.duration = 0.15f;
+        transition.hasExitTime = hasExitTime;
+        transition.duration = 0.25f;
         transition.canTransitionToSelf = false;
     }
 

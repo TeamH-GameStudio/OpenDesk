@@ -14,11 +14,14 @@ namespace OpenDesk.Presentation.Character.States
 
         private float _wanderTimer;
         private bool _isWalking;
+        private float _idleElapsed;       // IDLE 상태 누적 시간
+        private bool _isSleeping;         // sleeping 서브상태 여부
 
         // 배회 설정
         private const float WanderInterval = 6f;     // 대기 후 배회까지 시간
         private const float WanderRadius = 3f;        // 배회 반경
         private const int MaxSampleAttempts = 10;     // NavMesh 샘플링 시도 횟수
+        private const float SleepThreshold = 30f;     // 30초 후 sleeping 전환
 
         public string Name => "Idle";
 
@@ -28,15 +31,44 @@ namespace OpenDesk.Presentation.Character.States
         {
             _ctx.StopMoving();
             _ctx.Animation.PlayAnimation("Idle", loop: true);
+            _ctx.Expression?.SetExpression("Neutral");
+            _ctx.OnHUDStatusChanged?.Invoke("대기 중");
             _wanderTimer = WanderInterval + Random.Range(-2f, 2f);
             _isWalking = false;
+            _idleElapsed = 0f;
+            _isSleeping = false;
         }
 
         public void Update(float deltaTime)
         {
+            // sleeping 상태면 더 이상 배회하지 않음
+            if (_isSleeping) return;
+
+            // 카메라 포커스 중이면 가만히 Idle 유지
+            if (_ctx.IsFocused)
+            {
+                // 걷고 있었으면 멈춤
+                if (_isWalking)
+                {
+                    _isWalking = false;
+                    _ctx.StopMoving();
+                    _ctx.Animation.PlayAnimation("Idle", loop: true);
+                }
+                _idleElapsed = 0f; // sleeping 타이머 리셋
+                return;
+            }
+
+            _idleElapsed += deltaTime;
+
+            // 30초 경과 시 sleeping 전환
+            if (!_isWalking && _idleElapsed >= SleepThreshold)
+            {
+                EnterSleeping();
+                return;
+            }
+
             if (_isWalking)
             {
-                // 도착 체크
                 if (_ctx.HasReachedDestination)
                 {
                     _isWalking = false;
@@ -58,6 +90,21 @@ namespace OpenDesk.Presentation.Character.States
         {
             _ctx.StopMoving();
             _isWalking = false;
+            if (_isSleeping)
+            {
+                _ctx.Expression?.SetExpression("Neutral");
+                _isSleeping = false;
+            }
+        }
+
+        private void EnterSleeping()
+        {
+            _isSleeping = true;
+            _ctx.StopMoving();
+            _ctx.Animation.PlayAnimation("Sleeping", loop: true);
+            _ctx.Expression?.SetExpression("Sleeping");
+            _ctx.OnHUDStatusChanged?.Invoke("수면 중...");
+            Debug.Log($"[{_ctx.AgentName}] Idle -> Sleeping (30초 경과)");
         }
 
         private void TryWander()
