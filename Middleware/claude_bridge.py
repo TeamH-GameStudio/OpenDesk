@@ -15,10 +15,11 @@ logger = logging.getLogger("claude_bridge")
 class ClaudeBridge:
     """Claude CLI와의 통신을 담당"""
 
-    def __init__(self, cli_path: str = "claude", timeout: int = 120):
+    def __init__(self, cli_path: str = "claude", timeout: int = 300):
         self._cli_path = cli_path
         self._timeout = timeout
         self._active_process: asyncio.subprocess.Process | None = None
+        self._heartbeat_task: asyncio.Task | None = None
 
     async def check_cli_available(self) -> tuple[bool, str]:
         """Claude CLI 존재 및 인증 확인. (ok, model_or_error) 반환"""
@@ -73,6 +74,11 @@ class ClaudeBridge:
 
             accumulated_text = ""
             last_delta_text = ""
+
+            # 60초 간격 heartbeat 시작
+            self._heartbeat_task = asyncio.create_task(
+                self._heartbeat_loop(on_status)
+            )
 
             try:
                 async with asyncio.timeout(self._timeout):
@@ -138,6 +144,7 @@ class ClaudeBridge:
 
                         elif msg_type == "result":
                             # 최종 결과
+                            self._cancel_heartbeat()
                             result_text = data.get("result", accumulated_text)
                             cost = data.get("total_cost_usd", 0.0)
                             await on_final(result_text, cost)
@@ -151,6 +158,7 @@ class ClaudeBridge:
                                 logger.info(f"CLI session init: model={model}")
 
             except TimeoutError:
+                self._cancel_heartbeat()
                 self.kill_active_process()
                 await on_error("응답 시간 초과", "cli_timeout")
                 return
@@ -181,6 +189,7 @@ class ClaudeBridge:
         except Exception as e:
             await on_error(str(e), "cli_error")
         finally:
+            self._cancel_heartbeat()
             self._active_process = None
 
     def kill_active_process(self):
@@ -191,3 +200,24 @@ class ClaudeBridge:
                 logger.info("Active CLI process killed")
             except ProcessLookupError:
                 pass
+
+    async def _heartbeat_loop(self, on_status):
+        """60초 간격으로 상태 보고 — CLI 실행 중 Unity에 alive 알림"""
+        if on_status is None:
+            return
+        elapsed = 0
+        interval = 60
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                elapsed += interval
+                await on_status(f"처리 중... (경과: {elapsed}초)")
+                logger.debug(f"Heartbeat sent: {elapsed}s elapsed")
+        except asyncio.CancelledError:
+            pass
+
+    def _cancel_heartbeat(self):
+        """heartbeat Task 정리"""
+        if self._heartbeat_task and not self._heartbeat_task.done():
+            self._heartbeat_task.cancel()
+            self._heartbeat_task = None

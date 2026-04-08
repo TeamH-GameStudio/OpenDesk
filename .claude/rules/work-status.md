@@ -1,59 +1,54 @@
-# 작업 현황 (2026-04-01 최종 갱신)
+# 작업 현황 (2026-04-08 최종 갱신)
 
 작업 정리 폴더: `C:/Users/user/Desktop/OpenDesk/작업정리/`
+마일스톤 문서: `C:/Users/user/Desktop/OpenDesk/new기획정리/Unity_클라이언트_마일스톤.md`
 
-## 방향 전환 (03-31)
+## 방향 (04-07 확정)
 
-- OpenClaw 의존 제거 → Claude CLI/API 단일 백엔드
-- 핵심: 공간 파이프라인, 스킬 디스켓 메타포, 커스텀 크래프팅, 바톤터치, 외부 도구 연동
-- 기획서: `C:/Users/user/Desktop/OpenDesk/기획/2026-03-31_재정립/`
+- **Claude CLI 완전 폐기** — Anthropic SDK 미들웨어로 전환
+- **미들웨어/SDK 개발 안 함** — 승문 담당
+- **Unity = WebSocket 클라이언트만** — 새 프로토콜 대응
+- 에이전트 3개: researcher, writer, analyst
+- 기획서: `C:/Users/user/Desktop/OpenDesk/new기획정리/`
 
-## 2주 스프린트 (04-01 ~ 04-14)
+## Phase 진행 상황 (04-07~08)
 
-### Week 1 완료 (04-01)
+| Phase | 내용 | 상태 |
+|-------|------|------|
+| 1 | DTO 교체 (Unity→MW 7종, MW→Unity 6종) | 완료 |
+| 2 | WebSocket 클라이언트 교체 (송수신 + autoConnect) | 완료 |
+| 3 | ChatPanel 리팩토링 (agentId 동적, StringBuilder) | 완료 |
+| 4 | FSM 매핑 + ForceState 연동 | 완료 |
+| 5 | 세션 관리 UI (세션목록↔채팅 전환) | 완료 |
+| 6 | 버블 UI (HUD 타원형 + thinking/working 표시) | 완료 |
+| 7 | 레거시 정리 (MiddlewareLauncher, IClaudeService Obsolete) | 완료 |
+| 8 | 통합 테스트 (6개 시나리오) | 미착수 (승문 대기) |
 
-| Day | 내용 | 상태 |
-|-----|------|------|
-| 1 | SkillDiskette SO + 프리셋 5개 | 완료 |
-| 2 | IClaudeService Facade | 완료 |
-| 3 | AgentEquipmentManager + System Prompt 연동 | 완료 |
-| 4 | 디스켓 드래그&드롭 (New Input System) | 완료 |
-| 5 | 3D Printer + 크래프팅 | 완료 |
-| 6 | In-box + Out-box + PipelineManager | 완료 |
-| - | UI 개선: DisketteShelfUI + 크래프팅 토글 | 완료 |
+## 메인 씬: AgentProtocolTestScene
 
-### Week 2 예정
+- Office_35 + NavMesh 자동 베이크 + 가구 레이어 자동 설정
+- Cinemachine 2 VCam (Overview ↔ AgentCam, EaseInOut 0.8초)
+- 좌측: 테스트 버튼 (에이전트3, FSM7, 서버5, Mock6) — 항상 표시
+- 우측: 세션 목록 → 채팅 뷰 전환 — 에이전트 클릭 시 활성화
+- FSM 테스트 → 실제 3D ForceState() 연동 (의자 앉기/타이핑/Cheering 등)
+- Mock 모드: 미들웨어 없이 전체 흐름 시뮬레이션
 
-| Day | 내용 | 상태 |
-|-----|------|------|
-| 8-9 | 토큰 입력 UI + Notion MCP 연동 | 미착수 |
-| 10-11 | 전체 E2E 테스트 (6개 시나리오) | 미착수 |
-| 12-13 | VFX (크래프팅/장착/홀로그램) | 미착수 |
-| 14 | 안정화 + 데모 준비 | 미착수 |
+## 애니메이션 (11 State)
 
-## 동작 확인된 플로우 (04-01 기준)
+0=Idle(Businessman), 1=Typing, 2=Walk, 3=Cheering(Businessman), 4=Thinking(Drinking)
+5=Sleeping, 6=StandToSit, 7=SitToStand, 8=SitToType, 9=TypeToSit, 10=Error(FemaleStandingPose)
 
-1. 선반 UI 카드 드래그 → 에이전트 드롭 → system prompt 자동 반영 → 채팅 응답 변화
-2. 크래프팅 토글 → 프롬프트 입력 → Claude 응답 → 선반에 카드 추가
-3. In-box 파일 투입 → 채팅 시 파일 컨텍스트 포함
-4. 응답 완료 → Out-box 자동 저장 (TMP 태그 제거)
-5. 디스켓 해제 → 선반 복귀 → 다른 디스켓 장착
+## 빌드 순서 (씬 재구성 시)
 
-## 해결된 이슈 (04-01)
+1. Tools > OpenDesk > Build Agent Animator Controller
+2. Tools > OpenDesk > Build Agent Prefabs
+3. Tools > OpenDesk > Build Agent Protocol Test Scene
 
-| 이슈 | 해결 |
-|------|------|
-| OnMouseDown UI 차단 | Update + Physics.Raycast 직접 처리 |
-| 레거시 Input 에러 | New Input System (Mouse.current) 전환 |
-| DI 미주입 NullRef | AgentOfficeInstaller에 등록 |
-| 크래프팅 JSON 파싱 실패 | TMP 태그 제거 후 JSON 추출 |
-| Out-box TMP 태그 출력 | StripTmpTags() 적용 |
-| Mask 투명 Image 문제 | RectMask2D로 변경 |
-
-## 알려진 이슈 (미해결)
+## 알려진 이슈
 
 | 이슈 | 심각도 | 비고 |
 |------|--------|------|
-| Claude CLI 응답 시간 초과 (120초) | HIGH | timeout 300초 조정 예정 (Day 14) |
-| EquipmentSlotUI 씬 바인딩 미완 | MEDIUM | Patcher 추가 또는 수동 연결 필요 |
-| Notion MCP 미연동 | MEDIUM | Day 8-9에서 구현 |
+| 버블 UI 실제 표시 확인 | HIGH | HUD+씬 재빌드 순서 필수 |
+| 앉아서 Complete 모션 없음 | LOW | 클립 추가 시 수정 |
+| PlayerPrefs 세션 완전 제거 | LOW | 서버 세션 검증 후 |
+| 미들웨어 통합 테스트 | HIGH | 승문 서버 준비 후 |

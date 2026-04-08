@@ -38,7 +38,7 @@ Assets/02.Scripts/
 │   │   └── Modals/        — ModalDialogController
 │   ├── Dashboard/        — AgenticLoopVisualizer, ConsoleLogController, CostHudController
 │   └── SceneLoading/     — LoadingSceneController
-├── Claude/               — ClaudeWebSocketClient, ClaudeChatManager, MiddlewareLauncher, ClaudeChatProtocol
+├── Claude/               — ClaudeWebSocketClient (새 프로토콜 7+6종), AgentProtocolTestManager, ClaudeChatManager (레거시), MiddlewareLauncher (main.py), ClaudeChatProtocol (새 DTO)
 └── Onboarding/           — 온보딩 (현재 미사용 — OpenClaw 제거)
 ```
 

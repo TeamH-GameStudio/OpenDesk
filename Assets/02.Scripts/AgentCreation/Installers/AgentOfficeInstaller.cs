@@ -27,7 +27,11 @@ namespace OpenDesk.AgentCreation.Installers
             builder.RegisterComponentInHierarchy<AgentClickHandler>();
             builder.RegisterComponentInHierarchy<ClaudeWebSocketClient>();
             builder.Register<ClaudeService>(Lifetime.Scoped).As<IClaudeService>();
-            builder.RegisterComponentInHierarchy<DiskettePrinterController>();
+
+            // 씬에 있을 때만 등록 (Pipeline 패치 전에는 없을 수 있음)
+            var printer = FindObjectOfType<DiskettePrinterController>();
+            if (printer != null)
+                builder.RegisterComponent(printer);
 
             Debug.Log("[VContainer] AgentOfficeInstaller.Configure() 완료");
         }

@@ -20,6 +20,17 @@ import websockets
 from claude_bridge import ClaudeBridge
 from formatter import markdown_to_tmp
 
+# ── OpenDesk 에이전트 규칙 로드 ──────────────────────────────────
+
+OPENDESK_MD_PATH = Path(__file__).parent / "opendesk.md"
+
+
+def load_opendesk_rules() -> str:
+    """opendesk.md 파일에서 에이전트 행동 규칙 로드"""
+    if OPENDESK_MD_PATH.exists():
+        return OPENDESK_MD_PATH.read_text(encoding="utf-8")
+    return ""
+
 # ── 로깅 설정 ──────────────────────────────────────────────────
 
 logging.basicConfig(
@@ -44,7 +55,7 @@ def load_config() -> dict:
         "claude": {
             "systemPrompt": "당신은 친절한 AI 어시스턴트입니다. 한국어로 대답합니다.",
             "maxTurns": 50,
-            "timeoutSeconds": 120,
+            "timeoutSeconds": 300,
             "cliPath": "claude",
         },
         "formatting": {
@@ -89,7 +100,13 @@ class ChatSession:
         # 시스템 프롬프트
         if self.system_prompt:
             parts.append(f"[System]\n{self.system_prompt}\n")
-            parts.append("중요: 당신은 채팅 에이전트입니다. 파일 읽기, 코드 실행 등의 도구는 사용하지 마세요. 대화로만 응답하세요.\n")
+
+        # OpenDesk 에이전트 규칙
+        rules = load_opendesk_rules()
+        if rules:
+            parts.append(f"[Agent Rules]\n{rules}\n")
+
+        parts.append("중요: 당신은 채팅 에이전트입니다. 파일 읽기, 코드 실행 등의 도구는 사용하지 마세요. 대화로만 응답하세요.\n")
 
         # 마지막 user 메시지 찾기
         last_user_idx = -1
