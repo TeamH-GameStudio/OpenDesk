@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using OpenDesk.AgentCreation.Models;
 using OpenDesk.Claude;
+using OpenDesk.Claude.Models;
 using OpenDesk.Core.Models;
 using OpenDesk.Presentation.Character;
 using OpenDesk.Pipeline;
@@ -13,13 +14,14 @@ using UnityEngine.UI;
 namespace OpenDesk.Presentation.UI.Session
 {
     /// <summary>
-    /// 채팅 패널 — Claude CLI 미들웨어 연동.
+    /// 채팅 패널 — 새 미들웨어 프로토콜 연동.
+    /// 멀티 에이전트 대응: agent_id 기반 필터링.
     /// 메시지 전송/수신 시 에이전트 HUD + FSM 상태를 동기화.
     ///
     /// 흐름:
-    ///   메시지 전송 → Thinking (의자로 이동+생각)
-    ///   → delta 수신 → Chatting (타이핑)
-    ///   → final 수신 → Completed (환호) → Idle
+    ///   메시지 전송 → (서버에서 agent_state:thinking)
+    ///   → agent_delta 수신 → Chatting (타이핑)
+    ///   → agent_message 수신 → Completed → Idle
     /// </summary>
     public class ChatPanelController : MonoBehaviour
     {
@@ -41,9 +43,13 @@ namespace OpenDesk.Presentation.UI.Session
         [Header("Input")]
         [SerializeField] private TMP_InputField _inputField;
         [SerializeField] private Button _sendButton;
+        [SerializeField] private Button _dismissButton; // "작업 완료" 버튼
 
         [Header("Empty")]
         [SerializeField] private GameObject _emptyHint;
+
+        [Header("Navigation")]
+        [SerializeField] private SessionListController _sessionList;
 
         [Header("Claude")]
         [SerializeField] private ClaudeWebSocketClient _claudeClient;
@@ -51,13 +57,14 @@ namespace OpenDesk.Presentation.UI.Session
 
         // ── 상태 ────────────────────────────────────────────
         private string _currentSessionId;
+        private string _currentAgentId;   // 새 프로토콜: agent_id 기반 필터링
         private string _currentAgentName;
         private AgentRole _currentRole;
         private readonly List<GameObject> _spawnedBubbles = new();
         private bool _isSending;
         private GameObject _streamingBubble;
-        private TMP_Text _streamingText;
-        private string _streamingContent = "";
+        private TMP_Text _streamingTMP;
+        private readonly System.Text.StringBuilder _streamingBuffer = new();
 
         // ── 에이전트 연결 ───────────────────────────────────
         private AgentHUDController _linkedHUD;
@@ -83,6 +90,11 @@ namespace OpenDesk.Presentation.UI.Session
         {
             _backButton?.onClick.AddListener(Close);
             _sendButton?.onClick.AddListener(OnSendClicked);
+            _dismissButton?.onClick.AddListener(OnDismissClicked);
+
+            // 작업 완료 버튼은 처음에 숨김
+            if (_dismissButton != null)
+                _dismissButton.gameObject.SetActive(false);
 
             if (_inputField != null)
                 _inputField.onSubmit.AddListener(_ => OnSendClicked());
@@ -91,10 +103,9 @@ namespace OpenDesk.Presentation.UI.Session
 
             if (_claudeClient != null)
             {
-                _claudeClient.OnDelta += HandleDelta;
-                _claudeClient.OnFinal += HandleFinal;
-                _claudeClient.OnError += HandleError;
-                _claudeClient.OnStatus += HandleStatus;
+                _claudeClient.OnAgentDelta   += HandleDelta;
+                _claudeClient.OnAgentMessage += HandleFinal;
+                _claudeClient.OnAgentState   += HandleState;
             }
         }
 
@@ -102,10 +113,9 @@ namespace OpenDesk.Presentation.UI.Session
         {
             if (_claudeClient != null)
             {
-                _claudeClient.OnDelta -= HandleDelta;
-                _claudeClient.OnFinal -= HandleFinal;
-                _claudeClient.OnError -= HandleError;
-                _claudeClient.OnStatus -= HandleStatus;
+                _claudeClient.OnAgentDelta   -= HandleDelta;
+                _claudeClient.OnAgentMessage -= HandleFinal;
+                _claudeClient.OnAgentState   -= HandleState;
             }
         }
 
@@ -113,11 +123,21 @@ namespace OpenDesk.Presentation.UI.Session
         //  외부 API
         // ================================================================
 
+        /// <summary>agentId 기반 오버로드 (새 프로토콜용)</summary>
+        public void Open(string sessionId, string agentId, string agentName, AgentRole role)
+        {
+            _currentAgentId = agentId;
+            Open(sessionId, agentName, role);
+        }
+
         public void Open(string sessionId, string agentName, AgentRole role)
         {
             _currentSessionId = sessionId;
             _currentAgentName = agentName;
             _currentRole = role;
+            // agentId가 아직 설정되지 않았으면 기본값
+            if (string.IsNullOrEmpty(_currentAgentId))
+                _currentAgentId = "researcher";
 
             if (_headerTitle != null)
                 _headerTitle.text = agentName;
@@ -136,9 +156,35 @@ namespace OpenDesk.Presentation.UI.Session
             }
         }
 
+        /// <summary>"작업 완료" 버튼 — 에이전트를 일어나게 하고 카메라 복귀</summary>
+        private void OnDismissClicked()
+        {
+            // 에이전트 일어나기
+            if (_linkedCharCtrl != null)
+                _linkedCharCtrl.DismissFromWork();
+
+            // 카메라 Office View로 복귀
+            var focusCam = FindFirstObjectByType<Presentation.Camera.AgentFocusCameraController>();
+            if (focusCam != null) focusCam.ReturnToOffice();
+
+            // 버튼 숨김
+            if (_dismissButton != null)
+                _dismissButton.gameObject.SetActive(false);
+
+            Debug.Log("[ChatPanel] 작업 완료 — 에이전트 Dismiss");
+        }
+
         public void Close()
         {
             if (_panelRoot != null) _panelRoot.SetActive(false);
+
+            // 카메라 Office View로 복귀
+            var focusCam = FindFirstObjectByType<Presentation.Camera.AgentFocusCameraController>();
+            if (focusCam != null) focusCam.ReturnToOffice();
+
+            // 세션 목록으로 복귀
+            if (_sessionList != null)
+                _sessionList.ReturnFromChat();
         }
 
         public bool IsOpen => _panelRoot != null && _panelRoot.activeSelf;
@@ -213,16 +259,9 @@ namespace OpenDesk.Presentation.UI.Session
         {
             if (_claudeClient == null || !_claudeClient.IsConnected) return;
 
-            var convFile = ChatMessageStore.LoadConversationFile(_currentSessionId);
-            if (convFile == null || convFile.Messages.Count == 0)
-            {
-                _claudeClient.SendClear();
-                ApplySystemPrompt();
-                return;
-            }
-
-            var historyJson = JsonUtility.ToJson(convFile);
-            _claudeClient.SendResume(historyJson);
+            // 새 프로토콜: 미들웨어가 세션 관리. Resume 불필요.
+            // 기본 system prompt도 미들웨어가 관리하므로 ApplySystemPrompt만 호출 (로그용)
+            ApplySystemPrompt();
         }
 
         /// <summary>
@@ -249,18 +288,16 @@ namespace OpenDesk.Presentation.UI.Session
 
                 if (!string.IsNullOrEmpty(prompt))
                 {
-                    _claudeClient.SendConfig(prompt);
+                    // 새 프로토콜: 미들웨어가 system prompt 관리. 로그만 남김.
                     var fileCount = pipeline?.Inbox?.FilePaths?.Count ?? 0;
-                    Debug.Log($"[ChatPanel] System prompt 적용 ({prompt.Length}자, 디스켓 {equipment.EquippedDisks.Count}개, 파일 {fileCount}개)");
+                    Debug.Log($"[ChatPanel] System prompt 준비됨 ({prompt.Length}자, 디스켓 {equipment.EquippedDisks.Count}개, 파일 {fileCount}개) — 미들웨어 관리");
                     return;
                 }
             }
 
-            // fallback: 디스켓 없을 때 기본 프롬프트
+            // fallback: 디스켓 없을 때 — 미들웨어가 기본 프롬프트 관리
             var fallbackRole = RoleNames.GetValueOrDefault(_currentRole, "에이전트");
-            _claudeClient.SendConfig(
-                $"당신은 '{_currentAgentName}'이라는 이름의 {fallbackRole} 전문 에이전트입니다. " +
-                "한국어로 대화하며, 사용자의 요청에 전문적으로 답변합니다.");
+            Debug.Log($"[ChatPanel] 디스켓 미장착. 기본 프롬프트 사용 ({_currentAgentName}, {fallbackRole}) — 미들웨어 관리");
         }
 
         // ================================================================
@@ -281,7 +318,7 @@ namespace OpenDesk.Presentation.UI.Session
             SendMessage(text).Forget();
         }
 
-        private async UniTaskVoid SendMessage(string text)
+        private new async UniTaskVoid SendMessage(string text)
         {
             _isSending = true;
             if (_sendButton != null) _sendButton.interactable = false;
@@ -291,20 +328,28 @@ namespace OpenDesk.Presentation.UI.Session
             ChatMessageStore.Append(_currentSessionId, ChatSender.User, text, _currentAgentName);
             SpawnBubble(ChatSender.User, text, System.DateTime.Now, true);
 
+            // 작업 완료 버튼 숨김 (추가 작업 시작)
+            if (_dismissButton != null)
+                _dismissButton.gameObject.SetActive(false);
+
             // ★ 에이전트 상태: Thinking (의자로 이동 + 생각 모션)
             SetAgentState(AgentActionType.Thinking);
             UpdateSubtitle("생각 중...");
+
+            // ★ 카메라를 Monitor Cam으로 전환
+            var focusCam = FindFirstObjectByType<Presentation.Camera.AgentFocusCameraController>();
+            if (focusCam != null) focusCam.TransitionToMonitorCam();
 
             // 장착 디스켓 변경 반영 (매 메시지마다 최신 prompt 적용)
             ApplySystemPrompt();
 
             if (_claudeClient != null && _claudeClient.IsConnected)
             {
-                _streamingContent = "";
+                _streamingBuffer.Clear();
                 _streamingBubble = SpawnBubble(ChatSender.Agent, "...", System.DateTime.Now, true);
-                _streamingText = _streamingBubble?.GetComponentInChildren<TMP_Text>();
+                _streamingTMP = _streamingBubble?.GetComponentInChildren<TMP_Text>();
 
-                _claudeClient.SendChat(text);
+                _claudeClient.SendChatMessage(_currentAgentId, text);
             }
             else
             {
@@ -323,40 +368,47 @@ namespace OpenDesk.Presentation.UI.Session
         //  Claude 이벤트 핸들러
         // ================================================================
 
-        private void HandleDelta(string text)
+        private void HandleDelta(AgentDeltaMessage msg)
         {
+            if (msg.agent_id != _currentAgentId) return;
             if (_streamingBubble == null) return;
 
-            // ★ 첫 delta 수신 → Typing 상태 (생각 끝, 타이핑 시작)
-            if (string.IsNullOrEmpty(_streamingContent))
+            // 첫 delta 수신 → Typing 상태 (생각 끝, 타이핑 시작)
+            if (_streamingBuffer.Length == 0)
             {
                 SetAgentState(AgentActionType.ChatDelta);
                 UpdateSubtitle("응답 중...");
             }
 
-            _streamingContent += text;
+            _streamingBuffer.Append(msg.text);
 
-            if (_streamingText != null)
-                _streamingText.text = FormatBubbleText(ChatSender.Agent, _streamingContent, System.DateTime.Now);
+            if (_streamingTMP != null)
+                _streamingTMP.SetText(FormatBubbleText(ChatSender.Agent, _streamingBuffer.ToString(), System.DateTime.Now));
 
             ScrollToBottomNextFrame().Forget();
         }
 
-        private void HandleFinal(string text, float cost)
+        private void HandleFinal(AgentMessageMessage msg)
         {
-            var finalText = string.IsNullOrEmpty(text) ? _streamingContent : text;
+            if (msg.agent_id != _currentAgentId) return;
 
-            if (_streamingText != null)
-                _streamingText.text = FormatBubbleText(ChatSender.Agent, finalText, System.DateTime.Now);
+            var finalText = string.IsNullOrEmpty(msg.message)
+                ? _streamingBuffer.ToString()
+                : msg.message;
+
+            if (_streamingTMP != null)
+                _streamingTMP.SetText(FormatBubbleText(ChatSender.Agent, finalText, System.DateTime.Now));
 
             if (!string.IsNullOrEmpty(finalText))
                 ChatMessageStore.Append(_currentSessionId, ChatSender.Agent, finalText, _currentAgentName);
 
-            // ★ 에이전트 상태: Completed (환호 → 3초 후 Idle로 자동 복귀)
             SetAgentState(AgentActionType.ChatFinal);
             UpdateSubtitle("응답 완료");
 
-            // Out-box 연동: In-box에 파일이 있었으면 결과도 저장
+            if (_dismissButton != null)
+                _dismissButton.gameObject.SetActive(true);
+
+            // Out-box 연동
             var pipeline = FindFirstObjectByType<OfficePipelineManager>();
             if (pipeline?.Outbox != null && pipeline.Inbox != null
                 && pipeline.Inbox.FilePaths.Count > 0
@@ -365,39 +417,63 @@ namespace OpenDesk.Presentation.UI.Session
                 pipeline.Outbox.ReceiveResult(finalText);
             }
 
-            // 3초 후 서브타이틀 복귀
             RestoreSubtitleAfterDelay().Forget();
 
             _streamingBubble = null;
-            _streamingText = null;
-            _streamingContent = "";
+            _streamingTMP = null;
+            _streamingBuffer.Clear();
             _isSending = false;
             if (_sendButton != null) _sendButton.interactable = true;
 
             ScrollToBottomNextFrame().Forget();
         }
 
-        private void HandleError(string errorMsg)
+        private void HandleState(AgentStateMessage msg)
         {
-            if (_streamingBubble != null && _streamingText != null)
-                _streamingText.text = FormatBubbleText(ChatSender.System, $"[오류] {errorMsg}", System.DateTime.Now);
-            else
-                SpawnBubble(ChatSender.System, $"[오류] {errorMsg}", System.DateTime.Now, true);
+            if (msg.agent_id != _currentAgentId) return;
 
-            SetAgentState(AgentActionType.Idle);
-            UpdateSubtitle("대기 중");
+            switch (msg.state)
+            {
+                case "error":
+                    var errorMsg = msg.message ?? "알 수 없는 에러";
+                    if (_streamingBubble != null && _streamingTMP != null)
+                        _streamingTMP.SetText(FormatBubbleText(ChatSender.System, $"[오류] {errorMsg}", System.DateTime.Now));
+                    else
+                        SpawnBubble(ChatSender.System, $"[오류] {errorMsg}", System.DateTime.Now, true);
 
-            _streamingBubble = null;
-            _streamingText = null;
-            _streamingContent = "";
-            _isSending = false;
-            if (_sendButton != null) _sendButton.interactable = true;
-        }
+                    SetAgentState(AgentActionType.Idle);
+                    UpdateSubtitle("대기 중");
+                    _streamingBubble = null;
+                    _streamingTMP = null;
+                    _streamingBuffer.Clear();
+                    _isSending = false;
+                    if (_sendButton != null) _sendButton.interactable = true;
+                    break;
 
-        private void HandleStatus(string statusText)
-        {
-            if (_isSending)
-                UpdateSubtitle(statusText);
+                case "working":
+                    if (_isSending)
+                    {
+                        SetAgentState(AgentActionType.Executing);
+                        UpdateSubtitle($"도구 사용 중: {msg.tool}");
+                    }
+                    break;
+
+                case "thinking":
+                    if (_isSending)
+                    {
+                        SetAgentState(AgentActionType.Thinking);
+                        UpdateSubtitle("사고 중...");
+                    }
+                    break;
+
+                case "idle":
+                    if (!_isSending)
+                    {
+                        SetAgentState(AgentActionType.Idle);
+                        UpdateSubtitle("대기 중");
+                    }
+                    break;
+            }
         }
 
         // ================================================================

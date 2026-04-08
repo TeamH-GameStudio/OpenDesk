@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using OpenDesk.AgentCreation.Models;
+using OpenDesk.Claude;
+using OpenDesk.Claude.Models;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -34,12 +36,17 @@ namespace OpenDesk.Presentation.UI.Session
         [Header("Chat")]
         [SerializeField] private ChatPanelController _chatPanel;
 
+        [Header("서버 세션 (새 프로토콜)")]
+        [SerializeField] private ClaudeWebSocketClient _wsClient;
+
         // ── 상태 ────────────────────────────────────────────
         private int _currentAgentIndex = -1;
+        private string _currentAgentId;   // 새 프로토콜용
         private string _currentAgentName;
         private AgentRole _currentRole;
         private int _activeSessionIndex = -1;
         private readonly List<GameObject> _spawnedItems = new();
+        private bool _useServerSessions; // 서버 세션 모드 여부
 
         /// <summary>세션 선택 시 (sessionIndex)</summary>
         public event Action<int> OnSessionSelected;
@@ -69,6 +76,23 @@ namespace OpenDesk.Presentation.UI.Session
             _newSessionButton?.onClick.AddListener(CreateNewSession);
 
             if (_panelRoot != null) _panelRoot.SetActive(false);
+
+            // 서버 세션 이벤트 구독
+            if (_wsClient != null)
+            {
+                _useServerSessions = true;
+                _wsClient.OnSessionListResponse += HandleServerSessionList;
+                _wsClient.OnSessionSwitched += HandleServerSessionSwitched;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_wsClient != null)
+            {
+                _wsClient.OnSessionListResponse -= HandleServerSessionList;
+                _wsClient.OnSessionSwitched -= HandleServerSessionSwitched;
+            }
         }
 
         // ================================================================
@@ -86,10 +110,25 @@ namespace OpenDesk.Presentation.UI.Session
             if (_headerAgentRole != null)
                 _headerAgentRole.text = RoleNames.GetValueOrDefault(role, "에이전트");
 
-            RefreshList();
+            if (_useServerSessions && _wsClient != null && _wsClient.IsConnected)
+            {
+                // 서버에 세션 목록 요청
+                _wsClient.SendSessionList(_currentAgentId ?? "researcher");
+            }
+            else
+            {
+                RefreshList();
+            }
 
             if (_panelRoot != null) _panelRoot.SetActive(true);
             OnPanelToggled?.Invoke(true);
+        }
+
+        /// <summary>서버 세션용 오버로드 (agentId 기반)</summary>
+        public void OpenForAgent(string agentId, string agentName, AgentRole role)
+        {
+            _currentAgentId = agentId;
+            OpenForAgent(0, agentName, role);
         }
 
         public void ClosePanel()
@@ -99,6 +138,14 @@ namespace OpenDesk.Presentation.UI.Session
         }
 
         public bool IsOpen => _panelRoot != null && _panelRoot.activeSelf;
+
+        /// <summary>채팅 패널에서 뒤로가기 시 세션 목록 복귀</summary>
+        public void ReturnFromChat()
+        {
+            RefreshList();
+            if (_panelRoot != null) _panelRoot.SetActive(true);
+            OnPanelToggled?.Invoke(true);
+        }
 
         // ================================================================
         //  리스트 갱신
@@ -166,13 +213,11 @@ namespace OpenDesk.Presentation.UI.Session
             AgentSessionStore.SetActiveSession(sessionIndex);
             _activeSessionIndex = sessionIndex;
 
-            // 보더 갱신
-            RefreshList();
-
-            // 채팅 패널 열기
+            // 세션 목록 숨기고 채팅 패널 열기
             var session = AgentSessionStore.Load(sessionIndex);
             if (session != null && _chatPanel != null)
             {
+                if (_panelRoot != null) _panelRoot.SetActive(false);
                 _chatPanel.Open(session.SessionId, _currentAgentName, _currentRole);
             }
 
@@ -186,21 +231,112 @@ namespace OpenDesk.Presentation.UI.Session
 
         private void CreateNewSession()
         {
+            if (_useServerSessions && _wsClient != null && _wsClient.IsConnected)
+            {
+                _wsClient.SendSessionNew(_currentAgentId ?? "researcher");
+                Debug.Log($"[SessionList] 서버 새 세션 요청: {_currentAgentId}");
+                return;
+            }
+
             if (_currentAgentIndex < 0) return;
 
             var newIdx = AgentSessionStore.CreateSession(
                 _currentAgentIndex, _currentAgentName, _currentRole);
 
-            RefreshList();
-
-            // 바로 채팅 패널 열기
             var session = AgentSessionStore.Load(newIdx);
             if (session != null && _chatPanel != null)
+            {
+                if (_panelRoot != null) _panelRoot.SetActive(false);
                 _chatPanel.Open(session.SessionId, _currentAgentName, _currentRole);
+            }
 
             OnSessionSelected?.Invoke(newIdx);
-
             Debug.Log($"[SessionList] 새 세션 생성: [{newIdx}] {_currentAgentName}");
+        }
+
+        // ── 서버 세션 핸들러 ────────────────────────────────
+
+        private void HandleServerSessionList(SessionListResponse response)
+        {
+            if (response.agent_id != _currentAgentId) return;
+
+            ClearItems();
+
+            if (response.sessions == null || response.sessions.Length == 0)
+            {
+                if (_emptyState != null) _emptyState.SetActive(true);
+                return;
+            }
+
+            if (_emptyState != null) _emptyState.SetActive(false);
+
+            foreach (var info in response.sessions)
+            {
+                var isActive = info.session_id == response.current_session_id;
+                SpawnServerSessionItem(info, isActive);
+            }
+        }
+
+        private void SpawnServerSessionItem(SessionInfo info, bool isActive)
+        {
+            if (_sessionItemPrefab == null || _listContent == null) return;
+
+            var item = Instantiate(_sessionItemPrefab, _listContent);
+            item.SetActive(true);
+            _spawnedItems.Add(item);
+
+            var texts = item.GetComponentsInChildren<TMP_Text>(true);
+            var title = string.IsNullOrEmpty(info.title) ? "(새 대화)" : info.title;
+
+            if (texts.Length >= 3)
+            {
+                texts[0].text = title;
+                texts[1].text = $"메시지 {info.message_count}개";
+                texts[2].text = FormatTimestamp(info.updated_at);
+            }
+            else if (texts.Length >= 1)
+            {
+                texts[0].text = $"{title} ({info.message_count})";
+            }
+
+            var border = item.transform.Find("Border");
+            if (border != null)
+                border.gameObject.SetActive(isActive);
+
+            var btn = item.GetComponent<Button>();
+            if (btn != null)
+            {
+                var sid = info.session_id;
+                btn.onClick.AddListener(() =>
+                {
+                    _wsClient.SendSessionSwitch(_currentAgentId, sid);
+                    Debug.Log($"[SessionList] 서버 세션 전환: {sid}");
+                });
+            }
+        }
+
+        private void HandleServerSessionSwitched(SessionSwitchedMessage msg)
+        {
+            if (msg.agent_id != _currentAgentId) return;
+
+            if (_chatPanel != null)
+            {
+                if (_panelRoot != null) _panelRoot.SetActive(false);
+                _chatPanel.Open(msg.session_id, _currentAgentId, _currentAgentName, _currentRole);
+
+                // 히스토리 로드는 ChatPanel 내부에서 처리하지 않고 여기서 직접
+                // → Phase 3에서 ChatPanel이 session_switched를 구독하도록 확장 가능
+            }
+        }
+
+        private static string FormatTimestamp(double unixTimestamp)
+        {
+            if (unixTimestamp <= 0) return "";
+            var dt = DateTimeOffset.FromUnixTimeSeconds((long)unixTimestamp).LocalDateTime;
+            var now = DateTime.Now;
+            if (dt.Date == now.Date) return dt.ToString("HH:mm");
+            if (dt.Date == now.Date.AddDays(-1)) return "어제";
+            return dt.ToString("MM/dd");
         }
 
         // ================================================================
