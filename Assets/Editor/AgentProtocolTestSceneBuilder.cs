@@ -50,7 +50,7 @@ public static class AgentProtocolTestSceneBuilder
     const string HudPath        = "Assets/05.Prefabs/Agent/AgentHUD.prefab";
     const string AgentOfficePath = "Assets/05.Prefabs/AgentOffice.prefab";
 
-    const int RightW = 320;
+    const int RightW = 640;
 
     static TMP_FontAsset _font;
 
@@ -188,7 +188,7 @@ public static class AgentProtocolTestSceneBuilder
         Anchor(btnAddTextObj.AddComponent<RectTransform>(), V(0,0), V(1,1), V(0,0), V(0,0));
         var btnAddTMP = btnAddTextObj.AddComponent<TextMeshProUGUI>();
         btnAddTMP.text = "+ 새 세션";
-        btnAddTMP.fontSize = 14;
+        btnAddTMP.fontSize = 18;
         btnAddTMP.color = (Color)CWhite;
         btnAddTMP.alignment = TextAlignmentOptions.Center;
         btnAddTMP.fontStyle = FontStyles.Bold;
@@ -222,7 +222,7 @@ public static class AgentProtocolTestSceneBuilder
         Anchor(btnBackText.AddComponent<RectTransform>(), V(0,0), V(1,1), V(0,0), V(0,0));
         var btnBackTMP = btnBackText.AddComponent<TextMeshProUGUI>();
         btnBackTMP.text = "<";
-        btnBackTMP.fontSize = 20;
+        btnBackTMP.fontSize = 26;
         btnBackTMP.color = (Color)CWhite;
         btnBackTMP.alignment = TextAlignmentOptions.Center;
         if (_font) btnBackTMP.font = _font;
@@ -692,7 +692,7 @@ public static class AgentProtocolTestSceneBuilder
         root.AddComponent<RectTransform>();
         root.AddComponent<Image>().color = (Color)bg;
         var vlg = root.AddComponent<VerticalLayoutGroup>();
-        vlg.padding = new RectOffset(14, 14, 10, 10);
+        vlg.padding = new RectOffset(18, 18, 12, 12);
         vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
         vlg.childControlWidth = true; vlg.childControlHeight = true;
         root.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -702,7 +702,7 @@ public static class AgentProtocolTestSceneBuilder
         t.transform.SetParent(root.transform, false);
         t.AddComponent<RectTransform>();
         var tmp = t.AddComponent<TextMeshProUGUI>();
-        tmp.fontSize = 17; tmp.color = (Color)CWhite; tmp.alignment = align;
+        tmp.fontSize = 22; tmp.color = (Color)CWhite; tmp.alignment = align;
         tmp.enableWordWrapping = true; tmp.richText = true;
         if (_font) tmp.font = _font;
 
@@ -720,7 +720,7 @@ public static class AgentProtocolTestSceneBuilder
         t.transform.SetParent(root.transform, false);
         Anchor(t.AddComponent<RectTransform>(), V(0,0), V(1,1), V(0,0), V(0,0));
         var tmp = t.AddComponent<TextMeshProUGUI>();
-        tmp.fontSize = 15; tmp.color = (Color)CSysText;
+        tmp.fontSize = 19; tmp.color = (Color)CSysText;
         tmp.alignment = TextAlignmentOptions.Center; tmp.fontStyle = FontStyles.Italic;
         tmp.enableWordWrapping = true;
         if (_font) tmp.font = _font;
@@ -734,15 +734,16 @@ public static class AgentProtocolTestSceneBuilder
         root.AddComponent<RectTransform>();
         root.AddComponent<Image>().color = (Color)CSessionBg;
         root.AddComponent<Button>().targetGraphic = root.GetComponent<Image>();
-        var le = root.AddComponent<LayoutElement>(); le.minHeight = 42; le.flexibleWidth = 1;
+        var le = root.AddComponent<LayoutElement>(); le.minHeight = 60; le.flexibleWidth = 1;
 
         var t = new GameObject("Label");
         t.transform.SetParent(root.transform, false);
-        Anchor(t.AddComponent<RectTransform>(), V(0,0), V(1,1), V(10,3), V(-10,-3));
+        Anchor(t.AddComponent<RectTransform>(), V(0,0), V(1,1), V(12,4), V(-12,-4));
         var tmp = t.AddComponent<TextMeshProUGUI>();
-        tmp.fontSize = 15; tmp.color = (Color)CWhite;
+        tmp.fontSize = 19; tmp.color = (Color)CWhite;
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
-        tmp.overflowMode = TextOverflowModes.Ellipsis; tmp.enableWordWrapping = false;
+        tmp.overflowMode = TextOverflowModes.Ellipsis; tmp.enableWordWrapping = true;
+        tmp.richText = true;
         if (_font) tmp.font = _font;
 
         return SavePrefab(root, $"{PrefabDir}/SessionItem.prefab");

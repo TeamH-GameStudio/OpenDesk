@@ -281,6 +281,8 @@ namespace OpenDesk.Claude
                 case "session_list_response":
                 {
                     var msg = JsonUtility.FromJson<SessionListResponse>(json);
+                    var parsedCount = msg?.sessions?.Length ?? 0;
+                    Debug.Log($"[ClaudeWS] session_list_response: agent={msg?.agent_id}, parsed={parsedCount}, raw={json[..Math.Min(json.Length, 500)]}");
                     if (msg != null)
                         OnSessionList?.Invoke(msg.agent_id, msg.current_session_id ?? "", msg.sessions ?? Array.Empty<SessionInfo>());
                     break;

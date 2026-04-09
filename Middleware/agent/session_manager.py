@@ -140,12 +140,16 @@ class AgentSessionManager:
         runner = self._agents.get(agent_id)
         if not runner:
             return
+        sessions = runner.list_sessions()
+        logger.info(f"Session list for {agent_id}: {len(sessions)} sessions")
+        for s in sessions:
+            logger.info(f"  - {s['session_id']}: \"{s.get('title','')}\" msgs={s.get('message_count',0)}")
         await self._ws.broadcast(
             {
                 "type": "session_list_response",
                 "agent_id": agent_id,
                 "current_session_id": runner.current_session_id,
-                "sessions": runner.list_sessions(),
+                "sessions": sessions,
             }
         )
 
@@ -164,6 +168,8 @@ class AgentSessionManager:
                     "chat_history": chat_history,
                 }
             )
+            # 세션 목록도 함께 전송 (UI 즉시 갱신)
+            await self._handle_session_list(agent_id)
             await self._ws.broadcast(
                 {
                     "type": "agent_state",
@@ -178,6 +184,12 @@ class AgentSessionManager:
         runner = self._agents.get(agent_id)
         if not runner:
             return
+        # 현재 세션이 빈 대화면 삭제 (빈 세션 누적 방지)
+        # runner.delete_session은 재귀 호출되므로 store에서 직접 삭제
+        if runner.current_session_id and not runner.messages:
+            old_sid = runner.current_session_id
+            self._session_store.delete_session(runner.agent_id, old_sid)
+            logger.info(f"Empty session deleted: {old_sid}")
         meta = runner.new_session()
         await self._ws.broadcast(
             {
@@ -187,20 +199,14 @@ class AgentSessionManager:
                 "chat_history": [],
             }
         )
+        # 세션 목록도 함께 전송 (Unity UI 즉시 갱신)
+        await self._handle_session_list(agent_id)
         await self._ws.broadcast(
             {
                 "type": "agent_state",
                 "agent_id": agent_id,
                 "role": runner.role,
                 "state": "idle",
-            }
-        )
-        await self._ws.broadcast(
-            {
-                "type": "agent_message",
-                "agent_id": agent_id,
-                "role": runner.role,
-                "message": "새 대화를 시작합니다. 무엇을 도와드릴까요?",
             }
         )
 

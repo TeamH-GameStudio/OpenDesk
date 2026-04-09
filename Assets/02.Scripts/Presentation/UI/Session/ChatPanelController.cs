@@ -133,10 +133,7 @@ namespace OpenDesk.Presentation.UI.Session
             FindLinkedAgent();
             ClearBubbles();
 
-            // 서버에서 세션 히스토리 요청
-            if (_claudeClient != null && _claudeClient.IsConnected)
-                _claudeClient.SendSessionList(_currentAgentId);
-
+            // 세션 히스토리는 session_switched 이벤트로 자동 수신됨
             if (_panelRoot != null) _panelRoot.SetActive(true);
             if (_emptyHint != null) _emptyHint.SetActive(true);
             if (_inputField != null)
@@ -448,9 +445,9 @@ namespace OpenDesk.Presentation.UI.Session
             };
 
             if (sender == ChatSender.System)
-                return $"<color=#888><size=11>{timeStr}</size></color>  {text}";
+                return $"<color=#888><size=15>{timeStr}</size></color>  {text}";
 
-            return $"<color=#888><size=11>{timeStr}</size></color>  <b>{label}</b>\n{text}";
+            return $"<color=#888><size=15>{timeStr}</size></color>  <b>{label}</b>\n{text}";
         }
 
         // ================================================================

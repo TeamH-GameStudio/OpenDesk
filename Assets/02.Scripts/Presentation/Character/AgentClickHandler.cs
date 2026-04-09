@@ -49,12 +49,21 @@ namespace OpenDesk.Presentation.Character
                 return;
 
             var ray = _mainCamera.ScreenPointToRay(mouse.position.ReadValue());
+
+            // 에이전트가 아닌 빈 공간 클릭 시 전체 패널 닫기
             if (!Physics.Raycast(ray, out var hit, _maxRayDistance, _agentLayer))
+            {
+                CloseAllPanels();
                 return;
+            }
 
             var clickedObj = hit.collider.gameObject;
             var agentRoot = FindAgentRoot(clickedObj);
-            if (agentRoot == null) return;
+            if (agentRoot == null)
+            {
+                CloseAllPanels();
+                return;
+            }
 
             // AgentCharacterController에서 agent_id 읽기
             var charCtrl = agentRoot.GetComponent<AgentCharacterController>();
@@ -72,6 +81,13 @@ namespace OpenDesk.Presentation.Character
 
             Debug.Log($"[AgentClick] 에이전트 클릭: {agentName} (id: {agentId})");
 
+            // 같은 에이전트 재클릭 시 전체 패널 닫기 (토글)
+            if (_sessionList != null && _sessionList.IsOpen && _sessionList.CurrentAgentId == agentId)
+            {
+                CloseAllPanels();
+                return;
+            }
+
             // 카메라 포커스
             if (_isometricCamera != null)
                 _isometricCamera.FocusOnAgent(agentRoot.transform);
@@ -84,6 +100,12 @@ namespace OpenDesk.Presentation.Character
             // 세션 리스트 패널 오픈 (agent_id 기반)
             if (_sessionList != null)
                 _sessionList.OpenForAgent(agentId, agentName, role);
+        }
+
+        private void CloseAllPanels()
+        {
+            _sessionList?.ClosePanel();
+            _leftPanelToggle?.Hide();
         }
 
         /// <summary>클릭된 오브젝트에서 에이전트 루트 (Agent_ 이름) 찾기</summary>

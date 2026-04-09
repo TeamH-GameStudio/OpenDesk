@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenDesk.AgentCreation.Models;
 using OpenDesk.Claude;
 using OpenDesk.Claude.Models;
@@ -125,6 +126,7 @@ namespace OpenDesk.Presentation.UI.Session
         }
 
         public bool IsOpen => _panelRoot != null && _panelRoot.activeSelf;
+        public string CurrentAgentId => _currentAgentId;
 
         // ================================================================
         //  서버 이벤트 핸들러
@@ -137,6 +139,8 @@ namespace OpenDesk.Presentation.UI.Session
             _currentSessionId = currentSessionId;
             ClearItems();
 
+            Debug.Log($"[SessionList] 세션 목록 수신: agent={agentId}, count={sessions?.Length ?? 0}, current={currentSessionId}");
+
             if (sessions == null || sessions.Length == 0)
             {
                 if (_emptyState != null) _emptyState.SetActive(true);
@@ -145,8 +149,14 @@ namespace OpenDesk.Presentation.UI.Session
 
             if (_emptyState != null) _emptyState.SetActive(false);
 
-            foreach (var session in sessions)
+            // 마지막 채팅 시점 기준 내림차순 정렬 (서버에서도 정렬되지만 방어적 처리)
+            var sorted = sessions.OrderByDescending(s => s.updated_at).ToArray();
+
+            foreach (var session in sorted)
+            {
+                Debug.Log($"[SessionList]   - {session.session_id}: \"{session.title}\" msgs={session.message_count} updated={session.updated_at}");
                 SpawnSessionItem(session);
+            }
         }
 
         private void HandleSessionSwitched(string agentId, string sessionId, ChatHistoryEntry[] history)
@@ -154,10 +164,8 @@ namespace OpenDesk.Presentation.UI.Session
             if (agentId != _currentAgentId) return;
 
             _currentSessionId = sessionId;
-
-            // 채팅 패널이 열려있으면 히스토리 복원은 ChatPanelController가 처리
-            // 세션 목록의 활성 표시만 갱신
-            RefreshActiveHighlight();
+            // 서버가 session_switched 직후 session_list_response도 전송하므로
+            // HandleSessionList에서 자동으로 UI 갱신됨 (별도 요청 불필요)
         }
 
         // ================================================================
@@ -176,7 +184,9 @@ namespace OpenDesk.Presentation.UI.Session
             var texts = item.GetComponentsInChildren<TMP_Text>(true);
             if (texts.Length >= 3)
             {
-                texts[0].text = string.IsNullOrEmpty(session.title) ? "새 대화" : session.title;
+                var title = string.IsNullOrEmpty(session.title) ? "새 대화" : session.title;
+                var dateStr = FormatDateForTitle(session.updated_at);
+                texts[0].text = $"{title}  <color=#888><size=12>{dateStr}</size></color>";
                 texts[1].text = $"메시지 {session.message_count}개";
                 texts[2].text = FormatTimestamp(session.updated_at);
             }
@@ -263,6 +273,15 @@ namespace OpenDesk.Presentation.UI.Session
             if (dt.Date == now.Date.AddDays(-1))
                 return "어제";
             return dt.ToString("MM/dd");
+        }
+
+        private static string FormatDateForTitle(double unixTimestamp)
+        {
+            if (unixTimestamp <= 0) return "";
+
+            var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var dt = epoch.AddSeconds(unixTimestamp).ToLocalTime();
+            return dt.ToString("MM/dd HH:mm");
         }
     }
 }

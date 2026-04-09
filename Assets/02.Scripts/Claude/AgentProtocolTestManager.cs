@@ -500,8 +500,7 @@ namespace OpenDesk.Claude
                 }
             }
 
-            // 세션 목록도 갱신 요청
-            _wsClient?.SendSessionList(_currentAgentId);
+            // 서버가 session_switched 직후 session_list_response도 전송하므로 별도 요청 불필요
 
             AddLog($"<- session_switched: {sessionId} ({history?.Length ?? 0}개 메시지)");
         }
@@ -555,12 +554,21 @@ namespace OpenDesk.Claude
             if (tmp != null)
             {
                 var title = string.IsNullOrEmpty(info.title) ? "(새 대화)" : info.title;
-                tmp.SetText($"{title} ({info.message_count})");
+                var date = FormatSessionDate(info.updated_at);
+                tmp.SetText($"{title}  <color=#888><size=12>{date}</size></color>\n<color=#aaa>메시지 {info.message_count}개</color>");
             }
             var bg = go.GetComponent<Image>();
             if (bg != null)
                 bg.color = isActive ? new Color(0.13f, 0.59f, 0.95f, 0.3f) : new Color(0.25f, 0.25f, 0.25f);
             return go;
+        }
+
+        private static string FormatSessionDate(double unixTimestamp)
+        {
+            if (unixTimestamp <= 0) return "";
+            var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var dt = epoch.AddSeconds(unixTimestamp).ToLocalTime();
+            return dt.ToString("MM/dd HH:mm");
         }
 
         private void ClearSessionList()
@@ -767,7 +775,12 @@ namespace OpenDesk.Claude
             // 채팅 뷰 → 세션 목록
             if (_chatView != null) _chatView.SetActive(false);
             if (_sessionView != null) _sessionView.SetActive(true);
-            RefreshSessionList();
+
+            // 서버에 세션 목록 재요청 (로컬이 아닌 서버 데이터 기준)
+            if (_wsClient != null && _wsClient.IsConnected)
+                _wsClient.SendSessionList(_currentAgentId);
+            else
+                RefreshSessionList(); // 오프라인 시에만 로컬 fallback
         }
 
         private void SaveToSessionHistory(bool isUser, string text)
