@@ -88,6 +88,9 @@ namespace OpenDesk.Claude
         private readonly Dictionary<string, List<(bool isUser, string text)>> _sessionHistories = new();
         private readonly List<GameObject> _sessionTabs = new();
 
+        // ── agentId 기반 캐릭터 캐시 ──
+        private readonly Dictionary<string, Presentation.Character.AgentCharacterController> _agentCache = new();
+
         // ── 초기화 ─────────────────────────────────────────────
 
         private void Start()
@@ -149,13 +152,13 @@ namespace OpenDesk.Claude
             _btnMockFullFlow?.onClick.AddListener(() => MockFullFlow().Forget());
 
             // FSM 테스트 버튼 — 실제 3D 에이전트 FSM 제어
-            _btnFsmIdle?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.Idle, "Idle"));
-            _btnFsmThinking?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.Thinking, "Thinking (의자 이동→앉기→고민)"));
+            _btnFsmIdle?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.Idle, "Idle (배회)"));
+            _btnFsmThinking?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.Thinking, "Thinking (WorkStation→앉기→고민)"));
             _btnFsmChatting?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.ChatDelta, "Chatting (SitToType→타이핑)"));
-            _btnFsmCompleted?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.ChatFinal, "Completed (TypeToSit→대기→Cheering)"));
+            _btnFsmCompleted?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.ChatFinal, "Completed (대기→일어나기→Cheering)"));
             _btnFsmError?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.TaskFailed, "Error (일어나기→에러 표정)"));
-            _btnFsmDisconnected?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.Disconnected, "Disconnected"));
-            _btnFsmTyping?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.Executing, "Typing/도구 사용 (타이핑 모션)"));
+            _btnFsmDisconnected?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.Disconnected, "Disconnected (정지)"));
+            _btnFsmTyping?.onClick.AddListener(() => ForceAgentFsm(Core.Models.AgentActionType.Executing, "Typing (도구 사용 모션)"));
 
             // 세션 추가 버튼
             _btnAddSession?.onClick.AddListener(CreateNewSession);
@@ -207,19 +210,18 @@ namespace OpenDesk.Claude
         /// <summary>3D 에이전트 FSM을 직접 제어 (테스트 버튼용)</summary>
         private void ForceAgentFsm(Core.Models.AgentActionType actionType, string label)
         {
-            var charCtrl = UnityEngine.Object.FindFirstObjectByType<Presentation.Character.AgentCharacterController>();
+            var charCtrl = FindAgentController(_currentAgentId);
             if (charCtrl != null)
             {
                 charCtrl.ForceState(actionType);
-                AddLog($"[FSM] {label} → 에이전트 FSM 전환 완료");
+                AddLog($"[FSM] [{_currentAgentId}] {label}");
             }
             else
             {
-                AddLog($"[FSM] {label} → 에이전트를 찾을 수 없음");
+                AddLog($"[FSM] [{_currentAgentId}] {label} → 에이전트를 찾을 수 없음");
             }
 
-            // HUD 버블도 갱신
-            var hud = FindAgentHUD();
+            var hud = FindAgentHUD(_currentAgentId);
             hud?.ApplyState(actionType);
         }
 
@@ -239,7 +241,7 @@ namespace OpenDesk.Claude
                 _          => Core.Models.AgentActionType.Idle
             };
 
-            var charCtrl = UnityEngine.Object.FindFirstObjectByType<Presentation.Character.AgentCharacterController>();
+            var charCtrl = FindAgentController(_currentAgentId);
             charCtrl?.ForceState(actionType);
         }
 
@@ -343,7 +345,7 @@ namespace OpenDesk.Claude
             if (_statusText != null)
                 _statusText.SetText($"[{agentId}] {stateKr}");
 
-            var agentHud = FindAgentHUD();
+            var agentHud = FindAgentHUD(agentId);
             if (agentHud != null)
             {
                 if (state == "working" && !string.IsNullOrEmpty(tool))
@@ -375,7 +377,7 @@ namespace OpenDesk.Claude
             };
             if (actionType.HasValue)
             {
-                var charCtrl = UnityEngine.Object.FindFirstObjectByType<Presentation.Character.AgentCharacterController>();
+                var charCtrl = FindAgentController(agentId);
                 charCtrl?.ForceState(actionType.Value);
             }
 
@@ -395,7 +397,7 @@ namespace OpenDesk.Claude
                 _thinkingText.gameObject.SetActive(true);
             }
 
-            var agentHud = FindAgentHUD();
+            var agentHud = FindAgentHUD(agentId);
             if (agentHud != null)
             {
                 var bubblePreview = thinking?.Length > 40
@@ -407,10 +409,40 @@ namespace OpenDesk.Claude
             AddLog($"<- agent_thinking: {agentId} ({thinking?.Length ?? 0}자)");
         }
 
-        /// <summary>씬에서 현재 에이전트의 HUD 찾기</summary>
-        private OpenDesk.Presentation.Character.AgentHUDController FindAgentHUD()
+        /// <summary>agentId에 해당하는 3D 캐릭터 컨트롤러 찾기</summary>
+        private Presentation.Character.AgentCharacterController FindAgentController(string agentId = null)
         {
-            return UnityEngine.Object.FindFirstObjectByType<OpenDesk.Presentation.Character.AgentHUDController>();
+            agentId ??= _currentAgentId;
+
+            // 캐시 확인
+            if (_agentCache.TryGetValue(agentId, out var cached) && cached != null)
+                return cached;
+
+            // 씬에서 검색
+            var all = UnityEngine.Object.FindObjectsByType<Presentation.Character.AgentCharacterController>(FindObjectsSortMode.None);
+            foreach (var ctrl in all)
+            {
+                if (ctrl.AgentId == agentId)
+                {
+                    _agentCache[agentId] = ctrl;
+                    return ctrl;
+                }
+            }
+
+            // agentId 매칭 실패 시 첫 번째 반환 (단일 에이전트 폴백)
+            if (all.Length > 0)
+                return all[0];
+
+            return null;
+        }
+
+        /// <summary>씬에서 현재 에이전트의 HUD 찾기</summary>
+        private Presentation.Character.AgentHUDController FindAgentHUD(string agentId = null)
+        {
+            var ctrl = FindAgentController(agentId);
+            if (ctrl != null)
+                return ctrl.GetComponentInChildren<Presentation.Character.AgentHUDController>();
+            return null;
         }
 
         private void HandleAgentDelta(string agentId, string text)
@@ -423,7 +455,7 @@ namespace OpenDesk.Claude
                 _streamingBuffer.Clear();
                 _streamingBubble = SpawnBubble(_aiBubblePrefab, "");
 
-                var charCtrl = UnityEngine.Object.FindFirstObjectByType<Presentation.Character.AgentCharacterController>();
+                var charCtrl = FindAgentController(agentId);
                 charCtrl?.ForceState(Core.Models.AgentActionType.ChatDelta);
             }
 
@@ -446,7 +478,7 @@ namespace OpenDesk.Claude
                 SpawnBubble(_aiBubblePrefab, message);
             }
 
-            var charCtrl = UnityEngine.Object.FindFirstObjectByType<Presentation.Character.AgentCharacterController>();
+            var charCtrl = FindAgentController(agentId);
             charCtrl?.ForceState(Core.Models.AgentActionType.ChatFinal);
 
             SaveToSessionHistory(false, message);

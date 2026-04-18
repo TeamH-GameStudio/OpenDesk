@@ -157,7 +157,7 @@ namespace OpenDesk.Presentation.Character
 
             var animCtrl = new UnityAnimatorController(animator, _agentName);
             _ctx = new AgentCharacterContext(
-                animCtrl, _sessionId, _agentName,
+                animCtrl, _sessionId, _agentName, _agentId,
                 _navAgent, transform);
 
             // FaceSwapController 연결 (IExpressionController 구현체)

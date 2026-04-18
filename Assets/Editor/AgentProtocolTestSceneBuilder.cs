@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.AI.Navigation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -58,7 +59,18 @@ public static class AgentProtocolTestSceneBuilder
     //  메인
     // ══════════════════════════════════════════════════════
 
+    // ── Office 프리팹 직접 지정 위저드 ──────────────────────
+    internal static GameObject _customOfficePrefab;
+
     [MenuItem("Tools/OpenDesk/Build Agent Protocol Test Scene", false, 110)]
+    public static void ShowBuildWizard()
+    {
+        var window = EditorWindow.GetWindow<AgentProtocolTestSceneWizard>(
+            true, "Agent Protocol Test Scene Builder", true);
+        window.minSize = new Vector2(420, 160);
+        window.maxSize = new Vector2(420, 160);
+    }
+
     public static void Build()
     {
         _font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
@@ -414,15 +426,68 @@ public static class AgentProtocolTestSceneBuilder
         clickHandler = null;
         isoCam = null;
 
+        // -- Office 환경 (커스텀 프리팹 우선, 없으면 기본 경로 폴백)
+        var officePrefab = _customOfficePrefab;
+        if (officePrefab == null)
+            officePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(OfficePath);
+        if (officePrefab == null)
+            officePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AgentOfficePath);
+
+        GameObject officeInstance = null;
+        if (officePrefab != null)
+        {
+            officeInstance = (GameObject)PrefabUtility.InstantiatePrefab(officePrefab);
+            officeInstance.name = "Office";
+            officeInstance.transform.position = Vector3.zero;
+            officeInstance.transform.rotation = Quaternion.Euler(0, 140, 0);
+
+            // Navigation Static
+            SetStaticRecursive(officeInstance);
+
+            // NavMeshSurface
+            var navSurface = officeInstance.GetComponent<NavMeshSurface>();
+            if (navSurface == null)
+                navSurface = officeInstance.AddComponent<NavMeshSurface>();
+            navSurface.collectObjects = CollectObjects.Children;
+            navSurface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
+            navSurface.BuildNavMesh();
+            Debug.Log("[ProtocolTestBuilder] NavMesh 베이크 완료");
+
+            // 가구 레이어 — 프리팹에 이미 설정된 것 유지, 건드리지 않음
+        }
+        else
+        {
+            Debug.LogWarning("[ProtocolTestBuilder] Office 프리팹 없음 — 바닥만 생성");
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.name = "Floor";
+            floor.transform.localScale = new Vector3(2, 1, 2);
+            officeInstance = floor;
+        }
+
+        // -- Office 바운드 계산 (카메라/스폰/조명 동적 배치 기준)
+        var officeBounds = CalculateCompositeBounds(officeInstance);
+        var center = officeBounds.center;
+        var extents = officeBounds.extents;
+        float floorY = DetectFloorHeight(officeInstance);
+
+        Debug.Log($"[ProtocolTestBuilder] Office 바운드: center={center}, size={officeBounds.size}, floorY={floorY}");
+
+        // -- 카메라 위치 계산 (이소메트릭 40도, yaw 0)
+        // Office를 Y=140 회전해서 뚫린 면이 카메라(Z- 방향) 쪽을 향하게 함
+        float maxExtent = Mathf.Max(extents.x, extents.z);
+        float camHeight = center.y + maxExtent * 1.2f + 2f;
+        float camDepth = center.z - maxExtent * 1.0f - 3f;
+        var overviewPos = new Vector3(center.x, camHeight, camDepth);
+        var overviewRot = Quaternion.Euler(40, 0, 0);
+
         // -- 카메라 설정 (이소메트릭, 각도 고정)
         var cam = UnityEngine.Camera.main;
         if (cam != null)
         {
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.1f, 0.1f, 0.12f);
-            // Cinemachine Brain이 제어하므로 초기 위치는 OverviewCam과 일치
-            cam.transform.position = new Vector3(4f, 5.5f, -4.5f);
-            cam.transform.rotation = Quaternion.Euler(40, 0, 0);
+            cam.transform.position = overviewPos;
+            cam.transform.rotation = overviewRot;
             cam.fieldOfView = 50;
 
             // WallFadeController
@@ -437,33 +502,27 @@ public static class AgentProtocolTestSceneBuilder
                 Cinemachine.CinemachineBlendDefinition.Style.EaseInOut, 0.8f);
         }
 
-        // -- VCam 1: 오피스 오버뷰 (고정 위치, 초기 활성)
-        // Office_35는 마름모꼴 2변 벽 — 벽 없는 방향에서 내부 조감
+        // -- VCam 1: 오피스 오버뷰 (바운드 기반 자동 배치, 초기 활성)
         var overviewObj = new GameObject("CM_OverviewCam");
         var overviewCam = overviewObj.AddComponent<Cinemachine.CinemachineVirtualCamera>();
         overviewCam.m_Lens.FieldOfView = 50;
         overviewCam.Priority = 20;
-        overviewObj.transform.position = new Vector3(4f, 5.5f, -4.5f);
-        overviewObj.transform.rotation = Quaternion.Euler(40, 0, 0);
-        // 오버뷰는 Follow/LookAt 없음 — 고정 위치
+        overviewObj.transform.position = overviewPos;
+        overviewObj.transform.rotation = overviewRot;
 
         // -- VCam 2: 에이전트 포커스 (클릭 시 전환)
-        // 각도 OverviewCam과 동일 고정 — LookAt/Composer 없음
-        // 에이전트를 화면 중앙에 두고 Follow, 스크롤 줌 지원
         var agentCamObj = new GameObject("CM_AgentCam");
         var agentCam = agentCamObj.AddComponent<Cinemachine.CinemachineVirtualCamera>();
-        agentCam.m_Lens.FieldOfView = 50; // OverviewCam과 동일
+        agentCam.m_Lens.FieldOfView = 50;
         agentCam.Priority = 10;
-        agentCamObj.transform.rotation = Quaternion.Euler(40, 0, 0); // 각도 고정
+        agentCamObj.transform.rotation = overviewRot; // 동일 각도 고정
 
         var transposer = agentCam.AddCinemachineComponent<Cinemachine.CinemachineTransposer>();
-        transposer.m_FollowOffset = new Vector3(0f, 3f, -5f); // 중앙 배치 (X=0)
+        transposer.m_FollowOffset = new Vector3(0f, 3f, -5f);
         transposer.m_BindingMode = Cinemachine.CinemachineTransposer.BindingMode.WorldSpace;
         transposer.m_XDamping = 1f;
         transposer.m_YDamping = 1f;
         transposer.m_ZDamping = 1f;
-
-        // Composer/LookAt 없음 — 카메라 각도 회전 방지
 
         // -- IsometricCameraController (2 VCam 전환 관리)
         var isoCamObj = new GameObject("IsometricCameraController");
@@ -472,13 +531,13 @@ public static class AgentProtocolTestSceneBuilder
         isoCamSo.FindProperty("_overviewCam").objectReferenceValue = overviewCam;
         isoCamSo.FindProperty("_agentCam").objectReferenceValue = agentCam;
         isoCamSo.FindProperty("_agentOffset").vector3Value = new Vector3(0f, 3f, -5f);
-        isoCamSo.FindProperty("_zoomSpeed").floatValue = 5f;
-        isoCamSo.FindProperty("_minDistance").floatValue = 1.5f;
-        isoCamSo.FindProperty("_maxDistance").floatValue = 12f;
+        isoCamSo.FindProperty("_zoomSpeed").floatValue = 15f;
+        isoCamSo.FindProperty("_minDistance").floatValue = 0.5f;
+        isoCamSo.FindProperty("_maxDistance").floatValue = 30f;
         isoCamSo.FindProperty("_focusHeight").floatValue = 0.8f;
         isoCamSo.ApplyModifiedPropertiesWithoutUndo();
 
-        // -- 조명
+        // -- 조명 (Office 중심 기준 동적 배치)
         var lightObj = GameObject.Find("Directional Light");
         if (lightObj != null)
         {
@@ -487,82 +546,48 @@ public static class AgentProtocolTestSceneBuilder
             if (light != null) light.intensity = 1.2f;
         }
 
-        // 보조 포인트 라이트
         var pointLight = new GameObject("PointLight");
         var pl = pointLight.AddComponent<Light>();
         pl.type = LightType.Point;
-        pl.range = 12f;
+        pl.range = Mathf.Max(maxExtent * 2f, 12f);
         pl.intensity = 0.8f;
         pl.color = new Color(1f, 0.95f, 0.9f);
-        pointLight.transform.position = new Vector3(4, 4, 3);
+        pointLight.transform.position = new Vector3(center.x, center.y + extents.y + 2f, center.z);
 
-        // -- Office 환경
-        var officePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(OfficePath);
-        if (officePrefab == null)
-        {
-            // AgentOffice.prefab 폴백
-            officePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AgentOfficePath);
-        }
-
-        GameObject officeInstance = null;
-        if (officePrefab != null)
-        {
-            officeInstance = (GameObject)PrefabUtility.InstantiatePrefab(officePrefab);
-            officeInstance.name = "Office_35";
-            officeInstance.transform.position = new Vector3(4.5f, 0, 0);
-            officeInstance.transform.rotation = Quaternion.Euler(0, 170, 0);
-
-            // Navigation Static
-            SetStaticRecursive(officeInstance);
-
-            // NavMeshSurface
-            var navSurface = officeInstance.GetComponent<NavMeshSurface>();
-            if (navSurface == null)
-                navSurface = officeInstance.AddComponent<NavMeshSurface>();
-            navSurface.collectObjects = CollectObjects.Children;
-            navSurface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
-            navSurface.BuildNavMesh();
-            Debug.Log("[ProtocolTestBuilder] NavMesh 베이크 완료");
-
-            // 가구 레이어 자동 설정 (Chair → WorkPlaceChair, Table → WorkPlaceTable, Wall → OfficeWall)
-            AssignFurnitureLayers(officeInstance);
-        }
-        else
-        {
-            Debug.LogWarning("[ProtocolTestBuilder] Office 프리팹 없음 — 바닥만 생성");
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            floor.name = "Floor";
-            floor.transform.localScale = new Vector3(1, 1, 1);
-            officeInstance = floor;
-        }
-
-        // -- 바닥 높이 감지
-        float floorY = DetectFloorHeight(officeInstance);
-
-        // -- SpawnPoints (Office 자식으로 배치 → 로컬 좌표 기준)
+        // -- SpawnPoints (Office 바운드 내부에 균등 분배)
         var spawnParent = new GameObject("SpawnPoints");
         spawnParent.transform.SetParent(officeInstance.transform);
         spawnParent.transform.localPosition = Vector3.zero;
         spawnParent.transform.localRotation = Quaternion.identity;
 
-        // Office 로컬 좌표 기준 스폰 위치
-        var spawnLocalPositions = new Vector3[]
+        // 바운드 내부 25%~75% 범위에 4개 배치
+        float xMin = center.x - extents.x * 0.5f;
+        float xMax = center.x + extents.x * 0.5f;
+        float zMin = center.z - extents.z * 0.5f;
+        float zMax = center.z + extents.z * 0.5f;
+
+        var spawnWorldPositions = new Vector3[]
         {
-            new(1.5f, floorY, 1.5f),
-            new(4f,   floorY, 1.5f),
-            new(6.5f, floorY, 1.5f),
-            new(4f,   floorY, 4f),
+            new(xMin, floorY, zMin),
+            new(xMax, floorY, zMin),
+            new(xMin, floorY, zMax),
+            new(xMax, floorY, zMax),
         };
 
-        var spawnTransforms = new Transform[spawnLocalPositions.Length];
-        for (int i = 0; i < spawnLocalPositions.Length; i++)
+        var spawnTransforms = new Transform[spawnWorldPositions.Length];
+        for (int i = 0; i < spawnWorldPositions.Length; i++)
         {
             var sp = new GameObject($"SpawnPoint_{i}");
             sp.transform.SetParent(spawnParent.transform);
-            sp.transform.localPosition = spawnLocalPositions[i];
+            sp.transform.position = spawnWorldPositions[i]; // 월드 좌표 직접 배치
             sp.transform.localRotation = Quaternion.identity;
             spawnTransforms[i] = sp.transform;
+            Debug.Log($"[ProtocolTestBuilder] SpawnPoint_{i}: world={spawnWorldPositions[i]}, local={sp.transform.localPosition}");
         }
+
+        // -- WorkStation: 프리팹에 있으면 그대로 사용
+        var existingStations = officeInstance.GetComponentsInChildren<OpenDesk.Presentation.Character.WorkStation>();
+        Debug.Log($"[ProtocolTestBuilder] WorkStation {existingStations.Length}개 발견 -- 프리팹 그대로 사용");
 
         // -- AgentSpawner
         var spawnerObj = new GameObject("AgentSpawner");
@@ -618,10 +643,334 @@ public static class AgentProtocolTestSceneBuilder
             if (r.name.ToLower().Contains("floor"))
                 return r.bounds.max.y;
         }
-        // Raycast 폴백
-        if (Physics.Raycast(new Vector3(4, 10, 2), Vector3.down, out var hit, 20f))
-            return hit.point.y;
+        // 바운드 최소 Y 폴백 (가장 낮은 렌더러)
+        var renderers = officeRoot.GetComponentsInChildren<MeshRenderer>();
+        if (renderers.Length > 0)
+        {
+            float minY = float.MaxValue;
+            foreach (var r in renderers)
+                minY = Mathf.Min(minY, r.bounds.min.y);
+            return minY;
+        }
         return 0f;
+    }
+
+    /// <summary>모든 자식 렌더러의 합산 바운드 계산</summary>
+    static Bounds CalculateCompositeBounds(GameObject root)
+    {
+        var renderers = root.GetComponentsInChildren<MeshRenderer>();
+        if (renderers.Length == 0)
+            return new Bounds(root.transform.position, Vector3.one * 10f);
+
+        var bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+            bounds.Encapsulate(renderers[i].bounds);
+        return bounds;
+    }
+
+    /// <summary>
+    /// 기존 WorkStation 컴포넌트를 실제 의자 위치로 재배치.
+    /// Type별로 매칭: Main→MainAgentChair, Sub→SubAgentChair, Resting→RestingChair
+    /// 의자 위치에 WorkStation을 이동하고, 가장 가까운 책상 방향으로 회전.
+    /// </summary>
+    static void RepositionWorkStationsToChairs(
+        GameObject officeRoot,
+        OpenDesk.Presentation.Character.WorkStation[] stations)
+    {
+        // 레이어별 의자 수집
+        var chairsByType = new Dictionary<OpenDesk.Presentation.Character.WorkStationType,
+            System.Collections.Generic.List<Transform>>();
+        chairsByType[OpenDesk.Presentation.Character.WorkStationType.Main] = new();
+        chairsByType[OpenDesk.Presentation.Character.WorkStationType.Sub] = new();
+        chairsByType[OpenDesk.Presentation.Character.WorkStationType.Resting] = new();
+
+        int mainLayer = LayerMask.NameToLayer("MainAgentChair");
+        int subLayer = LayerMask.NameToLayer("SubAgentChair");
+        int restLayer = LayerMask.NameToLayer("RestingChair");
+
+        foreach (var t in officeRoot.GetComponentsInChildren<Transform>(true))
+        {
+            if (mainLayer >= 0 && t.gameObject.layer == mainLayer)
+                chairsByType[OpenDesk.Presentation.Character.WorkStationType.Main].Add(t);
+            else if (subLayer >= 0 && t.gameObject.layer == subLayer)
+                chairsByType[OpenDesk.Presentation.Character.WorkStationType.Sub].Add(t);
+            else if (restLayer >= 0 && t.gameObject.layer == restLayer)
+                chairsByType[OpenDesk.Presentation.Character.WorkStationType.Resting].Add(t);
+        }
+
+        // 책상 수집 (방향 계산용)
+        var desks = new System.Collections.Generic.List<Transform>();
+        foreach (var t in officeRoot.GetComponentsInChildren<Transform>(true))
+        {
+            var n = t.name.ToLower();
+            if (n.Contains("table") || n.Contains("desk"))
+                desks.Add(t);
+        }
+
+        // 사용된 의자 추적 (중복 배치 방지)
+        var usedChairs = new HashSet<Transform>();
+
+        foreach (var ws in stations)
+        {
+            var type = ws.Type;
+            if (!chairsByType.ContainsKey(type) || chairsByType[type].Count == 0)
+            {
+                Debug.LogWarning($"[ProtocolTestBuilder] '{ws.name}' (type={type}) — 매칭되는 의자 레이어 없음, 스킵");
+                continue;
+            }
+
+            // 아직 안 쓴 의자 중 첫 번째
+            Transform bestChair = null;
+            foreach (var chair in chairsByType[type])
+            {
+                if (!usedChairs.Contains(chair))
+                {
+                    bestChair = chair;
+                    break;
+                }
+            }
+
+            if (bestChair == null)
+            {
+                Debug.LogWarning($"[ProtocolTestBuilder] '{ws.name}' (type={type}) — 남은 의자 없음, 스킵");
+                continue;
+            }
+
+            usedChairs.Add(bestChair);
+
+            // 가장 가까운 책상 → 바라볼 방향
+            var chairPos = bestChair.position;
+            Vector3 lookForward = bestChair.forward;
+
+            float closestDist = float.MaxValue;
+            foreach (var desk in desks)
+            {
+                float dist = Vector3.Distance(chairPos, desk.position);
+                if (dist < closestDist && dist < 3f)
+                {
+                    closestDist = dist;
+                    var dir = desk.position - chairPos;
+                    dir.y = 0;
+                    if (dir.sqrMagnitude > 0.01f)
+                        lookForward = dir.normalized;
+                }
+            }
+
+            // WorkStation 이동 + 회전
+            ws.transform.position = chairPos;
+            ws.transform.rotation = Quaternion.LookRotation(lookForward, Vector3.up);
+
+            // SitPoint 자식이 있으면 위치 보정
+            var wsSo = new SerializedObject(ws);
+            var sitProp = wsSo.FindProperty("_sitPoint");
+            if (sitProp.objectReferenceValue is Transform sitT)
+            {
+                sitT.position = chairPos + Vector3.up * 0.3f;
+                sitT.rotation = Quaternion.LookRotation(lookForward, Vector3.up);
+            }
+
+            // ApproachPoint 자식이 있으면 옆쪽으로 배치
+            var approachProp = wsSo.FindProperty("_approachPoint");
+            if (approachProp.objectReferenceValue is Transform apT)
+            {
+                var sideDir = Vector3.Cross(Vector3.up, lookForward).normalized;
+                apT.position = chairPos + sideDir * 0.6f;
+                apT.rotation = Quaternion.LookRotation(lookForward, Vector3.up);
+            }
+
+            wsSo.ApplyModifiedPropertiesWithoutUndo();
+
+            Debug.Log($"[ProtocolTestBuilder] '{ws.name}' → 의자 '{bestChair.name}' 위치로 재배치 (방향={lookForward})");
+        }
+    }
+
+    /// <summary>
+    /// 프리팹 내 WorkStationMain/WorkStationSub/WorkStationRest 이름 오브젝트에
+    /// WorkStation 컴포넌트를 붙이고, 자식의 SitPoint/AproachPoint를 자동 바인딩.
+    /// </summary>
+    static int AttachWorkStationComponents(GameObject officeRoot)
+    {
+        int count = 0;
+        foreach (var t in officeRoot.GetComponentsInChildren<Transform>(true))
+        {
+            var name = t.name;
+            OpenDesk.Presentation.Character.WorkStationType? wsType = null;
+
+            if (name.StartsWith("WorkStationMain"))
+                wsType = OpenDesk.Presentation.Character.WorkStationType.Main;
+            else if (name.StartsWith("WorkStationSub"))
+                wsType = OpenDesk.Presentation.Character.WorkStationType.Sub;
+            else if (name.StartsWith("WorkStationRest"))
+                wsType = OpenDesk.Presentation.Character.WorkStationType.Resting;
+
+            if (!wsType.HasValue) continue;
+
+            // 이미 컴포넌트가 있으면 스킵
+            if (t.GetComponent<OpenDesk.Presentation.Character.WorkStation>() != null) continue;
+
+            var ws = t.gameObject.AddComponent<OpenDesk.Presentation.Character.WorkStation>();
+            var wsSo = new SerializedObject(ws);
+            wsSo.FindProperty("_type").enumValueIndex = (int)wsType.Value;
+
+            // 자식에서 SitPoint / AproachPoint (오타 포함) 탐색
+            Transform sitPoint = null;
+            Transform approachPoint = null;
+            foreach (Transform child in t)
+            {
+                var cn = child.name.ToLower();
+                if (cn.Contains("sitpoint"))
+                    sitPoint = child;
+                else if (cn.Contains("aproachpoint") || cn.Contains("approachpoint"))
+                    approachPoint = child;
+            }
+
+            if (sitPoint != null)
+                wsSo.FindProperty("_sitPoint").objectReferenceValue = sitPoint;
+            if (approachPoint != null)
+                wsSo.FindProperty("_approachPoint").objectReferenceValue = approachPoint;
+
+            wsSo.ApplyModifiedPropertiesWithoutUndo();
+
+            Debug.Log($"[ProtocolTestBuilder] '{name}' → WorkStation({wsType.Value}) 컴포넌트 부착" +
+                $" | SitPoint={(sitPoint != null ? "O" : "X")}" +
+                $" | ApproachPoint={(approachPoint != null ? "O" : "X")}");
+            count++;
+        }
+
+        if (count > 0)
+            Debug.Log($"[ProtocolTestBuilder] WorkStation 컴포넌트 {count}개 자동 부착 완료");
+
+        return count;
+    }
+
+    /// <summary>실제 의자 레이어(MainAgentChair/SubAgentChair/RestingChair)에서 WorkStation 자동 생성</summary>
+    static void AutoCreateWorkStationsFromChairs(GameObject officeRoot, float floorY)
+    {
+        // 레이어 이름 → WorkStationType 매핑
+        var layerMap = new (string layerName, OpenDesk.Presentation.Character.WorkStationType type)[]
+        {
+            ("MainAgentChair", OpenDesk.Presentation.Character.WorkStationType.Main),
+            ("SubAgentChair",  OpenDesk.Presentation.Character.WorkStationType.Sub),
+            ("RestingChair",   OpenDesk.Presentation.Character.WorkStationType.Resting),
+            // 기존 레이어 폴백
+            ("WorkPlaceChair", OpenDesk.Presentation.Character.WorkStationType.Main),
+        };
+
+        // 책상/테이블 오브젝트 수집 (방향 계산용)
+        var desks = new System.Collections.Generic.List<Transform>();
+        foreach (var t in officeRoot.GetComponentsInChildren<Transform>(true))
+        {
+            var n = t.name.ToLower();
+            if (n.Contains("table") || n.Contains("desk"))
+                desks.Add(t);
+        }
+
+        int created = 0;
+        foreach (var t in officeRoot.GetComponentsInChildren<Transform>(true))
+        {
+            // 레이어 매칭
+            OpenDesk.Presentation.Character.WorkStationType? wsType = null;
+            foreach (var (layerName, type) in layerMap)
+            {
+                int layer = LayerMask.NameToLayer(layerName);
+                if (layer >= 0 && t.gameObject.layer == layer)
+                {
+                    wsType = type;
+                    break;
+                }
+            }
+
+            // 레이어 매칭 안 되면 이름으로 폴백
+            if (!wsType.HasValue)
+            {
+                var n = t.name.ToLower();
+                if (n.Contains("mainagentchair") || n.Contains("main_chair"))
+                    wsType = OpenDesk.Presentation.Character.WorkStationType.Main;
+                else if (n.Contains("subagentchair") || n.Contains("sub_chair"))
+                    wsType = OpenDesk.Presentation.Character.WorkStationType.Sub;
+                else if (n.Contains("restingchair") || n.Contains("resting_chair"))
+                    wsType = OpenDesk.Presentation.Character.WorkStationType.Resting;
+            }
+
+            if (!wsType.HasValue) continue;
+
+            // 가장 가까운 책상 찾기 → 바라볼 방향 결정
+            var chairPos = t.position;
+            Vector3 lookForward = t.forward; // 기본값: 의자 자체 forward
+
+            float closestDist = float.MaxValue;
+            foreach (var desk in desks)
+            {
+                float dist = Vector3.Distance(chairPos, desk.position);
+                if (dist < closestDist && dist < 3f) // 3m 이내 책상
+                {
+                    closestDist = dist;
+                    var dir = desk.position - chairPos;
+                    dir.y = 0;
+                    if (dir.sqrMagnitude > 0.01f)
+                        lookForward = dir.normalized;
+                }
+            }
+
+            CreateTestWorkStation(
+                officeRoot.transform,
+                $"WorkStation_{wsType.Value}_{created}",
+                wsType.Value,
+                chairPos,
+                lookForward);
+
+            created++;
+            Debug.Log($"[ProtocolTestBuilder] 의자 '{t.name}' (layer={LayerMask.LayerToName(t.gameObject.layer)}) → WorkStation ({wsType.Value}), 방향={lookForward}");
+        }
+
+        if (created == 0)
+        {
+            Debug.LogWarning("[ProtocolTestBuilder] 의자 레이어(MainAgentChair/SubAgentChair/RestingChair) 없음! " +
+                "Office 프리팹의 의자에 레이어를 설정하거나, WorkStation 컴포넌트를 수동 추가하세요.");
+        }
+        else
+        {
+            Debug.Log($"[ProtocolTestBuilder] WorkStation {created}개 자동 생성 완료");
+        }
+    }
+
+    /// <summary>테스트용 WorkStation 자동 생성 (프리팹에 없을 때)</summary>
+    static void CreateTestWorkStation(
+        Transform parent, string name,
+        OpenDesk.Presentation.Character.WorkStationType type,
+        Vector3 worldPos, Vector3 forward)
+    {
+        var wsObj = new GameObject(name);
+        wsObj.transform.SetParent(parent);
+        wsObj.transform.position = worldPos;
+        wsObj.transform.rotation = Quaternion.LookRotation(forward, Vector3.up);
+
+        var ws = wsObj.AddComponent<OpenDesk.Presentation.Character.WorkStation>();
+        var wsSo = new SerializedObject(ws);
+        wsSo.FindProperty("_type").enumValueIndex = (int)type;
+        wsSo.FindProperty("_seatYOffset").floatValue = 0.3f;
+        wsSo.FindProperty("_approachDistance").floatValue = 0.7f;
+        wsSo.ApplyModifiedPropertiesWithoutUndo();
+
+        // SitPoint (자식, 의자 위치 = 부모 위치)
+        var sitObj = new GameObject("SitPoint");
+        sitObj.transform.SetParent(wsObj.transform);
+        sitObj.transform.localPosition = Vector3.up * 0.3f;
+        sitObj.transform.localRotation = Quaternion.identity;
+
+        // ApproachPoint (자식, 오른쪽 0.6m — 등받이 회피)
+        var approachObj = new GameObject("ApproachPoint");
+        approachObj.transform.SetParent(wsObj.transform);
+        approachObj.transform.localPosition = new Vector3(0.6f, 0, 0);
+        approachObj.transform.localRotation = Quaternion.identity;
+
+        // 포인트 바인딩
+        wsSo = new SerializedObject(ws);
+        wsSo.FindProperty("_sitPoint").objectReferenceValue = sitObj.transform;
+        wsSo.FindProperty("_approachPoint").objectReferenceValue = approachObj.transform;
+        wsSo.ApplyModifiedPropertiesWithoutUndo();
+
+        Debug.Log($"[ProtocolTestBuilder] WorkStation 생성: {name} (type={type}, pos={worldPos})");
     }
 
     /// <summary>Office 가구에 레이어 자동 할당 (Chair/Table/Wall)</summary>
@@ -645,6 +994,9 @@ public static class AgentProtocolTestSceneBuilder
         int assigned = 0;
         foreach (var t in officeRoot.GetComponentsInChildren<Transform>(true))
         {
+            // 이미 Default(0)가 아닌 레이어가 설정된 오브젝트는 스킵 (프리팹 레이어 보존)
+            if (t.gameObject.layer != 0) continue;
+
             var name = t.name.ToLower();
 
             if (name.Contains("chair"))
@@ -911,5 +1263,83 @@ public static class AgentProtocolTestSceneBuilder
         var prefab = PrefabUtility.SaveAsPrefabAsset(obj, path);
         Object.DestroyImmediate(obj);
         return prefab;
+    }
+}
+
+/// <summary>
+/// Office 프리팹을 직접 지정하고 씬을 생성하는 위저드 창.
+/// Tools > OpenDesk > Build Agent Protocol Test Scene 으로 열림.
+/// </summary>
+public class AgentProtocolTestSceneWizard : EditorWindow
+{
+    GameObject _officePrefab;
+    bool _showPreview;
+    Bounds _previewBounds;
+
+    void OnEnable()
+    {
+        if (_officePrefab == null)
+        {
+            _officePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/05.Prefabs/OfficePrefabs/OpenOffice.prefab");
+        }
+    }
+
+    void OnGUI()
+    {
+        GUILayout.Space(10);
+        EditorGUILayout.LabelField("Agent Protocol Test Scene Builder", EditorStyles.boldLabel);
+        GUILayout.Space(10);
+
+        EditorGUI.BeginChangeCheck();
+        _officePrefab = (GameObject)EditorGUILayout.ObjectField(
+            "Office Prefab", _officePrefab, typeof(GameObject), false);
+        if (EditorGUI.EndChangeCheck())
+            _showPreview = false;
+
+        if (_officePrefab == null)
+        {
+            EditorGUILayout.HelpBox(
+                "Office 프리팹을 지정하지 않으면 기본 Office_35 프리팹을 사용합니다.",
+                MessageType.Info);
+        }
+        else
+        {
+            // 프리팹 바운드 미리보기
+            if (GUILayout.Button("바운드 미리보기", GUILayout.Height(22)))
+            {
+                var temp = (GameObject)PrefabUtility.InstantiatePrefab(_officePrefab);
+                temp.transform.position = Vector3.zero;
+                temp.transform.rotation = Quaternion.identity;
+                var renderers = temp.GetComponentsInChildren<MeshRenderer>();
+                if (renderers.Length > 0)
+                {
+                    _previewBounds = renderers[0].bounds;
+                    for (int i = 1; i < renderers.Length; i++)
+                        _previewBounds.Encapsulate(renderers[i].bounds);
+                }
+                Object.DestroyImmediate(temp);
+                _showPreview = true;
+            }
+
+            if (_showPreview)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Center: {_previewBounds.center}\n" +
+                    $"Size: {_previewBounds.size}\n" +
+                    $"Min: {_previewBounds.min}  Max: {_previewBounds.max}",
+                    MessageType.None);
+            }
+        }
+
+        GUILayout.Space(10);
+
+        if (GUILayout.Button("씬 생성", GUILayout.Height(36)))
+        {
+            AgentProtocolTestSceneBuilder._customOfficePrefab = _officePrefab;
+            AgentProtocolTestSceneBuilder.Build();
+            AgentProtocolTestSceneBuilder._customOfficePrefab = null;
+            Close();
+        }
     }
 }

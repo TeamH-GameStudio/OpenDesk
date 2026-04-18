@@ -96,14 +96,24 @@ namespace OpenDesk.Presentation.Character.States
                     if (_ctx.Transform != null)
                     {
                         _slideStart = _ctx.Transform.position;
-                        // 슬라이드 목표: forward 방향 + NavMesh 높이로 내려가기
-                        var groundTarget = _slideStart + _ctx.Transform.forward * SlideDistance;
+
+                        // WorkStation의 ApproachPoint로 슬라이드 (없으면 forward 방향 폴백)
+                        Vector3 groundTarget;
+                        if (_ctx.CurrentWorkStation != null)
+                        {
+                            groundTarget = _ctx.CurrentWorkStation.ApproachPosition;
+                        }
+                        else
+                        {
+                            groundTarget = _slideStart + _ctx.Transform.forward * SlideDistance;
+                        }
+
                         if (UnityEngine.AI.NavMesh.SamplePosition(groundTarget, out var navHit, 3f, UnityEngine.AI.NavMesh.AllAreas))
                             groundTarget = navHit.position;
                         _slideTarget = groundTarget;
                     }
                     _ctx.Animation.PlayAnimation("SitToStand", loop: false);
-                    _timer = SitToStandDuration; // 슬라이드와 애니메이션이 같은 시간 동안
+                    _timer = SitToStandDuration;
                     _phase = Phase.StandingUp;
                     break;
 

@@ -21,9 +21,9 @@ namespace OpenDesk.Presentation.Camera
         [SerializeField] private Vector3 _agentOffset = new(0f, 3f, -5f);
 
         [Header("스크롤 줌")]
-        [SerializeField] private float _zoomSpeed = 5f;
-        [SerializeField] private float _minDistance = 1.5f;
-        [SerializeField] private float _maxDistance = 12f;
+        [SerializeField] private float _zoomSpeed = 15f;
+        [SerializeField] private float _minDistance = 0.5f;
+        [SerializeField] private float _maxDistance = 30f;
         [Tooltip("줌인 시 카메라가 향하는 목표점 (에이전트 로컬 Y 오프셋)")]
         [SerializeField] private float _focusHeight = 0.8f;
 
@@ -77,7 +77,9 @@ namespace OpenDesk.Presentation.Camera
             if (Mathf.Approximately(scroll, 0f)) return;
 
             // 스크롤 위 = 줌인 (거리 감소), 아래 = 줌아웃 (거리 증가)
-            _currentDistance -= scroll * _zoomSpeed * Time.unscaledDeltaTime;
+            // scroll 값 정규화 (120 단위) + 현재 거리 비례 줌 (멀수록 빠르게)
+            float normalizedScroll = scroll / 120f;
+            _currentDistance -= normalizedScroll * _zoomSpeed * Mathf.Max(_currentDistance * 0.15f, 0.3f);
             _currentDistance = Mathf.Clamp(_currentDistance, _minDistance, _maxDistance);
 
             // 포커스 높이 지점에서 줌 방향으로 거리만큼 떨어진 위치

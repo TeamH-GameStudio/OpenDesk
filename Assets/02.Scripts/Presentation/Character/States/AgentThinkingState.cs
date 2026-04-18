@@ -2,32 +2,34 @@ using OpenDesk.Presentation.Character.Context;
 using UnityEngine;
 using UnityEngine.AI;
 
+// WorkStation, WorkStationType 참조
+using OpenDesk.Presentation.Character;
+
 namespace OpenDesk.Presentation.Character.States
 {
     /// <summary>
-    /// 사고 중 상태 — WorkPlaceChair로 이동 → 앉기 → WorkPlaceTable 방향으로 회전.
-    /// 이미 앉아있으면 (Completed→Thinking 재진입) 이동 없이 바로 Thinking 모션.
+    /// 사고 중 상태 — WorkStation으로 이동 → 자연스럽게 앉기 → 작업 방향 응시.
+    ///
+    /// 흐름:
+    ///   1. WorkStation 탐색 (에이전트 역할 기반)
+    ///   2. NavMesh로 ApproachPoint까지 이동 (Walk)
+    ///   3. ApproachPoint 도착 → SitPoint 방향으로 회전 (TurningToSit)
+    ///   4. StandToSit 재생 + ApproachPoint→SitPoint Lerp 이동 (SittingDown)
+    ///   5. Thinking 루프 (Thinking)
+    ///
+    /// 이미 앉아있으면 (Completed→Thinking 재진입) 이동 없이 바로 Thinking.
     /// </summary>
     public class AgentThinkingState : IAgentState
     {
         private readonly AgentCharacterContext _ctx;
 
-        private enum Phase { MovingToChair, SittingDown, Thinking }
+        private enum Phase { MovingToApproach, Thinking }
         private Phase _phase;
-        private Vector3 _lookDirection;
-        private float _transitionTimer;
-        private Vector3 _seatPosition;
 
-        private const float ChairSearchRadius = 20f;
-        private const float SeatYOffset = 0.3f;
-        private const float StandToSitDuration = 1.5f;
+        private const float SearchRadius = 30f;
 
         /// <summary>현재 앉아있는지 (외부에서 참조)</summary>
         public bool IsSeated { get; private set; }
-
-        /// <summary>앉은 위치 저장 (CompletedState에서 재사용)</summary>
-        public Vector3 LastSeatPosition => _seatPosition;
-        public Vector3 LastLookDirection => _lookDirection;
 
         public string Name => "Thinking";
 
@@ -46,27 +48,34 @@ namespace OpenDesk.Presentation.Character.States
                 return;
             }
 
-            Debug.Log($"[{_ctx.AgentName}] Thinking 진입 -- WorkPlaceChair로 이동");
+            Debug.Log($"[{_ctx.AgentName}] Thinking 진입 -- WorkStation 탐색");
 
-            if (TryFindChair(out var chairPos) && TryFindTable(chairPos, out var tablePos))
+            var workStation = FindWorkStation();
+            if (workStation != null)
             {
-                var dir = (tablePos - chairPos);
-                dir.y = 0;
-                _lookDirection = dir.normalized;
-                _seatPosition = chairPos + Vector3.up * SeatYOffset;
+                workStation.IsOccupied = true;
+                _ctx.CurrentWorkStation = workStation;
 
-                var navTarget = chairPos;
-                if (NavMesh.SamplePosition(navTarget, out var hit, 2f, NavMesh.AllAreas))
-                    navTarget = hit.position;
+                // ApproachPoint로 NavMesh 이동
+                var approachPos = workStation.ApproachPosition;
+                if (NavMesh.SamplePosition(approachPos, out var hit, 2f, NavMesh.AllAreas))
+                    approachPos = hit.position;
 
-                if (_ctx.MoveTo(navTarget))
+                if (_ctx.MoveTo(approachPos))
                 {
                     _ctx.Animation.PlayAnimation("Walk", loop: true);
-                    _phase = Phase.MovingToChair;
+                    _phase = Phase.MovingToApproach;
+                    Debug.Log($"[{_ctx.AgentName}] WorkStation '{workStation.name}' ApproachPoint로 이동 시작");
                     return;
+                }
+                else
+                {
+                    Debug.LogWarning($"[{_ctx.AgentName}] MoveTo 실패 -- NavAgent 상태: enabled={_ctx.NavAgent?.enabled}, onNavMesh={_ctx.NavAgent?.isOnNavMesh}");
                 }
             }
 
+            // WorkStation 없거나 이동 불가 → 서있는 상태로 Idle 유지
+            Debug.LogWarning($"[{_ctx.AgentName}] WorkStation 이동 불가 -- 서있는 채로 대기");
             StartThinkingInPlace();
         }
 
@@ -74,35 +83,11 @@ namespace OpenDesk.Presentation.Character.States
         {
             switch (_phase)
             {
-                case Phase.MovingToChair:
+                case Phase.MovingToApproach:
                     if (_ctx.HasReachedDestination)
                     {
                         _ctx.StopMoving();
-
-                        if (_ctx.NavAgent != null)
-                            _ctx.NavAgent.enabled = false;
-
-                        if (_ctx.Transform != null)
-                        {
-                            _ctx.Transform.position = _seatPosition;
-                            if (_lookDirection != Vector3.zero)
-                                _ctx.Transform.forward = _lookDirection;
-                        }
-
-                        IsSeated = true;
-                        _ctx.Animation.PlayAnimation("StandToSit", loop: false);
-                        _transitionTimer = StandToSitDuration;
-                        _phase = Phase.SittingDown;
-                        Debug.Log($"[{_ctx.AgentName}] 의자 도착 -- 앉는 중");
-                    }
-                    break;
-
-                case Phase.SittingDown:
-                    _transitionTimer -= deltaTime;
-                    if (_transitionTimer <= 0f)
-                    {
-                        _ctx.Animation.PlayAnimation("Thinking", loop: true);
-                        _phase = Phase.Thinking;
+                        SitDown();
                     }
                     break;
 
@@ -115,13 +100,20 @@ namespace OpenDesk.Presentation.Character.States
         {
             _ctx.StopMoving();
             _ctx.Expression?.SetExpression("Neutral");
-            // IsSeated는 리셋하지 않음 — CompletedState/ChattingState에서 참조
+            // IsSeated, CurrentWorkStation은 리셋하지 않음 — CompletedState/ChattingState에서 참조
         }
 
         /// <summary>완전히 일어남 처리 (DismissAgent에서 호출)</summary>
         public void ResetSeated()
         {
             IsSeated = false;
+
+            // WorkStation 점유 해제
+            if (_ctx.CurrentWorkStation != null)
+            {
+                _ctx.CurrentWorkStation.IsOccupied = false;
+                _ctx.CurrentWorkStation = null;
+            }
 
             // NavMesh 높이로 복원
             if (_ctx.Transform != null)
@@ -135,67 +127,84 @@ namespace OpenDesk.Presentation.Character.States
                 _ctx.NavAgent.enabled = true;
         }
 
+        // ── 내부 메서드 ──────────────────────────────────────────
+
+        /// <summary>ApproachPoint 도착 → SitPoint에 즉시 앉기</summary>
+        private void SitDown()
+        {
+            if (_ctx.NavAgent != null)
+                _ctx.NavAgent.enabled = false;
+
+            var ws = _ctx.CurrentWorkStation;
+            if (ws != null && _ctx.Transform != null)
+            {
+                _ctx.Transform.position = ws.SitPosition;
+                _ctx.Transform.rotation = Quaternion.LookRotation(ws.SitForward, Vector3.up);
+            }
+
+            IsSeated = true;
+            _ctx.Animation.PlayAnimation("Thinking", loop: true);
+            _phase = Phase.Thinking;
+            Debug.Log($"[{_ctx.AgentName}] 앉기 완료 -- Thinking 루프");
+        }
+
         private void StartThinkingInPlace()
         {
             _ctx.StopMoving();
-            _ctx.Animation.PlayAnimation("Thinking", loop: true);
+            // 서있는 상태이므로 Idle 유지 (Thinking은 앉은 포즈라 어색함)
+            _ctx.Animation.PlayAnimation("Idle", loop: true);
             _phase = Phase.Thinking;
         }
 
-        private bool TryFindChair(out Vector3 position)
+        /// <summary>에이전트 역할에 맞는 WorkStation 탐색</summary>
+        private WorkStation FindWorkStation()
         {
-            return TryFindByLayer("WorkPlaceChair", out position);
-        }
+            var agentPos = _ctx.Transform != null ? _ctx.Transform.position : Vector3.zero;
+            var preferredType = GetPreferredType();
 
-        private bool TryFindTable(Vector3 fromChair, out Vector3 position)
-        {
-            position = Vector3.zero;
-            int layer = LayerMask.NameToLayer("WorkPlaceTable");
-            if (layer < 0) return false;
+            WorkStation bestMatch = null;
+            WorkStation fallback = null;
+            float bestDist = float.MaxValue;
+            float fallbackDist = float.MaxValue;
 
-            float closestDist = float.MaxValue;
-            bool found = false;
-            var allObjects = Object.FindObjectsByType<Transform>(FindObjectsSortMode.None);
-            foreach (var t in allObjects)
+            var stations = Object.FindObjectsByType<WorkStation>(FindObjectsSortMode.None);
+            foreach (var ws in stations)
             {
-                if (t.gameObject.layer != layer) continue;
-                var dist = Vector3.Distance(fromChair, t.position);
-                if (dist < closestDist && dist < 5f)
+                if (ws.IsOccupied) continue;
+
+                float dist = Vector3.Distance(agentPos, ws.SitPosition);
+                if (dist > SearchRadius) continue;
+
+                if (ws.Type == preferredType && dist < bestDist)
                 {
-                    closestDist = dist;
-                    position = t.position;
-                    found = true;
+                    bestDist = dist;
+                    bestMatch = ws;
+                }
+                else if (ws.Type != WorkStationType.Resting && dist < fallbackDist)
+                {
+                    fallbackDist = dist;
+                    fallback = ws;
                 }
             }
-            return found;
+
+            var result = bestMatch ?? fallback;
+            if (result != null)
+                Debug.Log($"[{_ctx.AgentName}] WorkStation 발견: {result.name} (type={result.Type}, dist={Vector3.Distance(agentPos, result.SitPosition):F1}m)");
+            else
+                Debug.LogWarning($"[{_ctx.AgentName}] WorkStation 없음 -- 제자리 Thinking");
+
+            return result;
         }
 
-        private bool TryFindByLayer(string layerName, out Vector3 position)
+        private WorkStationType GetPreferredType()
         {
-            position = Vector3.zero;
-            if (_ctx.Transform == null) return false;
-
-            int layer = LayerMask.NameToLayer(layerName);
-            if (layer < 0) return false;
-
-            var agentPos = _ctx.Transform.position;
-            GameObject closest = null;
-            float closestDist = float.MaxValue;
-            var allObjects = Object.FindObjectsByType<Transform>(FindObjectsSortMode.None);
-            foreach (var t in allObjects)
+            return _ctx.AgentId switch
             {
-                if (t.gameObject.layer != layer) continue;
-                if (t.IsChildOf(_ctx.Transform)) continue;
-                var dist = Vector3.Distance(agentPos, t.position);
-                if (dist < closestDist && dist < ChairSearchRadius)
-                {
-                    closestDist = dist;
-                    closest = t.gameObject;
-                }
-            }
-            if (closest == null) return false;
-            position = closest.transform.position;
-            return true;
+                "researcher" => WorkStationType.Main,
+                "writer" => WorkStationType.Sub,
+                "analyst" => WorkStationType.Sub,
+                _ => WorkStationType.Main
+            };
         }
     }
 }

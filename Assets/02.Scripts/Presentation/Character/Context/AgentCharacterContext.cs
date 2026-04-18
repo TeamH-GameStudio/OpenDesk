@@ -23,6 +23,7 @@ namespace OpenDesk.Presentation.Character.Context
         // 에이전트 식별
         public string SessionId { get; }
         public string AgentName { get; }
+        public string AgentId { get; }
 
         // ── 확장 슬롯 ──────────────────────────────────────────
         /// <summary>표정 변화 컨트롤러</summary>
@@ -34,16 +35,21 @@ namespace OpenDesk.Presentation.Character.Context
         /// <summary>HUD 상태 텍스트 직접 업데이트 (FSM 서브상태용)</summary>
         public System.Action<string> OnHUDStatusChanged { get; set; }
 
+        /// <summary>현재 사용 중인 WorkStation (앉아있을 때 non-null)</summary>
+        public WorkStation CurrentWorkStation { get; set; }
+
         public AgentCharacterContext(
             IAnimationController animation,
             string sessionId,
             string agentName,
+            string agentId = "",
             NavMeshAgent navAgent = null,
             Transform transform = null)
         {
             Animation = animation;
             SessionId = sessionId;
             AgentName = agentName;
+            AgentId = agentId;
             NavAgent = navAgent;
             Transform = transform;
         }
