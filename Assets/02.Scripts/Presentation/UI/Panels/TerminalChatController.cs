@@ -46,7 +46,8 @@ namespace OpenDesk.Presentation.UI.Panels
         [Header("설정")]
         [SerializeField] private int _maxMessages = 200;
 
-        [Inject] private IOpenClawBridgeService _bridge;
+        // DEPRECATED 2026-04-27: OpenClaw bridge 의존 제거. 채팅 경로는 IClaudeService로 이동.
+        // [Inject] private IOpenClawBridgeService _bridge;
         [Inject] private IAgentStateService     _agentState;
         [Inject] private IChannelService        _channelService;
 
@@ -69,7 +70,7 @@ namespace OpenDesk.Presentation.UI.Panels
             }
 
             // 전송 버튼
-            Debug.Log($"[Terminal] _sendButton={(_sendButton != null ? "OK" : "NULL")}, _chatInputField={(_chatInputField != null ? "OK" : "NULL")}, _bridge={(_bridge != null ? "OK" : "NULL")}");
+            Debug.Log($"[Terminal] _sendButton={(_sendButton != null ? "OK" : "NULL")}, _chatInputField={(_chatInputField != null ? "OK" : "NULL")}, _bridge=DEPRECATED");
             if (_sendButton != null)
                 _sendButton.onClick.AddListener(OnSendClicked);
 
@@ -99,22 +100,18 @@ namespace OpenDesk.Presentation.UI.Panels
                 });
             }
 
-            // 에이전트 이벤트 수신
-            if (_bridge != null)
-            {
-                _bridge.OnEventReceived.Subscribe(OnEventReceived).AddTo(this);
-
-                // 연결/해제 이벤트
-                _bridge.ConnectionState.Subscribe(connected =>
-                {
-                    var sysMsg = connected ? "[연결] Gateway 연결됨" : "[끊김] Gateway 연결 끊김 - 자동 재연결 대기 중";
-                    AddSystemMessage(sysMsg);
-
-                    // 상태 텍스트도 갱신
-                    if (_typingText != null)
-                        _typingText.text = connected ? "대기 중" : "연결 끊김";
-                }).AddTo(this);
-            }
+            // DEPRECATED: OpenClaw bridge 이벤트 구독 제거. 채팅 이벤트는 IClaudeService 경로로.
+            // if (_bridge != null)
+            // {
+            //     _bridge.OnEventReceived.Subscribe(OnEventReceived).AddTo(this);
+            //     _bridge.ConnectionState.Subscribe(connected =>
+            //     {
+            //         var sysMsg = connected ? "[연결] Gateway 연결됨" : "[끊김] Gateway 연결 끊김 - 자동 재연결 대기 중";
+            //         AddSystemMessage(sysMsg);
+            //         if (_typingText != null)
+            //             _typingText.text = connected ? "대기 중" : "연결 끊김";
+            //     }).AddTo(this);
+            // }
 
             // 에이전트 상태 변경 → StatusText 항상 표시
             if (_typingText != null)
@@ -171,21 +168,23 @@ namespace OpenDesk.Presentation.UI.Panels
             _chatInputField.text = "";
             _chatInputField.ActivateInputField();
 
-            // Gateway로 전송
-            if (_bridge == null || !_bridge.IsConnected)
-            {
-                AddSystemMessage("[!] Gateway에 연결되지 않았습니다. 메시지가 버퍼에 저장됩니다.");
-            }
-
-            try
-            {
-                if (_bridge != null)
-                    await _bridge.SendMessageAsync(_currentSessionId, text);
-            }
-            catch (Exception ex)
-            {
-                AddSystemMessage($"[!] 전송 실패: {ex.Message}");
-            }
+            // DEPRECATED 2026-04-27: OpenClaw Gateway 전송 제거.
+            // 새 경로(IClaudeService 직접 호출)는 ChatPanelController.OnSendClicked에서 처리됨.
+            AddSystemMessage("[!] TerminalChat은 OpenClaw legacy. ChatPanel을 사용하세요.");
+            await System.Threading.Tasks.Task.CompletedTask;
+            // if (_bridge == null || !_bridge.IsConnected)
+            // {
+            //     AddSystemMessage("[!] Gateway에 연결되지 않았습니다. 메시지가 버퍼에 저장됩니다.");
+            // }
+            // try
+            // {
+            //     if (_bridge != null)
+            //         await _bridge.SendMessageAsync(_currentSessionId, text);
+            // }
+            // catch (Exception ex)
+            // {
+            //     AddSystemMessage($"[!] 전송 실패: {ex.Message}");
+            // }
         }
 
         // ── 이벤트 수신 ─────────────────────────────────────────────────

@@ -16,8 +16,9 @@ namespace OpenDesk.Core.Implementations
 {
     /// <summary>
     /// 보안 감사 + 자가 복구
-    /// - 내장 점검: Gateway 노출, 파일 권한, 스킬 안전성
-    /// - 외부 연동: openclaw security audit --deep/--fix 명령 실행
+    /// - 내장 점검: 파일 권한, 스킬 안전성
+    /// - DEPRECATED 2026-04-27: Gateway 노출 점검 + 외부 openclaw CLI 호출 비활성화.
+    ///   Anthropic API 직접 호출로 전환되며 OpenClaw 게이트웨이/CLI 의존성 제거됨.
     /// </summary>
     public class SecurityAuditService : ISecurityAuditService, IDisposable
     {
@@ -28,14 +29,16 @@ namespace OpenDesk.Core.Implementations
         public ReadOnlyReactiveProperty<string> StatusText => _statusText;
         public AuditReport LastReport { get; private set; }
 
-        private const int GatewayPort = 18789;
+        // DEPRECATED 2026-04-27: OpenClaw Gateway port. No longer in use.
+        // private const int GatewayPort = 18789;
 
         public async UniTask<AuditReport> RunAuditAsync(bool deep = false, CancellationToken ct = default)
         {
             var report = new AuditReport { IsDeepScan = deep };
 
-            SetProgress(0.1f, "Gateway 노출 점검 중...");
-            await CheckGatewayExposure(report, ct);
+            // DEPRECATED 2026-04-27: Gateway 노출 점검 비활성 (OpenClaw 포트 18789 제거).
+            // SetProgress(0.1f, "Gateway 노출 점검 중...");
+            // await CheckGatewayExposure(report, ct);
 
             SetProgress(0.3f, "파일 시스템 점검 중...");
             await CheckFilesystemSecrets(report, ct);
@@ -46,11 +49,12 @@ namespace OpenDesk.Core.Implementations
             SetProgress(0.7f, "스킬 공급망 점검 중...");
             await CheckSkillsSupplyChain(report, ct);
 
-            if (deep)
-            {
-                SetProgress(0.85f, "외부 보안 감사 실행 중...");
-                await RunExternalAuditAsync(report, "--deep", ct);
-            }
+            // DEPRECATED 2026-04-27: openclaw CLI 외부 감사 비활성.
+            // if (deep)
+            // {
+            //     SetProgress(0.85f, "외부 보안 감사 실행 중...");
+            //     await RunExternalAuditAsync(report, "--deep", ct);
+            // }
 
             SetProgress(1f, report.IsClean ? "[OK] 보안 점검 통과" : $"[!] {report.CriticalCount} 치명적, {report.WarnCount} 경고 발견");
             LastReport = report;
@@ -63,29 +67,28 @@ namespace OpenDesk.Core.Implementations
         {
             SetProgress(0.1f, "자동 수정 실행 중...");
 
-            // openclaw security audit --fix 실행
-            var fixReport = new AuditReport();
-            await RunExternalAuditAsync(fixReport, "--fix", ct);
+            // DEPRECATED 2026-04-27: openclaw security audit --fix 호출 비활성.
+            // var fixReport = new AuditReport();
+            // await RunExternalAuditAsync(fixReport, "--fix", ct);
 
             SetProgress(0.7f, "수정 결과 확인 중...");
 
-            // 수정 후 재점검
+            // 수정 후 재점검 (외부 감사 없이 내장 점검만)
             var verifyReport = await RunAuditAsync(deep: false, ct);
 
             SetProgress(1f, verifyReport.IsClean ? "[OK] 자동 수정 완료" : "[!] 일부 항목 수동 수정 필요");
             return verifyReport;
         }
 
-        // ── 1. Gateway 노출 점검 ────────────────────────────────────────
-
+        // DEPRECATED 2026-04-27: Gateway 노출 점검 — OpenClaw legacy.
+        // OpenClaw 게이트웨이 제거됨. 새 보안 감사 항목(Anthropic API 키 노출 등)으로 재설계 필요.
+        /*
         private async UniTask CheckGatewayExposure(AuditReport report, CancellationToken ct)
         {
-            // 0.0.0.0 바인딩 체크 (외부 노출 위험)
             var isExposed = await UniTask.RunOnThreadPool(() =>
             {
                 try
                 {
-                    // 외부 인터페이스에서 접근 가능한지 확인
                     using var client = new TcpClient();
                     var task = client.ConnectAsync("0.0.0.0", GatewayPort);
                     return task.Wait(500);
@@ -115,7 +118,6 @@ namespace OpenDesk.Core.Implementations
                 });
             }
 
-            // Gateway 인증 확인
             report.Items.Add(new AuditItem
             {
                 Domain      = AuditDomain.GatewayExposure,
@@ -124,6 +126,7 @@ namespace OpenDesk.Core.Implementations
                 Description = "WebSocket 인증 토큰 설정 여부는 외부 감사(--deep)에서 확인",
             });
         }
+        */
 
         // ── 2. 파일 시스템/시크릿 점검 ──────────────────────────────────
 
@@ -131,12 +134,13 @@ namespace OpenDesk.Core.Implementations
         {
             return UniTask.RunOnThreadPool(() =>
             {
+                // DEPRECATED 2026-04-27: ~/.openclaw 디렉토리 점검 비활성. Anthropic API 키 점검으로 재설계 예정.
                 var basePath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openclaw")
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw");
+                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "opendesk")
+                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".opendesk");
 
                 // API 키 평문 노출 체크
-                var configFiles = new[] { "openclaw.json", "config.yaml", "agents.yaml" };
+                var configFiles = new[] { "opendesk.json", "config.yaml", "agents.yaml" };
                 foreach (var file in configFiles)
                 {
                     var path = Path.Combine(basePath, file);
@@ -191,10 +195,10 @@ namespace OpenDesk.Core.Implementations
         {
             return UniTask.RunOnThreadPool(() =>
             {
-                // 샌드박스 기본값 확인
+                // DEPRECATED 2026-04-27: ~/.openclaw 경로 → ~/.opendesk.
                 var basePath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openclaw")
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw");
+                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "opendesk")
+                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".opendesk");
 
                 var agentsConfig = Path.Combine(basePath, "agents.yaml");
                 if (File.Exists(agentsConfig))
@@ -231,9 +235,10 @@ namespace OpenDesk.Core.Implementations
         {
             return UniTask.RunOnThreadPool(() =>
             {
+                // DEPRECATED 2026-04-27: ~/.openclaw/skills 경로 → ~/.opendesk/skills.
                 var skillsPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openclaw", "skills")
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "skills");
+                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "opendesk", "skills")
+                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".opendesk", "skills");
 
                 if (!Directory.Exists(skillsPath))
                 {
@@ -290,8 +295,10 @@ namespace OpenDesk.Core.Implementations
             }, cancellationToken: ct);
         }
 
-        // ── 외부 openclaw CLI 감사 실행 ─────────────────────────────────
-
+        // DEPRECATED 2026-04-27: 외부 openclaw CLI 감사 실행 — 비활성화.
+        // OpenClaw CLI(`openclaw security audit --deep/--fix`) 제거됨. 새 외부 감사 도구가 필요하면 재설계.
+        /*
+        [Obsolete("OpenClaw CLI external audit. Removed 2026-04-27.", error: false)]
         private UniTask RunExternalAuditAsync(AuditReport report, string flags, CancellationToken ct)
         {
             return UniTask.RunOnThreadPool(() =>
@@ -334,6 +341,7 @@ namespace OpenDesk.Core.Implementations
                 }
             }, cancellationToken: ct);
         }
+        */
 
         private void SetProgress(float value, string text)
         {

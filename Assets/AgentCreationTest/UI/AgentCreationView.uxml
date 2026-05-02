@@ -1,0 +1,107 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss?fileID=7433441132597879392&amp;guid=fdc9203ac02aa4694961498f00020daf&amp;type=3#opendesk-tokens"/>
+    <Style src="project://database/Assets/AgentCreationTest/UI/AgentCreationStyles.uss?fileID=7433441132597879392&amp;guid=410edc3f27ae14bcf831c9d168b4cd98&amp;type=3#AgentCreationStyles"/>
+    <ui:VisualElement name="root" class="root">
+        <ui:VisualElement name="creation-header" class="creation-header">
+            <ui:Label name="creation-title" text="첫 동료를 만들어요" class="creation-header__title od-heading-md"/>
+        </ui:VisualElement>
+        <ui:VisualElement class="creation-body">
+            <ui:VisualElement class="preview-pane">
+                <ui:VisualElement class="preview-stack">
+                    <ui:VisualElement class="avatar-frame">
+                        <ui:VisualElement name="avatar-stage" class="avatar-stage">
+                            <ui:VisualElement name="avatar-head" class="avatar-head">
+                                <ui:VisualElement name="avatar-bun-extra" class="avatar-bun-extra"/>
+                                <ui:VisualElement name="avatar-hair" class="avatar-hair avatar-hair--rounded"/>
+                                <ui:VisualElement name="avatar-eye-left" class="avatar-eye avatar-eye--left"/>
+                                <ui:VisualElement name="avatar-eye-right" class="avatar-eye avatar-eye--right"/>
+                                <ui:VisualElement name="avatar-mouth" class="avatar-mouth"/>
+                            </ui:VisualElement>
+                            <ui:VisualElement name="avatar-top" class="avatar-top"/>
+                            <ui:VisualElement name="avatar-bottom" class="avatar-bottom">
+                                <ui:VisualElement class="avatar-leg-split"/>
+                            </ui:VisualElement>
+                            <ui:VisualElement class="avatar-shoes">
+                                <ui:VisualElement name="avatar-shoe-left" class="avatar-shoe avatar-shoe--left"/>
+                                <ui:VisualElement name="avatar-shoe-right" class="avatar-shoe avatar-shoe--right"/>
+                            </ui:VisualElement>
+                            <ui:VisualElement class="avatar-shadow"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="preview-card" style="justify-content: space-around; flex-direction: column;">
+                    <ui:Label name="preview-name" text="..." class="preview-card__name od-heading-md"/>
+                    <ui:Label name="preview-role" text="아직 정해지지 않았어요" class="preview-card__role od-body-sm"/>
+                    <ui:VisualElement name="preview-traits" class="preview-card__traits"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="step-pane" style="justify-content: center; opacity: 1; width: 100%;">
+                <ui:VisualElement class="step-content">
+                    <ui:VisualElement name="step-1" class="step step--active">
+                        <ui:VisualElement class="step-title-row" style="height: 97px; width: 563px;">
+                            <ui:Label text="이름을 정해주세요" class="step-title od-heading-lg" style="width: auto; height: auto; font-size: 45px;"/>
+                            <ui:Label text="당신의 동료를 어떻게 부를지" class="step-subtitle od-body-sm" style="font-size: 20px;"/>
+                        </ui:VisualElement>
+                        <ui:TextField name="name-input" class="field-input od-body-md"/>
+                        <ui:VisualElement class="nav-row">
+                            <ui:Button name="step-1-next" text="다음" class="nav-btn nav-btn--next od-body-md"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="step-2" class="step">
+                        <ui:VisualElement class="step-title-row">
+                            <ui:Label text="어떤 일을 도와줄까요?" class="step-title od-heading-lg"/>
+                            <ui:Label text="자유롭게 적어주세요" class="step-subtitle od-body-sm"/>
+                        </ui:VisualElement>
+                        <ui:TextField name="role-input" class="field-input field-input--with-helper od-body-md"/>
+                        <ui:Label text="예시: 글쓰기 / 마케팅 카피라이터 / 코드 리뷰 / 일정 관리" class="field-helper od-caption"/>
+                        <ui:VisualElement class="nav-row">
+                            <ui:Button name="step-2-prev" text="이전" class="nav-btn nav-btn--prev od-body-md"/>
+                            <ui:Button name="step-2-next" text="다음" class="nav-btn nav-btn--next od-body-md"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="step-3" class="step">
+                        <ui:VisualElement class="step-title-row">
+                            <ui:Label text="어떤 성격이 좋을까요?" class="step-title od-heading-lg"/>
+                            <ui:Label text="최대 3개까지 선택할 수 있어요" class="step-subtitle od-body-sm"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement name="trait-grid" class="trait-grid"/>
+                        <ui:VisualElement name="selected-traits-block" class="selected-traits-block">
+                            <ui:Label text="선택됨" class="selected-traits-label od-caption"/>
+                            <ui:VisualElement name="selected-traits-row" class="selected-traits-row"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="nav-row">
+                            <ui:Button name="step-3-prev" text="이전" class="nav-btn nav-btn--prev od-body-md"/>
+                            <ui:Button name="step-3-next" text="다음" class="nav-btn nav-btn--next od-body-md"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="step-4" class="step step--wardrobe">
+                        <ui:VisualElement class="step-title-row">
+                            <ui:Label text="옷을 입혀주세요" class="step-title od-heading-lg"/>
+                            <ui:Label text="마음에 드는 모습으로 꾸며보세요" class="step-subtitle od-body-sm"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement name="part-tabs" class="part-tabs"/>
+                        <ui:ScrollView name="option-scroll" mode="Vertical" class="option-scroll">
+                            <ui:VisualElement name="option-grid" class="option-grid"/>
+                        </ui:ScrollView>
+                        <ui:Button name="randomize-btn" text="랜덤" class="randomize-btn od-body-sm"/>
+                        <ui:VisualElement class="nav-row">
+                            <ui:Button name="step-4-prev" text="이전" class="nav-btn nav-btn--prev od-body-md"/>
+                            <ui:Button name="step-4-next" text="다음" class="nav-btn nav-btn--next od-body-md"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="step-5" class="step">
+                        <ui:VisualElement class="step-title-row">
+                            <ui:Label text="어떤 모델로 일할까요?" class="step-title od-heading-lg"/>
+                            <ui:Label text="곧 다양한 모델을 선택할 수 있어요" class="step-subtitle od-body-sm"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement name="model-list" class="model-list"/>
+                        <ui:VisualElement class="nav-row">
+                            <ui:Button name="step-5-prev" text="이전" class="nav-btn nav-btn--prev od-body-md"/>
+                            <ui:Button name="step-5-next" text="동료 만들기" class="nav-btn nav-btn--next od-body-md"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

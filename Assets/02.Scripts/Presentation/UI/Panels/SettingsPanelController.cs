@@ -28,15 +28,18 @@ namespace OpenDesk.Presentation.UI.Panels
         [SerializeField] private Button       _applyStateButton;
         [SerializeField] private TMP_InputField _debugSessionInput;
 
-        [Inject] private IOpenClawBridgeService _bridge;
+        // DEPRECATED 2026-04-27: OpenClaw bridge DI 제거. Gateway 설정은 Anthropic API 키 입력 UI로 대체 예정.
+        // [Inject] private IOpenClawBridgeService _bridge;
         [Inject] private IConsoleLogService     _logService;
         [Inject] private IAgentStateService     _agentState;
 
         private void Start()
         {
-            // Gateway URL
+            // DEPRECATED 2026-04-27: Gateway URL 읽기 비활성. OpenClaw legacy.
+            // if (_gatewayUrlInput != null)
+            //     _gatewayUrlInput.text = PlayerPrefs.GetString("OpenDesk_GatewayUrl", "ws://127.0.0.1:18789");
             if (_gatewayUrlInput != null)
-                _gatewayUrlInput.text = PlayerPrefs.GetString("OpenDesk_GatewayUrl", "ws://127.0.0.1:18789");
+                _gatewayUrlInput.text = "(legacy)";
 
             _gatewaySaveButton?.onClick.AddListener(OnGatewaySave);
 
@@ -86,28 +89,25 @@ namespace OpenDesk.Presentation.UI.Panels
 
         private async void OnGatewaySave()
         {
-            if (_gatewayUrlInput == null || _bridge == null) return;
-
-            var url = _gatewayUrlInput.text.Trim();
-            PlayerPrefs.SetString("OpenDesk_GatewayUrl", url);
-            PlayerPrefs.Save();
-
+            // DEPRECATED 2026-04-27: OpenClaw Gateway 연결 비활성. 추후 Anthropic API 키 입력 UI로 대체.
             if (_gatewayStatusText != null)
-                _gatewayStatusText.text = "연결 시도 중...";
-
-            try
-            {
-                await _bridge.DisconnectAsync();
-                await _bridge.ConnectAsync(url);
-
-                if (_gatewayStatusText != null)
-                    _gatewayStatusText.text = "[OK] 연결 성공";
-            }
-            catch (System.Exception ex)
-            {
-                if (_gatewayStatusText != null)
-                    _gatewayStatusText.text = $"[X] 실패: {ex.Message}";
-            }
+                _gatewayStatusText.text = "[—] OpenClaw Gateway 비활성 (Anthropic API 직접 호출 사용)";
+            await System.Threading.Tasks.Task.CompletedTask;
+            // if (_gatewayUrlInput == null || _bridge == null) return;
+            // var url = _gatewayUrlInput.text.Trim();
+            // PlayerPrefs.SetString("OpenDesk_GatewayUrl", url);
+            // PlayerPrefs.Save();
+            // if (_gatewayStatusText != null) _gatewayStatusText.text = "연결 시도 중...";
+            // try
+            // {
+            //     await _bridge.DisconnectAsync();
+            //     await _bridge.ConnectAsync(url);
+            //     if (_gatewayStatusText != null) _gatewayStatusText.text = "[OK] 연결 성공";
+            // }
+            // catch (System.Exception ex)
+            // {
+            //     if (_gatewayStatusText != null) _gatewayStatusText.text = $"[X] 실패: {ex.Message}";
+            // }
         }
 
         #if UNITY_EDITOR

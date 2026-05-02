@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using R3;
 using TMPro;
@@ -81,13 +83,40 @@ namespace OpenDesk.Pipeline
         public void AddFile(string filePath)
         {
             if (string.IsNullOrEmpty(filePath)) return;
+            if (!IsAllowedPath(filePath))
+            {
+                Debug.LogWarning($"[Inbox] 허용되지 않은 경로 차단: {filePath}");
+                return;
+            }
             if (_filePaths.Contains(filePath)) return;
 
             _filePaths.Add(filePath);
             _onFileAdded.OnNext(filePath);
             RefreshVisual();
 
-            Debug.Log($"[Inbox] 파일 추가: {System.IO.Path.GetFileName(filePath)} (총 {_filePaths.Count}개)");
+            Debug.Log($"[Inbox] 파일 추가: {Path.GetFileName(filePath)} (총 {_filePaths.Count}개)");
+        }
+
+        /// <summary>유저 홈 디렉토리 하위 경로만 허용 (Path Traversal 방어)</summary>
+        private static bool IsAllowedPath(string filePath)
+        {
+            try
+            {
+                var full = Path.GetFullPath(filePath);
+                if (!File.Exists(full)) return false;
+
+                var allowedRoot = Path.GetFullPath(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+                var separator = Path.DirectorySeparatorChar.ToString();
+                if (!allowedRoot.EndsWith(separator)) allowedRoot += separator;
+
+                return full.StartsWith(allowedRoot, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Inbox] 경로 검증 실패 ({filePath}): {ex.Message}");
+                return false;
+            }
         }
 
         public void Clear()

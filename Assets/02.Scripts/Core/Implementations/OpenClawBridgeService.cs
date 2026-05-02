@@ -16,6 +16,7 @@ namespace OpenDesk.Core.Implementations
     /// - 하트비트 ping (55초 간격 — 캐시 TTL 1시간 대응)
     /// - 연결 끊김 시 메시지 버퍼링
     /// </summary>
+    [Obsolete("OpenClaw legacy. Replaced by Claude CLI/Anthropic API path (IClaudeService). Will be removed once Anthropic-direct migration is fully verified.", error: false)]
     public class OpenClawBridgeService : IOpenClawBridgeService
     {
         private readonly IEventParserService _parser;

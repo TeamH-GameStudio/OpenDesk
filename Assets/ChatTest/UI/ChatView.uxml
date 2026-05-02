@@ -1,0 +1,51 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- Tokens first (variables become available to all subsequent stylesheets) -->
+    <Style src="../../02.Scripts/UI/Theme/opendesk-tokens.uss" />
+    <Style src="ChatStyles.uss" />
+
+    <ui:VisualElement name="root" class="root">
+        <!-- Body: left transparent gap (3D scene shows through) + right chat -->
+        <ui:VisualElement name="body" class="body">
+            <ui:VisualElement name="decoration-pane" class="decoration-pane" picking-mode="Ignore" />
+
+            <ui:VisualElement name="chat-pane" class="chat-pane">
+                <!-- Brand bar — 4px Warm Clay, OpenDesk signature accent -->
+                <ui:VisualElement class="chat-pane__brand-bar" />
+
+                <!-- Header: name · role + sessions + close -->
+                <ui:VisualElement name="chat-header" class="chat-header">
+                    <ui:VisualElement class="chat-header__title-row">
+                        <ui:Label text="Writer" class="chat-header__name od-heading-md" />
+                        <ui:Label text="·" class="chat-header__sep" />
+                        <ui:Label text="글쓰기" class="chat-header__role od-body-sm" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="chat-header__spacer" />
+                    <ui:Button name="sessions-button" class="icon-btn" tooltip="세션 목록">
+                        <ui:VisualElement class="hamburger-icon">
+                            <ui:VisualElement class="hamburger-line" />
+                            <ui:VisualElement class="hamburger-line" />
+                            <ui:VisualElement class="hamburger-line" />
+                        </ui:VisualElement>
+                    </ui:Button>
+                    <ui:Button name="close-button" class="icon-btn" tooltip="닫기" text="×" />
+                </ui:VisualElement>
+
+                <!-- Messages -->
+                <ui:ScrollView name="chat-scroll" class="chat-scroll" mode="Vertical">
+                    <ui:VisualElement name="messages-container" class="messages-container" />
+                </ui:ScrollView>
+
+                <!-- Input -->
+                <ui:VisualElement class="chat-input-area">
+                    <ui:VisualElement class="chat-input-row">
+                        <ui:TextField name="chat-input" class="chat-input od-body-md" multiline="true" />
+                        <ui:Button name="send-button" class="send-button">
+                            <ui:VisualElement class="send-arrow" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                    <ui:Label text="Enter로 전송, Shift+Enter로 줄바꿈" class="chat-input-hint od-caption" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

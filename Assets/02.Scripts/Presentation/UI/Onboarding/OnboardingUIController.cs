@@ -98,7 +98,8 @@ namespace OpenDesk.Presentation.UI.Onboarding
 
         // ── DI ────────────────────────────────────────────────────────
         [Inject] private IOnboardingService      _onboarding;
-        [Inject] private IOpenClawInstaller      _installer;
+        // DEPRECATED 2026-04-27: OpenClaw installer DI 제거.
+        // [Inject] private IOpenClawInstaller      _installer;
         [Inject] private INodeEnvironmentService _nodeEnv;
 
         private GameObject[] _allPanels;
@@ -132,8 +133,8 @@ namespace OpenDesk.Presentation.UI.Onboarding
             if (_whyNeededPanel != null) _whyNeededPanel.SetActive(false);
             if (_errorDetailPanel != null) _errorDetailPanel.SetActive(false);
 
-            // VContainer 주입 확인
-            Debug.Log($"[UI] [Inject] _onboarding={(_onboarding != null ? "OK" : "NULL")}, _installer={(_installer != null ? "OK" : "NULL")}, _nodeEnv={(_nodeEnv != null ? "OK" : "NULL")}");
+            // VContainer 주입 확인 (DEPRECATED 2026-04-27: _installer OpenClaw 제거)
+            Debug.Log($"[UI] [Inject] _onboarding={(_onboarding != null ? "OK" : "NULL")}, _nodeEnv={(_nodeEnv != null ? "OK" : "NULL")}");
 
             if (_onboarding == null)
             {
@@ -628,18 +629,18 @@ namespace OpenDesk.Presentation.UI.Onboarding
 
         private void BindInstallerProgress()
         {
-            if (_installer != null)
-            {
-                _installer.Progress.Subscribe(p =>
-                {
-                    if (_installProgressSlider != null) _installProgressSlider.value = p;
-                }).AddTo(this);
-
-                _installer.StatusText.Subscribe(t =>
-                {
-                    if (_installStatusText != null) _installStatusText.text = t;
-                }).AddTo(this);
-            }
+            // DEPRECATED 2026-04-27: OpenClaw installer 진행률 구독 제거.
+            // if (_installer != null)
+            // {
+            //     _installer.Progress.Subscribe(p =>
+            //     {
+            //         if (_installProgressSlider != null) _installProgressSlider.value = p;
+            //     }).AddTo(this);
+            //     _installer.StatusText.Subscribe(t =>
+            //     {
+            //         if (_installStatusText != null) _installStatusText.text = t;
+            //     }).AddTo(this);
+            // }
 
             if (_nodeEnv != null)
             {

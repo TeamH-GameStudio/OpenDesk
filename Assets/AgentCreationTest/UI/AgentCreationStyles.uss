@@ -1,0 +1,704 @@
+/* ============================================================
+   Agent Creation — implements §5 of opendesk-ui-onboarding
+   Source of truth: opendesk-onboarding.jsx (OnbAgent)
+   All values use tokens from ../../02.Scripts/UI/Theme/opendesk-tokens.uss
+   ============================================================ */
+
+.root {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: var(--n0);
+    color: var(--n900);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Header — 56px, centred title
+   ───────────────────────────────────────────────────────────── */
+.creation-header {
+    flex-direction: row;
+    align-items: center;
+    height: 56px;
+    padding: 0 20px;
+    flex-shrink: 0;
+}
+
+.creation-header__title {
+    flex-grow: 1;
+    color: var(--n900);
+    -unity-text-align: middle-center;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Body row — left 40 % preview, right 60 % step content
+   ───────────────────────────────────────────────────────────── */
+.creation-body {
+    flex-grow: 1;
+    flex-direction: row;
+    overflow: hidden;
+}
+
+.preview-pane {
+    width: 40%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px;
+}
+
+.preview-stack {
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Soft brand glow behind the avatar — UI Toolkit has no radial gradient,
+   so we approximate with a translucent capsule. */
+.avatar-glow {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border-radius: 100px;
+    background-color: var(--brand-tint);
+    opacity: 0.55;
+}
+
+.avatar-frame {
+    width: 180px;
+    height: 240px;
+    align-items: center;
+    justify-content: flex-end;
+    margin-bottom: 18px;
+}
+
+.avatar-stage {
+    width: 110px;
+    height: 230px;
+    align-self: center;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Avatar parts
+   ───────────────────────────────────────────────────────────── */
+.avatar-head {
+    position: absolute;
+    left: 23px;
+    top: 0;
+    width: 64px;
+    height: 64px;
+    border-radius: 32px;
+    overflow: visible;
+}
+
+.avatar-hair {
+    position: absolute;
+    left: 50%;
+    width: 60px;
+    height: 28px;
+    margin-left: -30px;
+    top: -4px;
+}
+.avatar-hair--rounded { width: 60px; height: 28px; margin-left: -30px; top: -4px;
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+.avatar-hair--spiky   { width: 64px; height: 26px; margin-left: -32px; top: -6px;
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
+.avatar-hair--bowl    { width: 68px; height: 32px; margin-left: -34px; top: -2px;
+    border-top-left-radius: 34px; border-top-right-radius: 34px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+.avatar-hair--side    { width: 60px; height: 30px; margin-left: -30px; top: -4px;
+    border-top-left-radius: 40px; border-top-right-radius: 20px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 12px; }
+.avatar-hair--wavy    { width: 64px; height: 30px; margin-left: -32px; top: -4px;
+    border-top-left-radius: 24px; border-top-right-radius: 18px;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+.avatar-hair--bun     { width: 60px; height: 28px; margin-left: -30px; top: -4px;
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+.avatar-hair--short   { width: 58px; height: 18px; margin-left: -29px; top: 0;
+    border-top-left-radius: 28px; border-top-right-radius: 28px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+.avatar-hair--long    { width: 60px; height: 36px; margin-left: -30px; top: -6px;
+    border-top-left-radius: 28px; border-top-right-radius: 28px;
+    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
+.avatar-hair--split   { width: 60px; height: 28px; margin-left: -30px; top: -4px;
+    border-top-left-radius: 20px; border-top-right-radius: 20px;
+    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; }
+
+.avatar-bun-extra {
+    position: absolute;
+    left: 50%;
+    top: -16px;
+    margin-left: -11px;
+    width: 22px;
+    height: 22px;
+    border-radius: 11px;
+    display: none;
+}
+.avatar-hair-shape--bun .avatar-bun-extra { display: flex; }
+
+.avatar-eye {
+    position: absolute;
+    background-color: #2A201A;
+}
+.avatar-eye--left  { left: 18px; top: 30px; }
+.avatar-eye--right { right: 18px; top: 30px; }
+
+.avatar-mouth {
+    position: absolute;
+    left: 50%;
+    top: 44px;
+    background-color: transparent;
+}
+
+.avatar-top {
+    position: absolute;
+    left: 50%;
+    top: 70px;
+    margin-left: -43px;
+    width: 86px;
+    height: 70px;
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.avatar-bottom {
+    position: absolute;
+    left: 50%;
+    top: 138px;
+    margin-left: -39px;
+    width: 78px;
+    height: 60px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.avatar-leg-split {
+    position: absolute;
+    left: 50%;
+    top: 8px;
+    bottom: 0;
+    margin-left: -1px;
+    width: 2px;
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.avatar-shoes {
+    position: absolute;
+    left: 50%;
+    top: 196px;
+    margin-left: -39px;
+    width: 78px;
+    height: 12px;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.avatar-shoe {
+    width: 32px;
+    height: 12px;
+}
+.avatar-shoe--left  { border-top-left-radius: 4px; border-bottom-left-radius: 4px;
+                     border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+.avatar-shoe--right { border-top-left-radius: 8px; border-bottom-left-radius: 8px;
+                     border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+
+.avatar-shadow {
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    margin-left: -65px;
+    width: 130px;
+    height: 10px;
+    border-radius: 5px;
+    background-color: rgba(36, 33, 30, 0.12);
+}
+
+/* Name / role / traits card under the avatar */
+.preview-card {
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    padding: 12px 16px;
+    align-items: center;
+    min-width: 200px;
+    max-width: 240px;
+}
+
+.preview-card__name {
+    color: var(--n900);
+    -unity-text-align: middle-center;
+}
+
+.preview-card__role {
+    color: var(--n500);
+    margin-top: 2px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.preview-card__traits {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.preview-card__trait {
+    padding: 3px 8px;
+    border-radius: var(--r-full);
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+    margin: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Right pane — step content
+   ───────────────────────────────────────────────────────────── */
+.step-pane {
+    width: 60%;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 16px 56px 24px 24px;
+}
+
+.step-content {
+    width: 100%;
+    max-width: 560px;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+/* Each step lives in its own root; View toggles display per step.
+   Default behaviour stacks title/body/nav as a compact group and centres
+   that group vertically inside the step pane. The wardrobe step opts out
+   — the option grid grows to fill the available space instead. */
+.step {
+    flex-direction: column;
+    flex-grow: 1;
+    justify-content: center;
+    display: none;
+}
+.step--active { display: flex; }
+.step--wardrobe { justify-content: flex-start; }
+
+.step-title-row {
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.step-title {
+    color: var(--n900);
+    margin-bottom: 4px;
+    -unity-text-align: middle-center;
+}
+
+.step-subtitle {
+    color: var(--n500);
+    -unity-text-align: middle-center;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Inputs (TextField inside the row)
+   ───────────────────────────────────────────────────────────── */
+.field-input {
+    margin-bottom: 24px;
+}
+
+.field-input > .unity-text-field__input {
+    height: 56px;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-top-left-radius: var(--r-md);
+    border-top-right-radius: var(--r-md);
+    border-bottom-left-radius: var(--r-md);
+    border-bottom-right-radius: var(--r-md);
+    padding: 0 16px;
+    color: var(--n900);
+    font-size: 16px;
+    -unity-text-align: middle-left;
+    transition-property: border-color;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: ease-out;
+}
+
+.field-input > .unity-text-field__input:focus {
+    border-color: var(--brand-signature);
+}
+
+/* Force black text on the inner TextElement — Unity's default
+   `--unity-text-color` resolves to a mid-grey on TextField inputs. */
+.field-input .unity-text-element {
+    color: var(--n900);
+}
+.field-input {
+    color: var(--n900);
+}
+
+.field-input--with-helper {
+    margin-bottom: 8px;
+}
+
+.field-helper {
+    color: var(--n500);
+    margin-bottom: 24px;
+    white-space: normal;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Nav row — prev (n0) + next (brand-signature)
+   ───────────────────────────────────────────────────────────── */
+.nav-row {
+    flex-direction: row;
+    flex-shrink: 0;
+}
+
+.nav-btn {
+    height: 56px;
+    border-radius: var(--r-md);
+    border-width: 0;
+    font-size: 16px;
+    -unity-text-align: middle-center;
+    transition-property: background-color;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: ease-out;
+}
+
+.nav-btn--prev {
+    width: 112px;
+    margin-right: 8px;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    color: var(--n700);
+}
+.nav-btn--prev:hover { background-color: var(--n50); }
+
+.nav-btn--next {
+    flex-grow: 1;
+    background-color: var(--brand-signature);
+    color: var(--n0);
+}
+.nav-btn--next:hover  { background-color: var(--brand-hover); }
+.nav-btn--next:active { background-color: var(--brand-pressed); }
+.nav-btn--next:disabled { background-color: var(--n200); color: var(--n400); opacity: 1; }
+
+/* ─────────────────────────────────────────────────────────────
+   Trait chips
+   ───────────────────────────────────────────────────────────── */
+.trait-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.trait-chip {
+    padding: 7px 14px;
+    border-radius: var(--r-lg);
+    border-width: 1px;
+    border-color: var(--n200);
+    background-color: var(--n0);
+    color: var(--n700);
+    margin: 4px 8px 4px 0;
+    transition-property: background-color, border-color, color;
+    transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out, ease-out;
+}
+.trait-chip:hover {
+    border-color: var(--n300);
+}
+.trait-chip--selected {
+    border-color: var(--brand-signature);
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+}
+.trait-chip--disabled {
+    background-color: var(--n50);
+    color: var(--n300);
+    border-color: var(--n200);
+    opacity: 1;
+}
+
+.trait-chip__add {
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n500);
+    border-color: var(--n300);
+}
+
+.trait-input-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 6px 4px 12px;
+    border-radius: var(--r-lg);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    background-color: var(--n0);
+    margin: 4px 8px 4px 0;
+}
+
+.trait-input-row > .unity-text-field__input {
+    width: 110px;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: var(--n900);
+    font-size: 13px;
+    padding: 0;
+}
+
+.trait-input-cancel {
+    width: 22px;
+    height: 22px;
+    border-radius: 11px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n400);
+    margin-left: 2px;
+    -unity-text-align: middle-center;
+}
+
+.selected-traits-block {
+    margin-bottom: 20px;
+}
+
+.selected-traits-label {
+    color: var(--n500);
+    -unity-font-style: bold;
+    margin-bottom: 8px;
+}
+
+.selected-traits-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.selected-trait {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 8px 6px 12px;
+    border-radius: var(--r-lg);
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    margin: 3px 6px 3px 0;
+}
+
+.selected-trait__remove {
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--brand-pressed);
+    margin-left: 6px;
+    -unity-text-align: middle-center;
+    font-size: 12px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Wardrobe — part tabs + 3×3 option grid + randomise
+   ───────────────────────────────────────────────────────────── */
+.part-tabs {
+    flex-direction: row;
+    padding: 4px;
+    background-color: var(--n50);
+    border-radius: var(--r-md);
+    margin-bottom: 14px;
+    flex-shrink: 0;
+}
+
+.part-tab {
+    flex-grow: 1;
+    height: 32px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n500);
+    margin: 0 1px;
+    border-radius: var(--r-sm);
+    -unity-text-align: middle-center;
+    transition-property: background-color, color;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+}
+.part-tab:hover { color: var(--n700); }
+.part-tab--active {
+    background-color: var(--n0);
+    color: var(--n900);
+    -unity-font-style: bold;
+}
+
+.option-scroll {
+    flex-grow: 1;
+    margin-bottom: 12px;
+}
+
+.option-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.option-cell {
+    width: 30%;
+    height: 90px;
+    margin: 4px 1.5%;
+    border-radius: var(--r-md);
+    border-width: 2px;
+    border-color: var(--n200);
+    background-color: var(--n0);
+    align-items: center;
+    justify-content: center;
+    color: var(--n400);
+    transition-property: border-color, background-color;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+}
+.option-cell:hover {
+    border-color: var(--n300);
+}
+.option-cell--selected {
+    border-color: var(--brand-signature);
+    background-color: var(--brand-tint);
+}
+
+.option-swatch {
+    width: 54px;
+    height: 54px;
+    border-radius: var(--r-sm);
+    background-color: var(--n100);
+    align-items: center;
+    justify-content: center;
+    color: var(--n400);
+    -unity-font-style: bold;
+}
+
+.option-check {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    -unity-text-align: middle-center;
+    font-size: 10px;
+    -unity-font-style: bold;
+    display: none;
+}
+.option-cell--selected .option-check { display: flex; }
+
+.randomize-btn {
+    height: 36px;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n300);
+    border-radius: var(--r-md);
+    color: var(--n700);
+    margin-bottom: 8px;
+    -unity-text-align: middle-center;
+    transition-property: background-color;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: ease-out;
+}
+.randomize-btn:hover { background-color: var(--n50); }
+
+/* ─────────────────────────────────────────────────────────────
+   Model cards
+   ───────────────────────────────────────────────────────────── */
+.model-list {
+    flex-direction: column;
+    margin-bottom: 24px;
+}
+
+.model-card {
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 14px;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    margin-bottom: 10px;
+    transition-property: background-color, border-color;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+}
+.model-card:hover {
+    border-color: var(--n300);
+}
+.model-card--selected {
+    background-color: var(--brand-tint);
+    border-color: var(--brand-signature);
+}
+.model-card--locked {
+    opacity: 0.7;
+}
+
+.model-radio {
+    width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    border-width: 1px;
+    border-color: var(--n300);
+    background-color: var(--n0);
+    margin-right: 12px;
+    margin-top: 2px;
+    align-items: center;
+    justify-content: center;
+}
+.model-card--selected .model-radio {
+    border-color: var(--brand-signature);
+}
+
+.model-radio__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background-color: var(--brand-signature);
+    display: none;
+}
+.model-card--selected .model-radio__dot { display: flex; }
+
+.model-text {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.model-name-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.model-name {
+    color: var(--n900);
+    -unity-font-style: bold;
+}
+.model-card--locked .model-name { color: var(--n400); }
+
+.model-lock {
+    color: var(--n400);
+    margin-left: 6px;
+    font-size: 12px;
+    display: none;
+}
+.model-card--locked .model-lock { display: flex; }
+
+.model-desc {
+    color: var(--n500);
+    margin-top: 2px;
+    white-space: normal;
+}
+.model-card--locked .model-desc { color: var(--n400); }
+
+.model-badge {
+    color: var(--success);
+    -unity-font-style: bold;
+    margin-left: 8px;
+    -unity-text-align: middle-right;
+}

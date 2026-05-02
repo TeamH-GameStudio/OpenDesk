@@ -12,7 +12,7 @@ namespace OpenDesk.Core.Models
         public string IconUrl      { get; set; } = "";
         public bool   IsInstalled  { get; set; }
         public bool   IsSandboxed  { get; set; } = true; // 기본: 샌드박스 ON
-        public string InstallPath  { get; set; } = "";   // ~/.openclaw/skills/{name}/
+        public string InstallPath  { get; set; } = "";   // ~/.opendesk/skills/{name}/ (2026-04-27 ~/.openclaw에서 마이그레이션)
         public float  Rating       { get; set; }         // 0.0 ~ 5.0
         public int    Downloads    { get; set; }
     }

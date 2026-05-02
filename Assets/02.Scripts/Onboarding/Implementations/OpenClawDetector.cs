@@ -14,6 +14,7 @@ namespace OpenDesk.Onboarding.Implementations
     /// - 크로스플랫폼 (Windows/macOS/Linux)
     /// - WSL2 환경 내 설치도 감지
     /// </summary>
+    [Obsolete("OpenClaw legacy. Replaced by Claude CLI/Anthropic API path (IClaudeService). Will be removed once Anthropic-direct migration is fully verified.", error: false)]
     public class OpenClawDetector : IOpenClawDetector
     {
         // 플랫폼별 기본 설치 경로

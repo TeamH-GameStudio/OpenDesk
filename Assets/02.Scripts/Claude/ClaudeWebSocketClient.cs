@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Cysharp.Threading.Tasks;
 using NativeWebSocket;
 using OpenDesk.Claude.Models;
 using UnityEngine;
@@ -51,10 +52,10 @@ namespace OpenDesk.Claude
 
         // ── 생명주기 ──────────────────────────────────────────
 
-        private async void Start()
+        private void Start()
         {
             _cts = new CancellationTokenSource();
-            await ConnectAsync();
+            ConnectAsync().Forget();
         }
 
         private void Update()
@@ -84,22 +85,22 @@ namespace OpenDesk.Claude
 
         // ── 연결 ──────────────────────────────────────────────
 
-        public async Cysharp.Threading.Tasks.UniTask ConnectAsync()
+        public async UniTask ConnectAsync(CancellationToken ct = default)
         {
             _intentionalDisconnect = false;
             _reconnectAttempts = 0;
 
-            await CreateAndConnect();
+            await CreateAndConnect(ct);
         }
 
-        public async Cysharp.Threading.Tasks.UniTask DisconnectAsync()
+        public async UniTask DisconnectAsync()
         {
             _intentionalDisconnect = true;
             if (_socket != null && _socket.State == WebSocketState.Open)
                 await _socket.Close();
         }
 
-        private async Cysharp.Threading.Tasks.UniTask CreateAndConnect()
+        private async UniTask CreateAndConnect(CancellationToken ct = default)
         {
             // 기존 소켓 정리
             if (_socket != null)
@@ -121,12 +122,15 @@ namespace OpenDesk.Claude
 
             try
             {
+                ct.ThrowIfCancellationRequested();
                 // NativeWebSocket.Connect()는 연결 종료까지 반환하지 않으므로 fire-and-forget
                 _socket.Connect().ContinueWith(
                     _ => { },
                     System.Threading.Tasks.TaskContinuationOptions.ExecuteSynchronously
                 );
+                await UniTask.Yield();
             }
+            catch (OperationCanceledException) { /* 정상 취소 */ }
             catch (Exception ex)
             {
                 Debug.LogError($"[ClaudeWS] 연결 실패: {ex.Message}");
@@ -135,7 +139,9 @@ namespace OpenDesk.Claude
 
         // ── 전송 메서드 ───────────────────────────────────────
 
-        public async void SendChat(string message)
+        public void SendChat(string message) => SendChatAsync(message).Forget();
+
+        public async UniTask SendChatAsync(string message)
         {
             if (!_isConnected || _socket == null)
             {
@@ -143,34 +149,71 @@ namespace OpenDesk.Claude
                 return;
             }
 
-            var req = new ChatRequest { message = message };
-            var json = JsonUtility.ToJson(req);
-            Debug.Log($"[ClaudeWS] 전송: {message.Substring(0, Math.Min(message.Length, 50))}...");
-            await _socket.SendText(json);
+            try
+            {
+                var req = new ChatRequest { message = message };
+                var json = JsonUtility.ToJson(req);
+                Debug.Log($"[ClaudeWS] 전송: {message.Substring(0, Math.Min(message.Length, 50))}...");
+                await _socket.SendText(json);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ClaudeWS] SendChat 실패: {ex.Message}");
+                OnError?.Invoke($"메시지 전송 실패: {ex.Message}");
+            }
         }
 
-        public async void SendClear()
+        public void SendClear() => SendClearAsync().Forget();
+
+        public async UniTask SendClearAsync()
         {
             if (!_isConnected || _socket == null) return;
-            var json = JsonUtility.ToJson(new ClearRequest());
-            await _socket.SendText(json);
+            try
+            {
+                var json = JsonUtility.ToJson(new ClearRequest());
+                await _socket.SendText(json);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ClaudeWS] SendClear 실패: {ex.Message}");
+            }
         }
 
-        public async void SendConfig(string systemPrompt)
+        public void SendConfig(string systemPrompt) => SendConfigAsync(systemPrompt).Forget();
+
+        public async UniTask SendConfigAsync(string systemPrompt)
         {
             if (!_isConnected || _socket == null) return;
-            var req = new ConfigRequest { systemPrompt = systemPrompt };
-            await _socket.SendText(JsonUtility.ToJson(req));
+            try
+            {
+                var req = new ConfigRequest { systemPrompt = systemPrompt };
+                await _socket.SendText(JsonUtility.ToJson(req));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ClaudeWS] SendConfig 실패: {ex.Message}");
+            }
         }
 
-        public async void SendPing()
+        public void SendPing() => SendPingAsync().Forget();
+
+        public async UniTask SendPingAsync()
         {
             if (!_isConnected || _socket == null) return;
-            await _socket.SendText(JsonUtility.ToJson(new PingRequest()));
+            try
+            {
+                await _socket.SendText(JsonUtility.ToJson(new PingRequest()));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ClaudeWS] SendPing 실패: {ex.Message}");
+            }
         }
 
         /// <summary>대화 히스토리 JSON을 전송하여 세션 이어나기</summary>
-        public async void SendResume(string conversationJson)
+        public void SendResume(string conversationJson) => SendResumeAsync(conversationJson).Forget();
+
+        public async UniTask SendResumeAsync(string conversationJson)
         {
             if (!_isConnected || _socket == null)
             {
@@ -178,10 +221,18 @@ namespace OpenDesk.Claude
                 return;
             }
 
-            var req = new ResumeRequest { conversation = conversationJson };
-            var json = JsonUtility.ToJson(req);
-            Debug.Log($"[ClaudeWS] resume 전송: {conversationJson.Length}자");
-            await _socket.SendText(json);
+            try
+            {
+                var req = new ResumeRequest { conversation = conversationJson };
+                var json = JsonUtility.ToJson(req);
+                Debug.Log($"[ClaudeWS] resume 전송: {conversationJson.Length}자");
+                await _socket.SendText(json);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ClaudeWS] SendResume 실패: {ex.Message}");
+                OnError?.Invoke($"세션 복원 실패: {ex.Message}");
+            }
         }
 
         // ── WebSocket 이벤트 핸들러 ───────────────────────────
@@ -276,12 +327,12 @@ namespace OpenDesk.Claude
             }
 
             if (!_intentionalDisconnect)
-                TryReconnect();
+                TryReconnectAsync().Forget();
         }
 
         // ── 자동 재연결 ──────────────────────────────────────
 
-        private async void TryReconnect()
+        private async UniTask TryReconnectAsync()
         {
             if (_intentionalDisconnect) return;
             if (_reconnectAttempts >= _maxReconnectAttempts)
@@ -294,13 +345,21 @@ namespace OpenDesk.Claude
             _reconnectAttempts++;
             Debug.Log($"[ClaudeWS] 재연결 시도 {_reconnectAttempts}/{_maxReconnectAttempts} ({_reconnectInterval}초 후)");
 
-            await Cysharp.Threading.Tasks.UniTask.Delay(
-                (int)(_reconnectInterval * 1000),
-                cancellationToken: _cts.Token
-            );
+            try
+            {
+                await UniTask.Delay(
+                    (int)(_reconnectInterval * 1000),
+                    cancellationToken: _cts.Token
+                );
 
-            if (!_intentionalDisconnect && !_isConnected)
-                await CreateAndConnect();
+                if (!_intentionalDisconnect && !_isConnected)
+                    await CreateAndConnect(_cts.Token);
+            }
+            catch (OperationCanceledException) { /* 정상 취소 */ }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ClaudeWS] 재연결 실패: {ex.Message}");
+            }
         }
     }
 }

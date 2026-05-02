@@ -42,11 +42,15 @@ namespace OpenDesk.Onboarding.Installers
 
             // ── 온보딩 전용 서비스 ────────────────────────────────────────
 
-            builder.Register<OpenClawDetector>(Lifetime.Singleton)
-                   .As<IOpenClawDetector>();
-
-            builder.Register<OpenClawInstaller>(Lifetime.Singleton)
-                   .As<IOpenClawInstaller>();
+            // DEPRECATED: OpenClaw legacy. Detector/Installer unregistered 2026-04-27.
+            // OnboardingScene 셸은 유지하되 OpenClaw 자동설치 단계는 비활성.
+#pragma warning disable CS0618
+            // builder.Register<OpenClawDetector>(Lifetime.Singleton)
+            //        .As<IOpenClawDetector>();
+            //
+            // builder.Register<OpenClawInstaller>(Lifetime.Singleton)
+            //        .As<IOpenClawInstaller>();
+#pragma warning restore CS0618
 
             builder.Register<AgentConfigParser>(Lifetime.Transient)
                    .As<IAgentConfigParser>();
@@ -60,8 +64,7 @@ namespace OpenDesk.Onboarding.Installers
             Debug.Log("[VContainer] RollbackService 등록 완료");
 
             // ── 오케스트레이터 ────────────────────────────────────────────
-            // IOpenClawBridgeService, IWorkspaceService는
-            // 부모 CoreInstaller에서 자동으로 주입됨
+            // DEPRECATED: IOpenClawBridgeService 의존성 제거됨 (OnboardingService 생성자 변경 2026-04-27)
             builder.Register<OnboardingService>(Lifetime.Singleton)
                    .As<IOnboardingService>();
 

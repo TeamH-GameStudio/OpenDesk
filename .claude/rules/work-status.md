@@ -1,4 +1,50 @@
-# 작업 현황 (2026-04-01 최종 갱신)
+# 작업 현황 (2026-04-27 최종 갱신)
+
+## AI 백엔드 이중화 — IAiChatService Facade (2026-04-27)
+
+추후 다른 AI 모델(OpenAI, Gemini 등) 통합 가능하도록 인터페이스 일반화 + 두 가지 Anthropic 백엔드 구현.
+
+| 항목 | 상세 |
+|------|------|
+| 인터페이스 | `IClaudeService` → **`IAiChatService`** (모델/제공자 비종속) |
+| 구현체 1 (CLI) | `ClaudeService` → **`AnthropicCliChatService`** (Python 미들웨어 + Claude CLI subprocess, MCP 지원) |
+| 구현체 2 (API) | **`AnthropicApiChatService`** 신규 — HttpClient + SSE 스트리밍, 외부 프로세스 불필요 |
+| 백엔드 토글 | PlayerPrefs `OpenDesk_ChatBackend` ("cli" \| "api"), 디폴트 "cli" |
+| 토글 UI | 에디터 메뉴 `OpenDesk > AI Backend > Use CLI/API/Show current` |
+| 미들웨어 자동기동 | `MiddlewareLauncher`가 백엔드 키 읽어 API 모드일 땐 스킵 |
+| 키 소스 | `IApiKeyVaultService.GetKeyAsync("anthropic")` |
+| 모델 | PlayerPrefs `OpenDesk_AnthropicModel` (디폴트 `claude-sonnet-4-5`) |
+| ChatPanelController | `ClaudeWebSocketClient` 직접 의존 → `IAiChatService` DI로 교체 |
+| DiskettePrinterController | 동일하게 IAiChatService로 마이그레이션 |
+
+**확장 패턴:** 새 백엔드는 `IAiChatService` 구현 → `AgentOfficeInstaller`의 토글 분기에 추가만 하면 됨.
+
+---
+
+## OpenClaw 레거시 Deprecated 처리 (2026-04-27)
+
+OpenClaw → Anthropic API 전환 후 잔존 코드를 가역적으로 비활성화. **삭제 없음, 모두 코멘트/Obsolete 처리**.
+
+| 작업 | 결과 |
+|------|------|
+| `[Obsolete]` 부착 | OpenClaw 7개 (`OpenClawBridgeService`, `IOpenClawBridgeService`, `OpenClawInstaller`, `OpenClawDetector`, `IOpenClawInstaller`, `IOpenClawDetector`, `EventParserService`, `IEventParserService`) |
+| DI 등록 비활성 | `CoreInstaller`(Bridge/EventParser), `OnboardingInstaller`(Detector/Installer) 코멘트 아웃 |
+| `AppBootstrapper` 경량화 | Bridge 의존 제거, CostMonitor만 활성. 거대 주석으로 원본 보존 |
+| `OnboardingService` stub | 600줄 본문 → 인자 없는 stub 생성자 + ReadyToEnter 즉시 전환. 원본은 거대 주석 |
+| `SecurityAuditService` | `RunExternalAuditAsync` 거대 주석 처리, `~/.openclaw` → `~/.opendesk` |
+| Skill 경로 마이그레이션 | `OpenDeskPaths` 신설, `SkillMarketService`/`ChannelService`/`SkillEntry`가 `~/.opendesk/skills/` 사용 |
+| UI 컨트롤러 6개 정리 | `[Inject] IOpenClawBridgeService/IOpenClawInstaller` 코멘트 + 사용처 비활성 (`TopBar`, `TerminalChat`, `Settings`, `OfficeWizard`, `OnboardingUI`, `OnboardingAppUI`) |
+| PlayerPrefs 키 | `OpenDesk_GatewayUrl`/`OpenDesk_GatewayToken`/`OpenDesk_MockMode` 쓰기 라인 코멘트 |
+| Tests 비활성화 | `OnboardingServiceTests`는 `#if OPENCLAW_LEGACY` 가드로 컴파일 제외 |
+| **보존** | Python 미들웨어 전체, `IClaudeService` 계열, `AgentEquipment`/`Pipeline` 계열, `AgentStateService`/`SubAgentService`, `ClawRouterService`(보류) |
+
+**규칙:** 새 코드는 OpenClaw 타입을 참조하지 말 것. `[Obsolete]` 경고가 사용처를 가시화한다.
+
+**검증 필요 (사용자 수동):** Unity 에디터에서 컴파일 → AgentOfficeScene/OnboardingScene/TestChattingScene Play로 동작 확인.
+
+---
+
+# 작업 현황 (2026-04-01 갱신)
 
 작업 정리 폴더: `C:/Users/user/Desktop/OpenDesk/작업정리/`
 

@@ -3,12 +3,14 @@ using Cysharp.Threading.Tasks;
 using OpenDesk.AgentCreation.Models;
 using OpenDesk.Claude;
 using OpenDesk.Core.Models;
+using OpenDesk.Core.Services;
 using OpenDesk.Presentation.Character;
 using OpenDesk.Pipeline;
 using OpenDesk.SkillDiskette;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using VContainer;
 
 namespace OpenDesk.Presentation.UI.Session
 {
@@ -45,9 +47,21 @@ namespace OpenDesk.Presentation.UI.Session
         [Header("Empty")]
         [SerializeField] private GameObject _emptyHint;
 
-        [Header("Claude")]
+        [Header("Claude (Inspector binding — used only as fallback if DI-injected service is unavailable)")]
         [SerializeField] private ClaudeWebSocketClient _claudeClient;
         [SerializeField] private MiddlewareLauncher _middlewareLauncher;
+
+        // ── AI 백엔드 (DI) ──────────────────────────────────
+        // CLI 백엔드: AnthropicCliChatService → ClaudeWebSocketClient 래핑
+        // API 백엔드: AnthropicApiChatService → HTTP 직접 호출
+        // 토글: PlayerPrefs `OpenDesk_ChatBackend` ("cli" | "api")
+        private IAiChatService _chat;
+
+        [Inject]
+        public void Construct(IAiChatService chat)
+        {
+            _chat = chat;
+        }
 
         // ── 상태 ────────────────────────────────────────────
         private string _currentSessionId;
@@ -89,23 +103,23 @@ namespace OpenDesk.Presentation.UI.Session
 
             if (_panelRoot != null) _panelRoot.SetActive(false);
 
-            if (_claudeClient != null)
+            if (_chat != null)
             {
-                _claudeClient.OnDelta += HandleDelta;
-                _claudeClient.OnFinal += HandleFinal;
-                _claudeClient.OnError += HandleError;
-                _claudeClient.OnStatus += HandleStatus;
+                _chat.OnDelta  += HandleDelta;
+                _chat.OnFinal  += HandleFinal;
+                _chat.OnError  += HandleError;
+                _chat.OnStatus += HandleStatus;
             }
         }
 
         private void OnDestroy()
         {
-            if (_claudeClient != null)
+            if (_chat != null)
             {
-                _claudeClient.OnDelta -= HandleDelta;
-                _claudeClient.OnFinal -= HandleFinal;
-                _claudeClient.OnError -= HandleError;
-                _claudeClient.OnStatus -= HandleStatus;
+                _chat.OnDelta  -= HandleDelta;
+                _chat.OnFinal  -= HandleFinal;
+                _chat.OnError  -= HandleError;
+                _chat.OnStatus -= HandleStatus;
             }
         }
 
@@ -211,18 +225,18 @@ namespace OpenDesk.Presentation.UI.Session
 
         private void ResumeSession()
         {
-            if (_claudeClient == null || !_claudeClient.IsConnected) return;
+            if (_chat == null || !_chat.IsConnected) return;
 
             var convFile = ChatMessageStore.LoadConversationFile(_currentSessionId);
             if (convFile == null || convFile.Messages.Count == 0)
             {
-                _claudeClient.SendClear();
+                _chat.ClearHistory();
                 ApplySystemPrompt();
                 return;
             }
 
             var historyJson = JsonUtility.ToJson(convFile);
-            _claudeClient.SendResume(historyJson);
+            _chat.ResumeSession(historyJson);
         }
 
         /// <summary>
@@ -231,18 +245,16 @@ namespace OpenDesk.Presentation.UI.Session
         /// </summary>
         private void ApplySystemPrompt()
         {
-            if (_claudeClient == null || !_claudeClient.IsConnected) return;
+            if (_chat == null || !_chat.IsConnected) return;
 
             var equipment = _linkedCharCtrl?.Equipment;
             if (equipment != null)
             {
-                // 에이전트 프로필 + Soul 자동 로드
                 var tone = _linkedCharCtrl.Profile != null
                     ? _linkedCharCtrl.Profile.Tone
                     : AgentTone.None;
                 equipment.SetAgentProfile(_currentAgentName, _currentRole, tone);
 
-                // 파이프라인 매니저가 있으면 파일 컨텍스트도 포함
                 var pipeline = FindFirstObjectByType<OfficePipelineManager>();
                 var prompt = pipeline != null
                     ? pipeline.BuildFullSystemPrompt(equipment)
@@ -250,7 +262,7 @@ namespace OpenDesk.Presentation.UI.Session
 
                 if (!string.IsNullOrEmpty(prompt))
                 {
-                    _claudeClient.SendConfig(prompt);
+                    _chat.SetSystemPrompt(prompt);
                     var fileCount = pipeline?.Inbox?.FilePaths?.Count ?? 0;
                     Debug.Log($"[ChatPanel] System prompt 적용 ({prompt.Length}자, 디스켓 {equipment.EquippedDisks.Count}개, 파일 {fileCount}개)");
                     return;
@@ -259,7 +271,7 @@ namespace OpenDesk.Presentation.UI.Session
 
             // fallback: 디스켓 없을 때 기본 프롬프트
             var fallbackRole = RoleNames.GetValueOrDefault(_currentRole, "에이전트");
-            _claudeClient.SendConfig(
+            _chat.SetSystemPrompt(
                 $"당신은 '{_currentAgentName}'이라는 이름의 {fallbackRole} 전문 에이전트입니다. " +
                 "한국어로 대화하며, 사용자의 요청에 전문적으로 답변합니다.");
         }
@@ -299,18 +311,18 @@ namespace OpenDesk.Presentation.UI.Session
             // 장착 디스켓 변경 반영 (매 메시지마다 최신 prompt 적용)
             ApplySystemPrompt();
 
-            if (_claudeClient != null && _claudeClient.IsConnected)
+            if (_chat != null && _chat.IsConnected)
             {
                 _streamingContent = "";
                 _streamingBubble = SpawnBubble(ChatSender.Agent, "...", System.DateTime.Now, true);
                 _streamingText = _streamingBubble?.GetComponentInChildren<TMP_Text>();
 
-                _claudeClient.SendChat(text);
+                _chat.SendMessage(text);
             }
             else
             {
                 SpawnBubble(ChatSender.System,
-                    "Claude 서버에 연결되지 않았습니다. 미들웨어 실행 상태를 확인해주세요.",
+                    "AI 백엔드에 연결되지 않았습니다. (CLI: 미들웨어 실행 / API: Anthropic 키 설정 확인)",
                     System.DateTime.Now, true);
 
                 SetAgentState(AgentActionType.Idle);

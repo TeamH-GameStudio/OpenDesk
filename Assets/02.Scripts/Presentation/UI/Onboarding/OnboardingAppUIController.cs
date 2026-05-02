@@ -18,7 +18,8 @@ namespace OpenDesk.Presentation.UI.Onboarding
     public class OnboardingAppUIController : MonoBehaviour
     {
         [Inject] private IOnboardingService      _onboarding;
-        [Inject] private IOpenClawInstaller      _installer;
+        // DEPRECATED 2026-04-27: OpenClaw installer DI 제거.
+        // [Inject] private IOpenClawInstaller      _installer;
         [Inject] private INodeEnvironmentService _nodeEnv;
 
         // ── App UI 루트 요소들 ────────────────────────────────────────
@@ -70,8 +71,9 @@ namespace OpenDesk.Presentation.UI.Onboarding
             }
 
             // 설치 진행률 바인딩
-            _installer?.Progress.Subscribe(p => _installProgress.value = p).AddTo(this);
-            _installer?.StatusText.Subscribe(t => _installStatusText.text = t).AddTo(this);
+            // DEPRECATED 2026-04-27: OpenClaw installer 진행률 제거.
+            // _installer?.Progress.Subscribe(p => _installProgress.value = p).AddTo(this);
+            // _installer?.StatusText.Subscribe(t => _installStatusText.text = t).AddTo(this);
             _nodeEnv?.Progress.Subscribe(p => _installProgress.value = p).AddTo(this);
             _nodeEnv?.StatusText.Subscribe(t => _installStatusText.text = t).AddTo(this);
 

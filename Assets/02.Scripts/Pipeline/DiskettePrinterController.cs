@@ -30,10 +30,10 @@ namespace OpenDesk.Pipeline
         [SerializeField] private TextMeshProUGUI _toggleLabel;
 
         // ── DI ──
-        private IClaudeService _claudeService;
+        private IAiChatService _claudeService;
 
         [Inject]
-        public void Construct(IClaudeService claudeService)
+        public void Construct(IAiChatService claudeService)
         {
             _claudeService = claudeService;
         }

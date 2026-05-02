@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -30,11 +31,21 @@ namespace OpenDesk.Claude
         private Process _process;
         private CancellationTokenSource _cts;
 
-        private async void Start()
+        private void Start() => StartAsync().Forget();
+
+        private async UniTask StartAsync()
         {
             if (!_autoLaunch)
             {
                 Debug.Log("[MiddlewareLauncher] 자동 실행 비활성");
+                return;
+            }
+
+            // API 백엔드 선택 시 미들웨어 불필요 — 스킵
+            var backend = PlayerPrefs.GetString("OpenDesk_ChatBackend", "cli");
+            if (backend == "api")
+            {
+                Debug.Log("[MiddlewareLauncher] AI 백엔드: api — Python 미들웨어 기동 스킵");
                 return;
             }
 
@@ -47,13 +58,20 @@ namespace OpenDesk.Claude
 #else
                 LaunchBuildMode();
 #endif
+                if (_process == null)
+                {
+                    Debug.LogWarning("[MiddlewareLauncher] 프로세스 시작 실패 (실행 파일 없음)");
+                    return;
+                }
+
                 Debug.Log($"[MiddlewareLauncher] 미들웨어 시작: PID={_process.Id}");
 
-                await Cysharp.Threading.Tasks.UniTask.Delay(
+                await UniTask.Delay(
                     (int)(_startupDelay * 1000),
                     cancellationToken: _cts.Token
                 );
             }
+            catch (System.OperationCanceledException) { /* 정상 취소 */ }
             catch (System.Exception ex)
             {
                 Debug.LogError($"[MiddlewareLauncher] 미들웨어 시작 실패: {ex.Message}");
@@ -135,13 +153,33 @@ namespace OpenDesk.Claude
             _process.Start();
         }
 
-        /// <summary>Python 실행 경로 탐색 — Inspector 지정 > WindowsApps > PATH 순</summary>
+        /// <summary>Python 실행 경로 탐색 — Inspector 지정 > 플랫폼별 일반 경로 > PATH 폴백</summary>
         private string ResolvePythonPath()
         {
             // 1) Inspector에서 직접 지정한 경우
             if (!string.IsNullOrEmpty(_pythonPath) && File.Exists(_pythonPath))
                 return _pythonPath;
 
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+            // macOS: python3 우선 (system python은 macOS 12.3+에서 제거됨)
+            var macCandidates = new[]
+            {
+                "/opt/homebrew/bin/python3",   // Apple Silicon Homebrew
+                "/usr/local/bin/python3",      // Intel Homebrew
+                "/usr/bin/python3",            // Xcode Command Line Tools
+            };
+            foreach (var p in macCandidates)
+                if (File.Exists(p)) return p;
+
+            Debug.LogWarning("[MiddlewareLauncher] macOS Python 경로를 찾을 수 없음 — 'python3' 로 시도");
+            return "python3";
+#elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+            var linuxCandidates = new[] { "/usr/bin/python3", "/usr/local/bin/python3" };
+            foreach (var p in linuxCandidates)
+                if (File.Exists(p)) return p;
+            return "python3";
+#else
+            // Windows
             // 2) WindowsApps python3.exe / python.exe 탐색
             var windowsApps = Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
@@ -166,13 +204,11 @@ namespace OpenDesk.Claude
             foreach (var basePath in programPaths)
             {
                 if (!Directory.Exists(basePath)) continue;
-                // Programs/Python/Python3xx/ 구조
                 foreach (var dir in Directory.GetDirectories(basePath, "Python*"))
                 {
                     var exe = Path.Combine(dir, "python.exe");
                     if (File.Exists(exe)) return exe;
                 }
-                // 직접 python.exe
                 var direct = Path.Combine(basePath, "python.exe");
                 if (File.Exists(direct)) return direct;
             }
@@ -180,6 +216,7 @@ namespace OpenDesk.Claude
             // 4) 폴백: PATH에서 찾기를 기대
             Debug.LogWarning("[MiddlewareLauncher] Python 경로를 찾을 수 없음 — 'python' 으로 시도");
             return "python";
+#endif
         }
 
         private void OnApplicationQuit()

@@ -26,7 +26,23 @@ namespace OpenDesk.AgentCreation.Installers
             builder.RegisterComponentInHierarchy<ChatPanelController>();
             builder.RegisterComponentInHierarchy<AgentClickHandler>();
             builder.RegisterComponentInHierarchy<ClaudeWebSocketClient>();
-            builder.Register<ClaudeService>(Lifetime.Scoped).As<IClaudeService>();
+
+            // ── AI 채팅 백엔드 선택 ──────────────────────────────────────
+            // PlayerPrefs `OpenDesk_ChatBackend` 키로 토글:
+            //   "cli" (기본): Anthropic Claude CLI subprocess + Python 미들웨어 (MCP 지원)
+            //   "api"       : Anthropic Messages API HTTP 직접 호출 (경량, 빠름)
+            var backend = PlayerPrefs.GetString("OpenDesk_ChatBackend", "cli");
+            if (backend == "api")
+            {
+                builder.Register<AnthropicApiChatService>(Lifetime.Scoped).As<IAiChatService>();
+                Debug.Log("[VContainer] AI 백엔드: AnthropicApiChatService (HTTP 직접)");
+            }
+            else
+            {
+                builder.Register<AnthropicCliChatService>(Lifetime.Scoped).As<IAiChatService>();
+                Debug.Log("[VContainer] AI 백엔드: AnthropicCliChatService (Python 미들웨어)");
+            }
+
             builder.RegisterComponentInHierarchy<DiskettePrinterController>();
 
             Debug.Log("[VContainer] AgentOfficeInstaller.Configure() 완료");

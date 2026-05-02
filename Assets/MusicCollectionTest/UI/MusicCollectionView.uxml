@@ -1,0 +1,32 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/MusicCollectionTest/UI/MusicCollectionStyles.uss?fileID=7433441132597879392&amp;guid=153fa467e4e0e425dae81676f5354645&amp;type=3#MusicCollectionStyles"/>
+    <ui:VisualElement name="root" enabled="true" class="root" style="visibility: visible; display: flex; background-color: rgba(241, 241, 241, 0.51);">
+        <ui:VisualElement name="header" class="header">
+            <ui:Label text="Music Collection" class="title"/>
+            <ui:VisualElement class="toolbar">
+                <ui:TextField name="search-field" class="search-field"/>
+                <ui:Toggle name="favorites-toggle" label="Favorites Only" class="favorites-toggle"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="content" class="content">
+            <ui:ScrollView name="album-scroll" mode="Vertical" class="album-scroll">
+                <ui:VisualElement name="album-grid" class="album-grid"/>
+            </ui:ScrollView>
+            <ui:VisualElement name="detail-panel" class="detail-panel">
+                <ui:VisualElement name="detail-empty" class="detail-empty">
+                    <ui:Label text="Select an Album" class="detail-empty-text"/>
+                </ui:VisualElement>
+                <ui:VisualElement name="detail-content" class="detail-content">
+                    <ui:Button name="detail-close-button" text="X" class="detail-close-button"/>
+                    <ui:VisualElement name="detail-cover" class="detail-cover"/>
+                    <ui:Label name="detail-title" class="detail-title"/>
+                    <ui:Label name="detail-artist" class="detail-artist"/>
+                    <ui:VisualElement class="detail-meta-row">
+                        <ui:Label text="Released" class="detail-meta-label"/>
+                        <ui:Label name="detail-year" class="detail-meta-value"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

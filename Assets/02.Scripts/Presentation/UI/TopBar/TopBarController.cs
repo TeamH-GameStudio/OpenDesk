@@ -18,19 +18,22 @@ namespace OpenDesk.Presentation.UI.TopBar
         [SerializeField] private Color    _connectedColor   = Color.green;
         [SerializeField] private Color    _disconnectedColor = Color.red;
 
-        [Inject] private IOpenClawBridgeService _bridge;
+        // DEPRECATED 2026-04-27: OpenClaw bridge 의존 제거.
+        // [Inject] private IOpenClawBridgeService _bridge;
 
         private void Start()
         {
-            if (_bridge == null) return;
-
-            _bridge.ConnectionState.Subscribe(connected =>
-            {
-                if (_connectionIcon != null)
-                    _connectionIcon.color = connected ? _connectedColor : _disconnectedColor;
-                if (_connectionText != null)
-                    _connectionText.text = connected ? "연결됨" : "연결 끊김";
-            }).AddTo(this);
+            // DEPRECATED: Gateway 연결 상태 표시는 IClaudeService 경로로 재구성 예정.
+            if (_connectionText != null) _connectionText.text = "—";
+            if (_connectionIcon != null) _connectionIcon.color = _disconnectedColor;
+            // if (_bridge == null) return;
+            // _bridge.ConnectionState.Subscribe(connected =>
+            // {
+            //     if (_connectionIcon != null)
+            //         _connectionIcon.color = connected ? _connectedColor : _disconnectedColor;
+            //     if (_connectionText != null)
+            //         _connectionText.text = connected ? "연결됨" : "연결 끊김";
+            // }).AddTo(this);
         }
     }
 }

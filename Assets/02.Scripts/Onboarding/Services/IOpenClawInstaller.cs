@@ -9,6 +9,7 @@ namespace OpenDesk.Onboarding.Services
     /// OpenClaw 자동 설치
     /// 진행률 스트림을 통해 UI와 소통
     /// </summary>
+    [Obsolete("OpenClaw legacy. Replaced by Claude CLI/Anthropic API path (IClaudeService). Will be removed once Anthropic-direct migration is fully verified.", error: false)]
     public interface IOpenClawInstaller
     {
         // 설치 진행률 0.0 ~ 1.0
