@@ -39,10 +39,13 @@ namespace OpenDesk.Cinematic
     //              into a new entry, lerp lighting toward the active tone.
     //   OnDestroy() — tear down the Playable graph so Unity doesn't leak it.
     //
-    // Crossfading: AnimationLayerMixerPlayable with two inputs. Each keyframe
-    // change destroys the slot-0 input (old "previous"), promotes the slot-1
-    // input to slot-0, and parks the new clip at slot-1. Weights tween from
-    // (1, 0) → (0, 1) over CrossfadeDuration.
+    // Crossfading: AnimationMixerPlayable with two inputs — sibling-style
+    // weighted average (NOT AnimationLayerMixerPlayable, whose weights blend
+    // each layer with the rest pose underneath and cause a visible "rise to
+    // T-pose then settle into the new clip" artifact during crossfade). Each
+    // keyframe change destroys the slot-0 input (old "previous"), promotes
+    // the slot-1 input to slot-0, and parks the new clip at slot-1. Weights
+    // tween from (1, 0) → (0, 1) over CrossfadeDuration.
     public sealed class CinematicCaptureController : MonoBehaviour
     {
         [Header("Mesh swap (CharacterPartSwapper)")]
@@ -77,7 +80,7 @@ namespace OpenDesk.Cinematic
 
         // Playable graph members. Built once at Start, torn down at OnDestroy.
         private PlayableGraph _graph;
-        private AnimationLayerMixerPlayable _mixer;
+        private AnimationMixerPlayable _mixer;
         private AnimationClipPlayable _previousClipPlayable; // input 0 — clip we're fading out of
         private AnimationClipPlayable _currentClipPlayable;  // input 1 — clip we're fading into
         private bool _graphBuilt;
@@ -207,7 +210,7 @@ namespace OpenDesk.Cinematic
             _graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
 
             // Two-input mixer: slot 0 = previous clip (fading out), slot 1 = current clip (fading in).
-            _mixer = AnimationLayerMixerPlayable.Create(_graph, 2);
+            _mixer = AnimationMixerPlayable.Create(_graph, 2);
             _mixer.SetInputWeight(0, 0f);
             _mixer.SetInputWeight(1, 0f);
 
