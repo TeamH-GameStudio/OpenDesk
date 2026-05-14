@@ -14,18 +14,23 @@ namespace OpenDesk.Cinematic.Editor
     //
     // Run via:  Tools > OpenDesk > Create Cinematic Capture Scene
     //
-    // Builds a clean alpha-rendering scene with:
-    //   - Two directional lights (key + fill)
-    //   - Model_Agent3D prefab instance (existing wardrobe rig)
-    //   - Capture camera (SolidColor, alpha = 0, MainCamera tag)
-    //   - Optional URP Volume preconfigured with a Vignette override
-    //   - _Cinematic empty with CinematicCaptureController wired up
+    // Builds a clean alpha-rendering scene by reusing AgentPreviewRig.prefab —
+    // the same self-contained rig the AgentCreation wizard uses. The rig
+    // ships with:
+    //   - A Camera (originally rendered to a preview RenderTexture)
+    //   - An Area Light
+    //   - A CharacterMount housing the wardrobe-equipped SD mannequin
+    //     (Animator + WardrobeApplier + CharacterPartSwapper)
+    //
+    // The builder mutates the rig's camera for cinematic capture (full-screen,
+    // SolidColor + alpha 0, MainCamera tag, RT cleared) and adds a fill light
+    // plus an optional URP post-FX volume. Everything else stays as-authored.
     //
     // The scene is saved to Assets/01.Scenes/CinematicCaptureScene.unity.
     public static class CinematicSceneBuilder
     {
         private const string ScenePath = "Assets/01.Scenes/CinematicCaptureScene.unity";
-        private const string AgentPrefabPath = "Assets/05.Prefabs/Agent/Model_Agent3D.prefab";
+        private const string AgentPrefabPath = "Assets/05.Prefabs/Agent/AgentPreviewRig.prefab";
 
         [MenuItem("Tools/OpenDesk/Create Cinematic Capture Scene")]
         public static void Build()
@@ -44,9 +49,19 @@ namespace OpenDesk.Cinematic.Editor
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            BuildLighting(out var keyLight, out var fillLight);
-            var agent = BuildAgent(out var animator, out var wardrobeApplier);
-            BuildCamera();
+            var rig = InstantiateRig();
+            if (rig == null) return;
+
+            var animator = rig.GetComponentInChildren<Animator>();
+            var wardrobeApplier = rig.GetComponentInChildren<WardrobeApplier>();
+            if (animator == null)
+                Debug.LogWarning("[CinematicSceneBuilder] Could not find Animator in AgentPreviewRig — pose clips will be ignored at runtime.");
+            if (wardrobeApplier == null)
+                Debug.LogWarning("[CinematicSceneBuilder] Could not find WardrobeApplier in AgentPreviewRig — outfit changes will be skipped.");
+
+            var keyLight = ReconfigureRigCamera(rig);    // returns the rig's Area Light (re-used as key)
+            var fillLight = BuildFillLight();
+            ConfigureAmbient();
             var postVolume = BuildPostFx();
             BuildController(animator, wardrobeApplier, keyLight, fillLight, postVolume);
 
@@ -54,76 +69,93 @@ namespace OpenDesk.Cinematic.Editor
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
 
-            Debug.Log($"[CinematicSceneBuilder] Scene saved at {ScenePath}. Open Unity Recorder (Window > General > Recorder > Recorder Window), add an Image Sequence recorder with PNG + Include Alpha, target the CaptureCamera, and press START RECORDING.");
+            Debug.Log($"[CinematicSceneBuilder] Scene saved at {ScenePath}. Open Unity Recorder (Window > General > Recorder > Recorder Window), add an Image Sequence recorder with PNG + Include Alpha, target the rig's Camera, and press START RECORDING.");
         }
 
-        private static void BuildLighting(out Light keyLight, out Light fillLight)
+        private static GameObject InstantiateRig()
         {
-            var keyGo = new GameObject("KeyLight");
-            keyGo.transform.position = new Vector3(0, 3, 0);
-            keyGo.transform.rotation = Quaternion.Euler(50, -30, 0);
-            keyLight = keyGo.AddComponent<Light>();
-            keyLight.type = LightType.Directional;
-            keyLight.color = Color.white;
-            keyLight.intensity = 1.2f;
-            keyLight.shadows = LightShadows.Soft;
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AgentPrefabPath);
+            if (prefab == null)
+            {
+                EditorUtility.DisplayDialog(
+                    "AgentPreviewRig not found",
+                    $"Could not load '{AgentPrefabPath}'. Aborting scene build.",
+                    "OK");
+                return null;
+            }
 
+            var rig = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            rig.transform.position = Vector3.zero;
+            rig.transform.rotation = Quaternion.identity;
+            return rig;
+        }
+
+        // Mutates the camera child of AgentPreviewRig from "preview RT renderer"
+        // into a full-screen alpha capture camera. Also returns the rig's Area
+        // Light so the controller can use it as the key light.
+        //
+        // NOTE: PrefabUtility.UnpackPrefabInstance is called so subsequent edits
+        // don't get reverted by the prefab override system.
+        private static Light ReconfigureRigCamera(GameObject rig)
+        {
+            PrefabUtility.UnpackPrefabInstance(rig, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);
+
+            Camera rigCamera = rig.GetComponentInChildren<Camera>(includeInactive: true);
+            if (rigCamera != null)
+            {
+                rigCamera.gameObject.tag = "MainCamera";
+                rigCamera.clearFlags = CameraClearFlags.SolidColor;
+                rigCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+                rigCamera.targetTexture = null;          // render to screen so Recorder picks it up directly
+                rigCamera.cullingMask = ~0;              // Everything — the rig camera was restricted to AgentPreview layer only
+                rigCamera.allowHDR = false;
+                rigCamera.allowMSAA = true;
+
+                var camData = rigCamera.GetComponent<UniversalAdditionalCameraData>();
+                if (camData == null) camData = rigCamera.gameObject.AddComponent<UniversalAdditionalCameraData>();
+                camData.renderPostProcessing = true;
+                camData.volumeLayerMask = ~0;            // pick up our PostFX volume regardless of layer
+
+                if (rigCamera.GetComponent<AudioListener>() == null)
+                    rigCamera.gameObject.AddComponent<AudioListener>();
+            }
+            else
+            {
+                Debug.LogWarning("[CinematicSceneBuilder] AgentPreviewRig has no Camera child — add one manually before recording.");
+            }
+
+            // The rig ships with an "Area Light"; we drive it as the key light.
+            // Area lights bake only — switch it to Directional so it animates at
+            // runtime when the controller writes color/intensity.
+            Light rigLight = rig.GetComponentInChildren<Light>(includeInactive: true);
+            if (rigLight != null)
+            {
+                rigLight.type = LightType.Directional;
+                rigLight.gameObject.name = "KeyLight";
+                rigLight.shadows = LightShadows.Soft;
+                rigLight.intensity = 1.2f;
+                rigLight.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+            }
+            return rigLight;
+        }
+
+        private static Light BuildFillLight()
+        {
             var fillGo = new GameObject("FillLight");
             fillGo.transform.position = new Vector3(0, 3, -3);
-            fillGo.transform.rotation = Quaternion.Euler(20, 160, 0);
-            fillLight = fillGo.AddComponent<Light>();
+            fillGo.transform.rotation = Quaternion.Euler(20f, 160f, 0f);
+            var fillLight = fillGo.AddComponent<Light>();
             fillLight.type = LightType.Directional;
             fillLight.color = new Color(0.78f, 0.85f, 1f);
             fillLight.intensity = 0.35f;
             fillLight.shadows = LightShadows.None;
+            return fillLight;
+        }
 
-            // Neutral ambient — controller overrides at runtime per keyframe.
+        private static void ConfigureAmbient()
+        {
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.45f, 0.45f, 0.5f, 1f);
-        }
-
-        private static GameObject BuildAgent(out Animator animator, out WardrobeApplier wardrobeApplier)
-        {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AgentPrefabPath);
-            GameObject root;
-            if (prefab == null)
-            {
-                Debug.LogWarning($"[CinematicSceneBuilder] Could not find '{AgentPrefabPath}'. Creating empty Cinematic GameObject — wire the character manually.");
-                root = new GameObject("Cinematic");
-            }
-            else
-            {
-                root = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-                root.name = "Cinematic";
-            }
-            root.transform.position = Vector3.zero;
-            root.transform.rotation = Quaternion.identity;
-
-            animator = root.GetComponentInChildren<Animator>();
-            wardrobeApplier = root.GetComponentInChildren<WardrobeApplier>();
-            return root;
-        }
-
-        private static void BuildCamera()
-        {
-            var camGo = new GameObject("CaptureCamera");
-            camGo.tag = "MainCamera";
-            camGo.transform.position = new Vector3(0, 1.5f, 2.2f);
-            camGo.transform.rotation = Quaternion.Euler(5, 180, 0);
-
-            var cam = camGo.AddComponent<Camera>();
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0, 0, 0, 0);
-            cam.fieldOfView = 28f;
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 50f;
-            cam.allowHDR = false;
-            cam.allowMSAA = true;
-
-            var camData = camGo.AddComponent<UniversalAdditionalCameraData>();
-            camData.renderPostProcessing = true;
-
-            camGo.AddComponent<AudioListener>();
         }
 
         private static Volume BuildPostFx()
