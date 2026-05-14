@@ -109,11 +109,12 @@ namespace OpenDesk.Cinematic
 
         // MaterialPropertyBlocks for the face submaterials. One per slot so a
         // write to "eyes" can't stomp the "mouth" texture and vice versa.
-        // Field-initialised because the controller may be on a nested GameObject
-        // where Awake/OnEnable timing relative to other components isn't
-        // guaranteed — same reason WardrobeApplier does it this way.
-        private MaterialPropertyBlock _eyesMpb = new MaterialPropertyBlock();
-        private MaterialPropertyBlock _mouthMpb = new MaterialPropertyBlock();
+        // Created lazily on first use — field initialisers don't re-run when
+        // Unity adds new private fields to an existing scripted component (the
+        // serialised instance keeps null for the new field), so we defensively
+        // re-create when needed.
+        private MaterialPropertyBlock _eyesMpb;
+        private MaterialPropertyBlock _mouthMpb;
 
         // Index of the keyframe currently "active" (the largest i with TimeSeconds <= elapsed).
         // -1 means we haven't entered the first keyframe yet (the first keyframe is applied
@@ -136,12 +137,21 @@ namespace OpenDesk.Cinematic
             float elapsed = Time.timeSinceLevelLoad;
 
             // Advance to the latest keyframe whose TimeSeconds has been crossed.
+            // If a per-keyframe handler throws, log and keep advancing — otherwise
+            // a single bad keyframe freezes the entire timeline.
             int newIndex = FindKeyframeIndex(elapsed);
             if (newIndex > _currentIndex && newIndex >= 0)
             {
                 for (int i = _currentIndex + 1; i <= newIndex; i++)
                 {
-                    EnterKeyframe(i);
+                    try
+                    {
+                        EnterKeyframe(i);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogError($"[CinematicCaptureController] Keyframe {i} threw: {ex.Message}\n{ex.StackTrace}", this);
+                    }
                 }
                 _currentIndex = newIndex;
             }
@@ -302,17 +312,25 @@ namespace OpenDesk.Cinematic
 
             Texture2D eyeTex = _eyeExpressionSet.Get(key);
             if (eyeTex != null)
-                WriteFaceTexture(eyeTex, _eyesTextureProperty, _eyesMpb, _eyesMaterialIndex);
+                WriteFaceTexture(eyeTex, _eyesTextureProperty, ref _eyesMpb, _eyesMaterialIndex);
 
             Texture2D mouthTex = _eyeExpressionSet.GetMouth(key);
             if (mouthTex != null)
-                WriteFaceTexture(mouthTex, _mouthTextureProperty, _mouthMpb, _mouthMaterialIndex);
+                WriteFaceTexture(mouthTex, _mouthTextureProperty, ref _mouthMpb, _mouthMaterialIndex);
         }
 
+        // Takes the MPB field by ref so a null field (post-script-reload) is
+        // lazily replaced with a fresh block AND written back to the field.
         private void WriteFaceTexture(Texture2D texture, string propertyName,
-                                       MaterialPropertyBlock mpb, int materialIndex)
+                                       ref MaterialPropertyBlock mpb, int materialIndex)
         {
             if (texture == null || _bodyRenderer == null || string.IsNullOrEmpty(propertyName)) return;
+            if (mpb == null) mpb = new MaterialPropertyBlock();
+            if (materialIndex < 0 || materialIndex >= _bodyRenderer.sharedMaterials.Length)
+            {
+                Debug.LogWarning($"[CinematicCaptureController] BodyRenderer has {_bodyRenderer.sharedMaterials.Length} submaterials but materialIndex={materialIndex}. Adjust EyesMaterialIndex/MouthMaterialIndex.", this);
+                return;
+            }
             _bodyRenderer.GetPropertyBlock(mpb, materialIndex);
             mpb.SetTexture(propertyName, texture);
             _bodyRenderer.SetPropertyBlock(mpb, materialIndex);
