@@ -76,6 +76,9 @@ namespace OpenDesk.Cinematic
         [Header("Tweens (object reveals, character spin, camera moves)")]
         [SerializeField] private List<TimedTween> _tweens = new List<TimedTween>();
 
+        [Header("Camera Moves (orbital — yaw/pitch/distance around LookAt)")]
+        [SerializeField] private List<CameraMove> _cameraMoves = new List<CameraMove>();
+
         [Header("Runtime")]
         [Tooltip("When the timeline finishes, exit play mode so Unity Recorder flushes and stops cleanly.")]
         [SerializeField] private bool _autoExitPlayMode = true;
@@ -117,11 +120,18 @@ namespace OpenDesk.Cinematic
         private bool[] _tweenStarted;
         private bool[] _tweenFinished;
 
+        // Per-CameraMove "have we written the final frame and stopped touching
+        // this camera" flag. We always write the camera transform every frame
+        // *during* the move (not just on transitions), so we don't need a
+        // "_started" flag — only a "_finished" one to release the camera.
+        private bool[] _cameraMoveFinished;
+
         private void Start()
         {
             EquipParts();
             SetupAnimator();
             SetupTweens();
+            SetupCameraMoves();
             ApplyFirstKeyframeImmediate();
         }
 
@@ -149,6 +159,7 @@ namespace OpenDesk.Cinematic
             }
 
             AdvanceTweens(elapsed);
+            AdvanceCameraMoves(elapsed);
 
             if (elapsed >= _totalDuration)
             {
@@ -288,6 +299,89 @@ namespace OpenDesk.Cinematic
             return t < 0.5f
                 ? 4f * t * t * t
                 : 1f - Mathf.Pow(-2f * t + 2f, 3f) * 0.5f;
+        }
+
+        // ─── Camera moves (orbital around LookAt) ──────────────────────────
+
+        // Snap the camera to the earliest move's From-pose so the first
+        // recorded frame starts with the intended framing rather than the
+        // scene's authored camera transform.
+        private void SetupCameraMoves()
+        {
+            if (_cameraMoves == null)
+            {
+                _cameraMoveFinished = Array.Empty<bool>();
+                return;
+            }
+            _cameraMoveFinished = new bool[_cameraMoves.Count];
+
+            // If a move starts at (or before) t=0, snap to its From-pose so
+            // the first recorded frame has the intended framing. If the
+            // earliest move starts later, leave the scene-authored camera
+            // transform alone — the move will be authored to start from
+            // whatever pose was on-screen anyway.
+            int earliestIdx = -1;
+            float earliestStart = float.PositiveInfinity;
+            for (int i = 0; i < _cameraMoves.Count; i++)
+            {
+                if (_cameraMoves[i].StartTime < earliestStart)
+                {
+                    earliestStart = _cameraMoves[i].StartTime;
+                    earliestIdx = i;
+                }
+            }
+            if (earliestIdx >= 0 && earliestStart <= 0.001f)
+            {
+                ApplyCameraMove(_cameraMoves[earliestIdx], 0f);
+            }
+        }
+
+        private void AdvanceCameraMoves(float elapsed)
+        {
+            if (_cameraMoves == null || _cameraMoves.Count == 0 || _cameraMoveFinished == null) return;
+
+            for (int i = 0; i < _cameraMoves.Count; i++)
+            {
+                if (_cameraMoveFinished[i]) continue;
+                var move = _cameraMoves[i];
+                if (move.LookAt == null) { _cameraMoveFinished[i] = true; continue; }
+                if (elapsed < move.StartTime) continue;
+
+                float t = move.Duration > 0f
+                    ? Mathf.Clamp01((elapsed - move.StartTime) / move.Duration)
+                    : 1f;
+                float curved = (move.Easing != null && move.Easing.length >= 2)
+                    ? move.Easing.Evaluate(t)
+                    : EaseInOutCubic(t);
+
+                ApplyCameraMove(move, curved);
+
+                if (t >= 1f) _cameraMoveFinished[i] = true;
+            }
+        }
+
+        // Writes camera position + rotation for a given normalized progress t
+        // (already eased). Centralised so SetupCameraMoves can reuse it for
+        // the t=0 pre-snap.
+        private void ApplyCameraMove(CameraMove move, float curved)
+        {
+            if (move.LookAt == null) return;
+            Camera cam = move.Camera != null ? move.Camera : Camera.main;
+            if (cam == null) return;
+
+            float yaw   = Mathf.LerpUnclamped(move.FromYaw,      move.ToYaw,      curved);
+            float pitch = Mathf.LerpUnclamped(move.FromPitch,    move.ToPitch,    curved);
+            float dist  = Mathf.LerpUnclamped(move.FromDistance, move.ToDistance, curved);
+
+            Vector3 pivot = move.LookAt.position + move.PivotOffset;
+            // -pitch so positive pitch in the inspector = camera ABOVE subject
+            // (high angle / looking down), matching cinematography terminology.
+            Quaternion rot = Quaternion.Euler(-pitch, yaw, 0f);
+            Vector3 offset = rot * new Vector3(0f, 0f, -dist);
+
+            var camT = cam.transform;
+            camT.position = pivot + offset;
+            camT.LookAt(pivot);
         }
 
         private void ApplyFirstKeyframeImmediate()
