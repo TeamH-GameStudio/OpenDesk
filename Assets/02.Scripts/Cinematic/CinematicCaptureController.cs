@@ -73,6 +73,9 @@ namespace OpenDesk.Cinematic
         [Min(0.1f)]
         [SerializeField] private float _totalDuration = 8f;
 
+        [Header("Tweens (object reveals, character spin, camera moves)")]
+        [SerializeField] private List<TimedTween> _tweens = new List<TimedTween>();
+
         [Header("Runtime")]
         [Tooltip("When the timeline finishes, exit play mode so Unity Recorder flushes and stops cleanly.")]
         [SerializeField] private bool _autoExitPlayMode = true;
@@ -107,10 +110,18 @@ namespace OpenDesk.Cinematic
         private int _currentIndex = -1;
         private bool _finished;
 
+        // Per-tween state. _tweenStarted = "we've already snapped From-values
+        // and toggled SetActive(true)"; _tweenFinished = "we've already
+        // written the final To-values, stop touching this transform". Tracked
+        // as parallel arrays so we don't mutate the serialised struct list.
+        private bool[] _tweenStarted;
+        private bool[] _tweenFinished;
+
         private void Start()
         {
             EquipParts();
             SetupAnimator();
+            SetupTweens();
             ApplyFirstKeyframeImmediate();
         }
 
@@ -136,6 +147,8 @@ namespace OpenDesk.Cinematic
                 }
                 _currentIndex = newIndex;
             }
+
+            AdvanceTweens(elapsed);
 
             if (elapsed >= _totalDuration)
             {
@@ -205,6 +218,76 @@ namespace OpenDesk.Cinematic
             _animatorReady = _placeholderA != null && _placeholderB != null;
             if (!_animatorReady)
                 Debug.LogWarning($"[CinematicCaptureController] Base controller is missing '{PlaceholderNameA}' or '{PlaceholderNameB}' placeholder clips — re-bake the controller via SceneBuilder.", this);
+        }
+
+        // ─── Tween scanner ─────────────────────────────────────────────────
+
+        // Initialise state arrays + pre-disable any object that should pop
+        // in mid-sequence. Authors keep ActivateOnStart objects enabled in
+        // the scene editor (so they can place them visually); we hide them
+        // here until their StartTime arrives.
+        private void SetupTweens()
+        {
+            if (_tweens == null)
+            {
+                _tweenStarted = Array.Empty<bool>();
+                _tweenFinished = Array.Empty<bool>();
+                return;
+            }
+            _tweenStarted = new bool[_tweens.Count];
+            _tweenFinished = new bool[_tweens.Count];
+
+            for (int i = 0; i < _tweens.Count; i++)
+            {
+                var tw = _tweens[i];
+                if (tw.ActivateOnStart && tw.Target != null && tw.StartTime > 0.001f)
+                    tw.Target.gameObject.SetActive(false);
+            }
+        }
+
+        private void AdvanceTweens(float elapsed)
+        {
+            if (_tweens == null || _tweens.Count == 0 || _tweenStarted == null) return;
+
+            for (int i = 0; i < _tweens.Count; i++)
+            {
+                if (_tweenFinished[i]) continue;
+                var tw = _tweens[i];
+                if (tw.Target == null) { _tweenFinished[i] = true; continue; }
+                if (elapsed < tw.StartTime) continue;
+
+                if (!_tweenStarted[i])
+                {
+                    if (tw.ActivateOnStart) tw.Target.gameObject.SetActive(true);
+                    if (tw.TweenPosition) tw.Target.localPosition = tw.FromLocalPos;
+                    if (tw.TweenRotation) tw.Target.localEulerAngles = tw.FromLocalEuler;
+                    _tweenStarted[i] = true;
+                }
+
+                float t = tw.Duration > 0f
+                    ? Mathf.Clamp01((elapsed - tw.StartTime) / tw.Duration)
+                    : 1f;
+                float curved = (tw.Easing != null && tw.Easing.length >= 2)
+                    ? tw.Easing.Evaluate(t)
+                    : EaseInOutCubic(t);
+
+                if (tw.TweenPosition)
+                    tw.Target.localPosition = Vector3.LerpUnclamped(tw.FromLocalPos, tw.ToLocalPos, curved);
+                if (tw.TweenRotation)
+                    tw.Target.localEulerAngles = Vector3.LerpUnclamped(tw.FromLocalEuler, tw.ToLocalEuler, curved);
+
+                if (t >= 1f) _tweenFinished[i] = true;
+            }
+        }
+
+        // Smooth-step ease (Penner cubic). Matches the feel of Unity's
+        // default AnimationCurve "EaseInOut" but doesn't require an authored
+        // curve in the inspector.
+        private static float EaseInOutCubic(float t)
+        {
+            return t < 0.5f
+                ? 4f * t * t * t
+                : 1f - Mathf.Pow(-2f * t + 2f, 3f) * 0.5f;
         }
 
         private void ApplyFirstKeyframeImmediate()
