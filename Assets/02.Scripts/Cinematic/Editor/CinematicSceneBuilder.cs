@@ -3,6 +3,7 @@ using System.IO;
 using OpenDesk.Characters;
 using OpenDesk.Characters.Wardrobe.Expressions;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
@@ -166,10 +167,58 @@ namespace OpenDesk.Cinematic.Editor
             so.FindProperty("_bodyRenderer").objectReferenceValue = bodyRenderer;
             so.FindProperty("_eyeExpressionSet").objectReferenceValue = FindFirstEyeExpressionSet();
             so.FindProperty("_animator").objectReferenceValue = animator;
+            so.FindProperty("_baseController").objectReferenceValue = CreateOrLoadBaseController();
             so.FindProperty("_totalDuration").floatValue = 8f;
             so.FindProperty("_autoExitPlayMode").boolValue = true;
             so.FindProperty("_logProgress").boolValue = true;
             so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // Creates (or loads) the base AnimatorController the runtime overrides.
+        // Layout:
+        //   one layer with two empty states "StateA" and "StateB",
+        //   each referencing a placeholder AnimationClip sub-asset whose name
+        //   the runtime uses to identify which state it should swap. No
+        //   transitions — Animator.CrossFadeInFixedTime drives blends.
+        //
+        // Idempotent: returns the existing asset when one is already present
+        // so re-running the menu doesn't churn GUIDs.
+        private const string BaseControllerPath = "Assets/01.Scenes/CinematicCaptureScene_Assets/CinematicBaseController.controller";
+        private const string PlaceholderNameA = "_placeholderA";
+        private const string PlaceholderNameB = "_placeholderB";
+
+        private static RuntimeAnimatorController CreateOrLoadBaseController()
+        {
+            var dir = Path.GetDirectoryName(BaseControllerPath);
+            Directory.CreateDirectory(dir);
+
+            var existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(BaseControllerPath);
+            if (existing != null) return existing;
+
+            var controller = AnimatorController.CreateAnimatorControllerAtPath(BaseControllerPath);
+            var rootSm = controller.layers[0].stateMachine;
+
+            var placeholderA = new AnimationClip { name = PlaceholderNameA, legacy = false };
+            var placeholderB = new AnimationClip { name = PlaceholderNameB, legacy = false };
+            // Placeholders MUST be sub-assets of the controller — otherwise the
+            // override map loses them when the project re-imports.
+            AssetDatabase.AddObjectToAsset(placeholderA, controller);
+            AssetDatabase.AddObjectToAsset(placeholderB, controller);
+
+            var stateA = rootSm.AddState("StateA");
+            stateA.motion = placeholderA;
+            stateA.writeDefaultValues = true;
+
+            var stateB = rootSm.AddState("StateB");
+            stateB.motion = placeholderB;
+            stateB.writeDefaultValues = true;
+
+            rootSm.defaultState = stateA;
+
+            EditorUtility.SetDirty(controller);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.ImportAsset(BaseControllerPath);
+            return controller;
         }
 
         // Pulls the body Renderer out of CharacterPartSwapper's _bodyRenderer
