@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.IO;
-using OpenDesk.Characters.Wardrobe;
+using OpenDesk.Characters;
+using OpenDesk.Characters.Wardrobe.Expressions;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -53,17 +54,21 @@ namespace OpenDesk.Cinematic.Editor
             if (rig == null) return;
 
             var animator = rig.GetComponentInChildren<Animator>();
-            var wardrobeApplier = rig.GetComponentInChildren<WardrobeApplier>();
+            var partSwapper = rig.GetComponentInChildren<CharacterPartSwapper>();
+            var bodyRenderer = ResolveBodyRenderer(partSwapper, rig);
+
             if (animator == null)
                 Debug.LogWarning("[CinematicSceneBuilder] Could not find Animator in AgentPreviewRig — pose clips will be ignored at runtime.");
-            if (wardrobeApplier == null)
-                Debug.LogWarning("[CinematicSceneBuilder] Could not find WardrobeApplier in AgentPreviewRig — outfit changes will be skipped.");
+            if (partSwapper == null)
+                Debug.LogWarning("[CinematicSceneBuilder] Could not find CharacterPartSwapper in AgentPreviewRig — wire it manually.");
+            if (bodyRenderer == null)
+                Debug.LogWarning("[CinematicSceneBuilder] Could not infer body Renderer — wire the BodyRenderer field manually so expression textures land on the right submaterials.");
 
             var keyLight = ReconfigureRigCamera(rig);    // returns the rig's Area Light (re-used as key)
             var fillLight = BuildFillLight();
             ConfigureAmbient();
             var postVolume = BuildPostFx();
-            BuildController(animator, wardrobeApplier, keyLight, fillLight, postVolume);
+            BuildController(animator, partSwapper, bodyRenderer, keyLight, fillLight, postVolume);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -184,32 +189,63 @@ namespace OpenDesk.Cinematic.Editor
             return volume;
         }
 
-        private static void BuildController(Animator animator, WardrobeApplier wardrobeApplier,
+        private static void BuildController(Animator animator, CharacterPartSwapper partSwapper, Renderer bodyRenderer,
                                             Light keyLight, Light fillLight, Volume postVolume)
         {
             var ctlGo = new GameObject("_Cinematic");
             var controller = ctlGo.AddComponent<CinematicCaptureController>();
 
             var so = new SerializedObject(controller);
-            so.FindProperty("_catalog").objectReferenceValue = FindWardrobeCatalog();
-            so.FindProperty("_wardrobeApplier").objectReferenceValue = wardrobeApplier;
+            so.FindProperty("_partSwapper").objectReferenceValue = partSwapper;
+            so.FindProperty("_bodyRenderer").objectReferenceValue = bodyRenderer;
+            so.FindProperty("_eyeExpressionSet").objectReferenceValue = FindFirstEyeExpressionSet();
             so.FindProperty("_animator").objectReferenceValue = animator;
             so.FindProperty("_keyLight").objectReferenceValue = keyLight;
             so.FindProperty("_fillLight").objectReferenceValue = fillLight;
             so.FindProperty("_postVolume").objectReferenceValue = postVolume;
-            so.FindProperty("_useDefaultOutfit").boolValue = true;
             so.FindProperty("_totalDuration").floatValue = 8f;
             so.FindProperty("_autoExitPlayMode").boolValue = true;
             so.FindProperty("_logProgress").boolValue = true;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static WardrobeCatalogSO FindWardrobeCatalog()
+        // Pulls the body Renderer out of CharacterPartSwapper's _bodyRenderer
+        // SerializeField via SerializedObject. Falls back to the largest
+        // SkinnedMeshRenderer in the rig hierarchy when the swapper isn't
+        // present or its field is empty. The largest renderer heuristic is
+        // unreliable for rigs with multiple equal-sized skinned meshes — when
+        // wrong, the user just rewires the BodyRenderer field by hand.
+        private static Renderer ResolveBodyRenderer(CharacterPartSwapper partSwapper, GameObject rig)
         {
-            var guids = AssetDatabase.FindAssets("t:WardrobeCatalogSO");
+            if (partSwapper != null)
+            {
+                var so = new SerializedObject(partSwapper);
+                var prop = so.FindProperty("_bodyRenderer");
+                if (prop != null && prop.objectReferenceValue is Renderer fromSwapper)
+                    return fromSwapper;
+            }
+
+            if (rig == null) return null;
+            Renderer best = null;
+            float bestSize = -1f;
+            foreach (var smr in rig.GetComponentsInChildren<SkinnedMeshRenderer>(includeInactive: true))
+            {
+                var size = smr.bounds.size.sqrMagnitude;
+                if (size > bestSize)
+                {
+                    bestSize = size;
+                    best = smr;
+                }
+            }
+            return best;
+        }
+
+        private static EyeExpressionSetSO FindFirstEyeExpressionSet()
+        {
+            var guids = AssetDatabase.FindAssets("t:EyeExpressionSetSO");
             if (guids == null || guids.Length == 0) return null;
             var path = AssetDatabase.GUIDToAssetPath(guids[0]);
-            return AssetDatabase.LoadAssetAtPath<WardrobeCatalogSO>(path);
+            return AssetDatabase.LoadAssetAtPath<EyeExpressionSetSO>(path);
         }
     }
 }

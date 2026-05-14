@@ -1,7 +1,7 @@
+using System;
 using System.Collections.Generic;
-using AgentCreationTest.Models;
-using OpenDesk.Characters.Wardrobe;
-using OpenDesk.Characters.Wardrobe.Persistence;
+using OpenDesk.Characters;
+using OpenDesk.Characters.Wardrobe.Expressions;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
@@ -13,10 +13,30 @@ using UnityEditor;
 
 namespace OpenDesk.Cinematic
 {
+    // Maps 1:1 to the lowercase slot strings CharacterPartSwapper expects
+    // ("hair"/"top"/"bottom"/"shoes"). Exposed as an enum so the inspector
+    // never holds a typo'd string.
+    public enum CharacterSlot
+    {
+        Hair,
+        Top,
+        Bottom,
+        Shoes,
+    }
+
+    // One row of the inspector's "Character Parts" list — pairs a slot with
+    // the prefab to equip. Null prefab means "unequip this slot".
+    [Serializable]
+    public struct PartEquip
+    {
+        public CharacterSlot Slot;
+        public GameObject PartPrefab;
+    }
+
     // Drives an 8-second cutscene from a single MonoBehaviour, no DI.
     //
     // Lifecycle:
-    //   Start()  — apply outfit, build Playable graph, snap to the first keyframe.
+    //   Start()  — equip parts, build Playable graph, snap to the first keyframe.
     //   Update() — scan timeline, fire transitions when the elapsed time crosses
     //              into a new entry, lerp lighting toward the active tone.
     //   OnDestroy() — tear down the Playable graph so Unity doesn't leak it.
@@ -27,12 +47,21 @@ namespace OpenDesk.Cinematic
     // (1, 0) → (0, 1) over CrossfadeDuration.
     public sealed class CinematicCaptureController : MonoBehaviour
     {
-        [Header("Wardrobe")]
-        [SerializeField] private WardrobeCatalogSO _catalog;
-        [SerializeField] private WardrobeApplier _wardrobeApplier;
-        [SerializeField] private WardrobeOutfit _outfit = new WardrobeOutfit();
-        [Tooltip("When true, ignores _outfit and applies the catalog's default outfit.")]
-        [SerializeField] private bool _useDefaultOutfit = true;
+        [Header("Mesh swap (CharacterPartSwapper)")]
+        [Tooltip("Swapper on the character. Each entry in CharacterParts calls EquipPart(slotName, prefab) at Start.")]
+        [SerializeField] private CharacterPartSwapper _partSwapper;
+        [Tooltip("Parts to equip at Start. Leave a row's prefab null to unequip that slot.")]
+        [SerializeField] private List<PartEquip> _characterParts = new List<PartEquip>();
+
+        [Header("Face textures (eyes + mouth)")]
+        [Tooltip("Body SkinnedMeshRenderer that exposes eyes/mouth as submaterials. Same renderer WardrobeApplier targets.")]
+        [SerializeField] private Renderer _bodyRenderer;
+        [SerializeField] private int _eyesMaterialIndex = 1;
+        [SerializeField] private int _mouthMaterialIndex = 2;
+        [SerializeField] private string _eyesTextureProperty = "_BaseMap";
+        [SerializeField] private string _mouthTextureProperty = "_BaseMap";
+        [Tooltip("Expression set whose textures are written to the eyes/mouth submaterials at each keyframe.")]
+        [SerializeField] private EyeExpressionSetSO _eyeExpressionSet;
 
         [Header("Animation")]
         [Tooltip("Animator on the character. The Animator's runtimeController is replaced by a Playables graph at Start.")]
@@ -78,6 +107,14 @@ namespace OpenDesk.Cinematic
         // Vignette override pulled out of _postVolume.profile once at Start.
         private Vignette _vignetteOverride;
 
+        // MaterialPropertyBlocks for the face submaterials. One per slot so a
+        // write to "eyes" can't stomp the "mouth" texture and vice versa.
+        // Field-initialised because the controller may be on a nested GameObject
+        // where Awake/OnEnable timing relative to other components isn't
+        // guaranteed — same reason WardrobeApplier does it this way.
+        private MaterialPropertyBlock _eyesMpb = new MaterialPropertyBlock();
+        private MaterialPropertyBlock _mouthMpb = new MaterialPropertyBlock();
+
         // Index of the keyframe currently "active" (the largest i with TimeSeconds <= elapsed).
         // -1 means we haven't entered the first keyframe yet (the first keyframe is applied
         // synchronously at Start, so this is bumped to 0 immediately).
@@ -86,7 +123,7 @@ namespace OpenDesk.Cinematic
 
         private void Start()
         {
-            ApplyOutfit();
+            EquipParts();
             BuildGraph();
             ResolveVignette();
             ApplyFirstKeyframeImmediate();
@@ -129,28 +166,43 @@ namespace OpenDesk.Cinematic
 
         // ─── Setup ──────────────────────────────────────────────────────────
 
-        private void ApplyOutfit()
+        // Equips each row of _characterParts through CharacterPartSwapper.
+        // Slots map 1:1 to the lowercase strings WardrobeApplier uses internally
+        // ("hair"/"top"/"bottom"/"shoes"), so the swapper's slot dictionary
+        // stays consistent with anything else in the project that pokes at it.
+        // A null prefab unequips the slot — handy for "no hat" / "no shoes".
+        private void EquipParts()
         {
-            if (_wardrobeApplier == null)
+            if (_partSwapper == null)
             {
-                Debug.LogWarning("[CinematicCaptureController] WardrobeApplier not assigned — skipping outfit step.", this);
+                Debug.LogWarning("[CinematicCaptureController] CharacterPartSwapper not assigned — mesh swaps will be skipped.", this);
                 return;
             }
-            if (_catalog == null)
-            {
-                Debug.LogWarning("[CinematicCaptureController] Catalog not assigned — wardrobe stays at prefab default.", this);
-                return;
-            }
+            if (_characterParts == null || _characterParts.Count == 0) return;
 
-            _wardrobeApplier.SetCatalog(_catalog);
-            if (_useDefaultOutfit || _outfit == null)
+            foreach (var part in _characterParts)
             {
-                _wardrobeApplier.ApplyDefaults();
+                string slot = SlotToName(part.Slot);
+                if (part.PartPrefab == null)
+                {
+                    _partSwapper.UnequipPart(slot);
+                }
+                else
+                {
+                    _partSwapper.EquipPart(slot, part.PartPrefab);
+                }
             }
-            else
+        }
+
+        private static string SlotToName(CharacterSlot slot)
+        {
+            switch (slot)
             {
-                Wardrobe indices = _outfit.ToWardrobe(_catalog);
-                _wardrobeApplier.Apply(indices);
+                case CharacterSlot.Hair: return "hair";
+                case CharacterSlot.Top: return "top";
+                case CharacterSlot.Bottom: return "bottom";
+                case CharacterSlot.Shoes: return "shoes";
+                default: return slot.ToString().ToLowerInvariant();
             }
         }
 
@@ -236,10 +288,34 @@ namespace OpenDesk.Cinematic
 
         // ─── Expression ────────────────────────────────────────────────────
 
-        private void ApplyExpression(OpenDesk.Characters.Wardrobe.Expressions.AgentExpressionKey key)
+        // Writes the eyes + (optional) mouth texture for `key` into the body
+        // renderer's submaterial slots via MaterialPropertyBlock — same
+        // technique WardrobeApplier uses, but without going through the
+        // wardrobe catalog.
+        //
+        // GetMouth() returns null when the expression set ships eye textures
+        // only — in that case the mouth submaterial keeps whatever the prefab
+        // authored, so we leave it alone.
+        private void ApplyExpression(AgentExpressionKey key)
         {
-            if (_wardrobeApplier == null) return;
-            _wardrobeApplier.SetEyeExpression(key);
+            if (_eyeExpressionSet == null || _bodyRenderer == null) return;
+
+            Texture2D eyeTex = _eyeExpressionSet.Get(key);
+            if (eyeTex != null)
+                WriteFaceTexture(eyeTex, _eyesTextureProperty, _eyesMpb, _eyesMaterialIndex);
+
+            Texture2D mouthTex = _eyeExpressionSet.GetMouth(key);
+            if (mouthTex != null)
+                WriteFaceTexture(mouthTex, _mouthTextureProperty, _mouthMpb, _mouthMaterialIndex);
+        }
+
+        private void WriteFaceTexture(Texture2D texture, string propertyName,
+                                       MaterialPropertyBlock mpb, int materialIndex)
+        {
+            if (texture == null || _bodyRenderer == null || string.IsNullOrEmpty(propertyName)) return;
+            _bodyRenderer.GetPropertyBlock(mpb, materialIndex);
+            mpb.SetTexture(propertyName, texture);
+            _bodyRenderer.SetPropertyBlock(mpb, materialIndex);
         }
 
         // ─── Pose crossfade ────────────────────────────────────────────────
@@ -410,7 +486,13 @@ namespace OpenDesk.Cinematic
 
         public void Editor_ApplyOutfitPreview()
         {
-            ApplyOutfit();
+            EquipParts();
+            // Apply the first keyframe's expression (if any) so the preview
+            // matches what the controller will snap to on Play.
+            if (_timeline != null && _timeline.Count > 0)
+            {
+                ApplyExpression(_timeline[0].Expression);
+            }
         }
 
         public void Editor_SortTimeline()
