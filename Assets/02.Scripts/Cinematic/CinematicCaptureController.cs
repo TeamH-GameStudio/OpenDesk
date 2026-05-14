@@ -5,8 +5,6 @@ using OpenDesk.Characters.Wardrobe.Expressions;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -67,13 +65,6 @@ namespace OpenDesk.Cinematic
         [Tooltip("Animator on the character. The Animator's runtimeController is replaced by a Playables graph at Start.")]
         [SerializeField] private Animator _animator;
 
-        [Header("Lighting")]
-        [SerializeField] private Light _keyLight;
-        [Tooltip("Optional. Stays static during the cutscene — wire it only for an authoring reference.")]
-        [SerializeField] private Light _fillLight;
-        [Tooltip("Optional URP Volume. If its profile carries a Vignette override, the controller will animate Vignette.intensity.")]
-        [SerializeField] private Volume _postVolume;
-
         [Header("Timeline")]
         [SerializeField] private List<CinematicTimelineEntry> _timeline = new List<CinematicTimelineEntry>();
         [Min(0.1f)]
@@ -97,16 +88,6 @@ namespace OpenDesk.Cinematic
         private float _crossfadeDuration;
         private bool _crossfadeActive;
 
-        // Lighting lerp state.
-        private LightingTone _lightingFrom;
-        private LightingTone _lightingTo;
-        private float _lightingElapsed;
-        private float _lightingDuration;
-        private LightingTone _lightingCurrent;
-
-        // Vignette override pulled out of _postVolume.profile once at Start.
-        private Vignette _vignetteOverride;
-
         // MaterialPropertyBlocks for the face submaterials. One per slot so a
         // write to "eyes" can't stomp the "mouth" texture and vice versa.
         // Created lazily on first use — field initialisers don't re-run when
@@ -126,7 +107,6 @@ namespace OpenDesk.Cinematic
         {
             EquipParts();
             BuildGraph();
-            ResolveVignette();
             ApplyFirstKeyframeImmediate();
         }
 
@@ -157,7 +137,6 @@ namespace OpenDesk.Cinematic
             }
 
             AdvanceCrossfade(Time.deltaTime);
-            AdvanceLightingLerp(Time.deltaTime);
 
             if (elapsed >= _totalDuration)
             {
@@ -239,30 +218,15 @@ namespace OpenDesk.Cinematic
             _graphBuilt = true;
         }
 
-        private void ResolveVignette()
-        {
-            _vignetteOverride = null;
-            if (_postVolume == null || _postVolume.profile == null) return;
-            if (_postVolume.profile.TryGet(out Vignette v))
-            {
-                _vignetteOverride = v;
-            }
-        }
-
         private void ApplyFirstKeyframeImmediate()
         {
-            if (_timeline == null || _timeline.Count == 0)
-            {
-                _lightingCurrent = LightingTone.Neutral;
-                return;
-            }
+            if (_timeline == null || _timeline.Count == 0) return;
 
             var first = _timeline[0];
             // Treat the first keyframe as a synchronous snap regardless of its
-            // authored TransitionSeconds — there is no "previous" to lerp from.
+            // authored CrossfadeDuration — there is no "previous" to fade from.
             ApplyExpression(first.Expression);
             SnapPose(first.PoseClip);
-            SnapLighting(first.Lighting);
             _currentIndex = 0;
 
             if (_logProgress)
@@ -290,7 +254,6 @@ namespace OpenDesk.Cinematic
 
             ApplyExpression(entry.Expression);
             StartPoseTransition(entry.PoseClip, Mathf.Max(0f, entry.CrossfadeDuration));
-            StartLightingTransition(entry.Lighting);
 
             if (_logProgress)
                 Debug.Log($"[CinematicCaptureController] Enter keyframe {index} @ {entry.TimeSeconds:F2}s — {entry.Note}", this);
@@ -410,72 +373,6 @@ namespace OpenDesk.Cinematic
                 playable.Destroy();
             }
             playable = default;
-        }
-
-        // ─── Lighting ──────────────────────────────────────────────────────
-
-        private void SnapLighting(LightingTone tone)
-        {
-            _lightingCurrent = tone;
-            _lightingFrom = tone;
-            _lightingTo = tone;
-            _lightingDuration = 0f;
-            _lightingElapsed = 0f;
-            ApplyLighting(tone);
-        }
-
-        private void StartLightingTransition(LightingTone tone)
-        {
-            float duration = Mathf.Max(0f, tone.TransitionSeconds);
-            if (duration <= 0f)
-            {
-                SnapLighting(tone);
-                return;
-            }
-            _lightingFrom = _lightingCurrent;
-            _lightingTo = tone;
-            _lightingDuration = duration;
-            _lightingElapsed = 0f;
-        }
-
-        private void AdvanceLightingLerp(float deltaTime)
-        {
-            if (_lightingDuration <= 0f) return;
-
-            _lightingElapsed += deltaTime;
-            float t = Mathf.Clamp01(_lightingElapsed / _lightingDuration);
-
-            _lightingCurrent = new LightingTone
-            {
-                KeyLightColor = Color.Lerp(_lightingFrom.KeyLightColor, _lightingTo.KeyLightColor, t),
-                KeyLightIntensity = Mathf.Lerp(_lightingFrom.KeyLightIntensity, _lightingTo.KeyLightIntensity, t),
-                AmbientColor = Color.Lerp(_lightingFrom.AmbientColor, _lightingTo.AmbientColor, t),
-                Vignette = Mathf.Lerp(_lightingFrom.Vignette, _lightingTo.Vignette, t),
-                TransitionSeconds = _lightingTo.TransitionSeconds,
-            };
-            ApplyLighting(_lightingCurrent);
-
-            if (t >= 1f)
-            {
-                _lightingCurrent = _lightingTo;
-                _lightingDuration = 0f;
-            }
-        }
-
-        private void ApplyLighting(LightingTone tone)
-        {
-            if (_keyLight != null)
-            {
-                _keyLight.color = tone.KeyLightColor;
-                _keyLight.intensity = tone.KeyLightIntensity;
-            }
-            RenderSettings.ambientLight = tone.AmbientColor;
-
-            if (_vignetteOverride != null)
-            {
-                _vignetteOverride.intensity.overrideState = true;
-                _vignetteOverride.intensity.value = tone.Vignette;
-            }
         }
 
         // ─── Finish ────────────────────────────────────────────────────────

@@ -5,7 +5,6 @@ using OpenDesk.Characters.Wardrobe.Expressions;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 
@@ -64,11 +63,10 @@ namespace OpenDesk.Cinematic.Editor
             if (bodyRenderer == null)
                 Debug.LogWarning("[CinematicSceneBuilder] Could not infer body Renderer — wire the BodyRenderer field manually so expression textures land on the right submaterials.");
 
-            var keyLight = ReconfigureRigCamera(rig);    // returns the rig's Area Light (re-used as key)
-            var fillLight = BuildFillLight();
+            ReconfigureRigCamera(rig);    // mutates rig's camera + Area Light into static scene lighting
+            BuildFillLight();              // static fill light, not controller-driven
             ConfigureAmbient();
-            var postVolume = BuildPostFx();
-            BuildController(animator, partSwapper, bodyRenderer, keyLight, fillLight, postVolume);
+            BuildController(animator, partSwapper, bodyRenderer);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -96,12 +94,13 @@ namespace OpenDesk.Cinematic.Editor
         }
 
         // Mutates the camera child of AgentPreviewRig from "preview RT renderer"
-        // into a full-screen alpha capture camera. Also returns the rig's Area
-        // Light so the controller can use it as the key light.
+        // into a full-screen alpha capture camera, and re-types the rig's Area
+        // Light into a Directional one so the character is actually lit at
+        // runtime (Area lights only contribute through baking).
         //
         // NOTE: PrefabUtility.UnpackPrefabInstance is called so subsequent edits
         // don't get reverted by the prefab override system.
-        private static Light ReconfigureRigCamera(GameObject rig)
+        private static void ReconfigureRigCamera(GameObject rig)
         {
             PrefabUtility.UnpackPrefabInstance(rig, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);
 
@@ -119,7 +118,6 @@ namespace OpenDesk.Cinematic.Editor
                 var camData = rigCamera.GetComponent<UniversalAdditionalCameraData>();
                 if (camData == null) camData = rigCamera.gameObject.AddComponent<UniversalAdditionalCameraData>();
                 camData.renderPostProcessing = true;
-                camData.volumeLayerMask = ~0;            // pick up our PostFX volume regardless of layer
 
                 if (rigCamera.GetComponent<AudioListener>() == null)
                     rigCamera.gameObject.AddComponent<AudioListener>();
@@ -129,9 +127,6 @@ namespace OpenDesk.Cinematic.Editor
                 Debug.LogWarning("[CinematicSceneBuilder] AgentPreviewRig has no Camera child — add one manually before recording.");
             }
 
-            // The rig ships with an "Area Light"; we drive it as the key light.
-            // Area lights bake only — switch it to Directional so it animates at
-            // runtime when the controller writes color/intensity.
             Light rigLight = rig.GetComponentInChildren<Light>(includeInactive: true);
             if (rigLight != null)
             {
@@ -141,10 +136,9 @@ namespace OpenDesk.Cinematic.Editor
                 rigLight.intensity = 1.2f;
                 rigLight.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
             }
-            return rigLight;
         }
 
-        private static Light BuildFillLight()
+        private static void BuildFillLight()
         {
             var fillGo = new GameObject("FillLight");
             fillGo.transform.position = new Vector3(0, 3, -3);
@@ -154,7 +148,6 @@ namespace OpenDesk.Cinematic.Editor
             fillLight.color = new Color(0.78f, 0.85f, 1f);
             fillLight.intensity = 0.35f;
             fillLight.shadows = LightShadows.None;
-            return fillLight;
         }
 
         private static void ConfigureAmbient()
@@ -163,34 +156,7 @@ namespace OpenDesk.Cinematic.Editor
             RenderSettings.ambientLight = new Color(0.45f, 0.45f, 0.5f, 1f);
         }
 
-        private static Volume BuildPostFx()
-        {
-            var volumeGo = new GameObject("PostFX");
-            var volume = volumeGo.AddComponent<Volume>();
-            volume.isGlobal = true;
-            volume.priority = 0;
-
-            var profile = ScriptableObject.CreateInstance<VolumeProfile>();
-            profile.name = "CinematicVolumeProfile";
-
-            var vignette = profile.Add<Vignette>(true);
-            vignette.intensity.overrideState = true;
-            vignette.intensity.value = 0f;
-            vignette.smoothness.overrideState = true;
-            vignette.smoothness.value = 0.6f;
-
-            var profileDir = "Assets/01.Scenes/CinematicCaptureScene_Assets";
-            Directory.CreateDirectory(profileDir);
-            var profilePath = $"{profileDir}/CinematicVolumeProfile.asset";
-            AssetDatabase.CreateAsset(profile, profilePath);
-            AssetDatabase.SaveAssets();
-
-            volume.sharedProfile = profile;
-            return volume;
-        }
-
-        private static void BuildController(Animator animator, CharacterPartSwapper partSwapper, Renderer bodyRenderer,
-                                            Light keyLight, Light fillLight, Volume postVolume)
+        private static void BuildController(Animator animator, CharacterPartSwapper partSwapper, Renderer bodyRenderer)
         {
             var ctlGo = new GameObject("_Cinematic");
             var controller = ctlGo.AddComponent<CinematicCaptureController>();
@@ -200,9 +166,6 @@ namespace OpenDesk.Cinematic.Editor
             so.FindProperty("_bodyRenderer").objectReferenceValue = bodyRenderer;
             so.FindProperty("_eyeExpressionSet").objectReferenceValue = FindFirstEyeExpressionSet();
             so.FindProperty("_animator").objectReferenceValue = animator;
-            so.FindProperty("_keyLight").objectReferenceValue = keyLight;
-            so.FindProperty("_fillLight").objectReferenceValue = fillLight;
-            so.FindProperty("_postVolume").objectReferenceValue = postVolume;
             so.FindProperty("_totalDuration").floatValue = 8f;
             so.FindProperty("_autoExitPlayMode").boolValue = true;
             so.FindProperty("_logProgress").boolValue = true;
