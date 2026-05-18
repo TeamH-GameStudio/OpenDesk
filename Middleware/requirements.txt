@@ -1,1 +1,6 @@
 websockets>=13.0
+anthropic>=0.40.0
+mcp>=1.2.0
+python-dotenv>=1.0.0
+apscheduler>=3.10.0
+aiohttp>=3.9.0

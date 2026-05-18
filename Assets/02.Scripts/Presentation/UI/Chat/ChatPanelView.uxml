@@ -1,0 +1,83 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss?fileID=7433441132597879392&amp;guid=fdc9203ac02aa4694961498f00020daf&amp;type=3#opendesk-tokens"/>
+    <Style src="project://database/Assets/02.Scripts/Presentation/UI/Chat/ChatPanelView.uss?fileID=7433441132597879392&amp;guid=47650a042d94140b78bd9b7e42453cf6&amp;type=3#ChatPanelView"/>
+    <ui:VisualElement name="chat-panel" picking-mode="Ignore" class="chat-panel">
+        <ui:VisualElement class="chat-panel__body">
+            <ui:VisualElement picking-mode="Ignore" class="chat-panel__deco">
+                <ui:VisualElement name="deco-menu" picking-mode="Ignore" class="deco-menu">
+                    <ui:VisualElement name="deco-menu-panel" class="deco-menu__panel">
+                        <ui:Button name="deco-menu-skills" text="스킬" class="deco-menu__item od-body-sm"/>
+                        <ui:Button name="deco-menu-agent-settings" text="에이전트 세팅" class="deco-menu__item od-body-sm"/>
+                    </ui:VisualElement>
+                    <ui:Button name="deco-menu-toggle" tooltip="메뉴" class="deco-menu__toggle">
+                        <ui:VisualElement class="hamburger-icon">
+                            <ui:VisualElement class="hamburger-line"/>
+                            <ui:VisualElement class="hamburger-line"/>
+                            <ui:VisualElement class="hamburger-line"/>
+                        </ui:VisualElement>
+                    </ui:Button>
+                </ui:VisualElement>
+                <ui:VisualElement name="deco-skills" picking-mode="Ignore" class="deco-skills">
+                    <ui:VisualElement name="deco-skills-panel" class="deco-skills__panel">
+                        <ui:VisualElement name="deco-skills-list" class="deco-skills__list"/>
+                        <ui:Button name="deco-skills-empty-add" tooltip="스킬 추가" class="deco-skills__chip deco-skills__chip--add">
+                            <ui:Label text="+" class="deco-skills__chip-icon deco-skills__chip-icon--add"/>
+                            <ui:Label text="스킬 추가" class="deco-skills__chip-label od-body-sm"/>
+                        </ui:Button>
+                        <ui:Button name="deco-skills-more" tooltip="모든 스킬 보기" class="deco-skills__chip deco-skills__chip--more">
+                            <ui:Label text="..." class="deco-skills__chip-icon deco-skills__chip-icon--more"/>
+                            <ui:Label text="모든 스킬" class="deco-skills__chip-label od-body-sm"/>
+                        </ui:Button>
+                    </ui:VisualElement>
+                    <ui:Button name="deco-skills-toggle" text="스킬" tooltip="스킬 메뉴" class="deco-skills__toggle od-body-sm"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="chat-pane" class="chat-pane">
+                <ui:VisualElement class="chat-pane__brand-bar"/>
+                <ui:VisualElement name="chat-header" class="chat-header" style="height: 56px;">
+                    <ui:VisualElement class="chat-header__title-row">
+                        <ui:Label name="chat-agent-name" text="에이전트" class="chat-header__name od-heading-md"/>
+                        <ui:Label text="·" class="chat-header__sep"/>
+                        <ui:Label name="chat-agent-role" text="" class="chat-header__role od-body-sm"/>
+                    </ui:VisualElement>
+                    <ui:Label name="chat-status" text="" class="chat-header__status od-caption"/>
+                    <ui:VisualElement class="chat-header__spacer"/>
+                    <ui:DropdownField name="chat-model-dropdown" tooltip="모델 선택" class="chat-model-dropdown"/>
+                    <ui:Button name="chat-new-session-button" tooltip="새 대화" text="+" class="icon-btn icon-btn--accent"/>
+                    <ui:Button name="chat-sessions-button" tooltip="대화 목록" class="icon-btn">
+                        <ui:VisualElement class="hamburger-icon">
+                            <ui:VisualElement class="hamburger-line"/>
+                            <ui:VisualElement class="hamburger-line"/>
+                            <ui:VisualElement class="hamburger-line"/>
+                        </ui:VisualElement>
+                    </ui:Button>
+                    <ui:Button name="chat-close-button" tooltip="닫기" text="×" class="icon-btn"/>
+                </ui:VisualElement>
+                <ui:ScrollView name="chat-scroll" mode="Vertical" class="chat-scroll"/>
+                <ui:Label name="chat-empty-hint" text="첫 메시지를 보내 대화를 시작해보세요." class="chat-empty-hint od-body-sm"/>
+                <ui:VisualElement class="chat-input-area">
+                    <ui:VisualElement class="chat-input-row">
+                        <ui:TextField name="chat-input" multiline="true" class="chat-input od-body-md"/>
+                        <ui:Button name="chat-send-button" tooltip="전송" class="send-button">
+                            <ui:VisualElement class="send-arrow"/>
+                        </ui:Button>
+                        <ui:Button name="chat-stop-button" tooltip="응답 중단" class="stop-button">
+                            <ui:VisualElement class="stop-icon"/>
+                        </ui:Button>
+                    </ui:VisualElement>
+                    <ui:Label text="Enter로 전송, Shift+Enter로 줄바꿈" class="chat-input-hint od-caption"/>
+                </ui:VisualElement>
+                <ui:VisualElement name="sessions-drawer" class="sessions-drawer">
+                    <ui:VisualElement class="sessions-drawer__header">
+                        <ui:Label text="대화 목록" class="sessions-drawer__title od-heading-md"/>
+                        <ui:VisualElement class="chat-header__spacer"/>
+                        <ui:Button name="sessions-drawer-new" text="+ 새 대화" class="sessions-drawer__btn sessions-drawer__btn--primary"/>
+                        <ui:Button name="sessions-drawer-close" text="×" tooltip="채팅으로 돌아가기" class="sessions-drawer__btn sessions-drawer__btn--close"/>
+                    </ui:VisualElement>
+                    <ui:ScrollView name="sessions-drawer-scroll" mode="Vertical" vertical-scroller-visibility="Auto" horizontal-scroller-visibility="Hidden" class="sessions-drawer__scroll"/>
+                    <ui:Label name="sessions-drawer-empty" text="아직 대화가 없습니다." class="sessions-drawer__empty od-body-sm"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

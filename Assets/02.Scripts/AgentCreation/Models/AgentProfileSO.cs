@@ -1,3 +1,4 @@
+using OpenDesk.AgentCreation.Persistence;
 using UnityEngine;
 
 namespace OpenDesk.AgentCreation.Models
@@ -6,6 +7,10 @@ namespace OpenDesk.AgentCreation.Models
     /// 에이전트 한 명의 모든 설정을 담는 ScriptableObject.
     /// 위저드 완료 시 런타임 생성 가능, 또는 에셋으로 미리 생성 가능.
     /// 실제 3D 모델이 준비되면 ModelPrefab만 교체하면 됨.
+    ///
+    /// 2026-05-14 — JSON-SSOT 리팩토링: Record(원본) 를 Source 로 노출.
+    /// 다운스트림은 enum 매핑된 캐시(Role/Tone 등) 대신 Source 의 raw 필드를
+    /// 우선 참조해야 한다. Visual 슬롯(ModelPrefab/HudColor) 만 SO 가 유일한 보관소.
     /// </summary>
     [CreateAssetMenu(fileName = "NewAgentProfile", menuName = "OpenDesk/Agent Profile")]
     public class AgentProfileSO : ScriptableObject
@@ -29,6 +34,12 @@ namespace OpenDesk.AgentCreation.Models
         // ── Session ─────────────────────────────────────────
         [Header("Session")]
         [SerializeField] private string _sessionId = "";
+
+        // ── Source (JSON SSOT) ──────────────────────────────
+        // 비-Serialize: 디스크 SO 에는 저장되지 않는다. AgentProfileFactory.FromRecord 가
+        // 런타임에 주입 (CreateAsset 으로 만든 디자이너 SO 는 Source 가 null 일 수 있음 — 호출자가 null 가드).
+        private AgentDraftRecord _source;
+        public AgentDraftRecord Source => _source;
 
         // ── Properties ──────────────────────────────────────
         public string AgentName       => _agentName;

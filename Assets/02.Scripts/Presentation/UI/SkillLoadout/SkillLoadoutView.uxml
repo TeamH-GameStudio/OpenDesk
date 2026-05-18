@@ -1,0 +1,131 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss"/>
+    <Style src="SkillLoadoutView.uss"/>
+
+    <ui:VisualElement name="loadout-root" class="loadout-root" picking-mode="Position">
+        <ui:VisualElement class="loadout-veil"/>
+
+        <ui:VisualElement class="loadout-card-root" picking-mode="Position">
+
+            <!-- Header ────────────────────────────────────────────── -->
+            <ui:VisualElement class="loadout-header">
+                <ui:VisualElement class="loadout-header__titles">
+                    <ui:Label name="agent-name" text="에이전트" class="loadout-header__name od-heading-lg"/>
+                    <ui:Label name="agent-subtitle" text="스킬 장착" class="loadout-header__subtitle od-caption"/>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="preset-bar" class="loadout-presets" picking-mode="Position"/>
+
+                <ui:Button name="close-btn" text="✕" class="loadout-close"/>
+            </ui:VisualElement>
+
+            <!-- Body : 좌(장착) + 우(인벤토리) ─────────────────── -->
+            <ui:VisualElement class="loadout-body">
+
+                <!-- Left: 캐릭터 프리뷰 + 장착 게이지 + 6개 슬롯 -->
+                <ui:VisualElement class="loadout-left">
+
+                    <ui:VisualElement class="loadout-preview">
+                        <ui:VisualElement name="preview-frame" class="loadout-preview__frame"/>
+                        <ui:Label text="현재 에이전트" class="loadout-preview__caption od-caption"/>
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="loadout-gauge">
+                        <ui:VisualElement class="loadout-gauge__row">
+                            <ui:Label text="장착 슬롯" class="loadout-gauge__label od-caption"/>
+                            <ui:VisualElement class="loadout-gauge__counts">
+                                <ui:Label name="gauge-used" text="0" class="loadout-gauge__used od-caption"/>
+                                <ui:Label name="gauge-total" text=" / 6" class="loadout-gauge__total od-caption"/>
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="loadout-gauge__bar">
+                            <ui:VisualElement name="gauge-fill" class="loadout-gauge__fill"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="slot-list" class="loadout-slots"/>
+
+                    <ui:Label name="loadout-empty-hint"
+                              text="오른쪽 인벤토리에서 스킬을 골라 장착해 보세요."
+                              class="loadout-slots__hint od-body-sm"/>
+
+                </ui:VisualElement>
+
+                <!-- Right: 보유 스킬 인벤토리 -->
+                <ui:VisualElement class="loadout-right">
+
+                    <ui:VisualElement class="loadout-right__head">
+                        <ui:Label text="보유한 스킬" class="loadout-right__title od-heading-md"/>
+                        <ui:Label name="inventory-count" text="" class="loadout-right__count od-caption"/>
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="loadout-search">
+                        <ui:Label text="🔍" class="loadout-search__icon"/>
+                        <ui:TextField name="search-field" class="loadout-search__field" picking-mode="Position"/>
+                    </ui:VisualElement>
+
+                    <ui:ScrollView name="category-bar"
+                                   class="loadout-categories"
+                                   mode="Horizontal"
+                                   horizontal-scroller-visibility="Hidden"
+                                   vertical-scroller-visibility="Hidden"/>
+
+                    <ui:ScrollView name="inventory-scroll"
+                                   class="loadout-inventory"
+                                   mode="Vertical"
+                                   vertical-scroller-visibility="Auto"
+                                   horizontal-scroller-visibility="Hidden"/>
+
+                    <ui:Label name="inventory-empty"
+                              text="보유한 스킬이 없습니다. 아래 버튼으로 마켓에서 스킬을 찾아보세요."
+                              class="loadout-inventory__empty od-caption"/>
+
+                    <ui:Button name="open-market-btn"
+                               text="+ 스킬 마켓에서 더 찾기"
+                               class="loadout-cta od-body-sm"/>
+
+                </ui:VisualElement>
+
+            </ui:VisualElement>
+
+            <!-- Replace confirm modal (6/6 → 교체 확인) ───────── -->
+            <ui:VisualElement name="replace-modal" class="loadout-replace" picking-mode="Position">
+                <ui:VisualElement name="replace-veil" class="loadout-replace__veil"/>
+                <ui:VisualElement class="loadout-replace__card">
+                    <ui:Label text="슬롯이 가득 찼어요" class="loadout-replace__title od-heading-md"/>
+                    <ui:Label name="replace-subtitle" text="" class="loadout-replace__sub od-body-md"/>
+
+                    <ui:VisualElement class="loadout-replace__row">
+                        <ui:VisualElement class="loadout-replace__side">
+                            <ui:VisualElement name="replace-old-icon" class="loadout-replace__icon">
+                                <ui:Label name="replace-old-letter" text="" class="loadout-replace__icon-letter"/>
+                            </ui:VisualElement>
+                            <ui:VisualElement class="loadout-replace__side-body">
+                                <ui:Label name="replace-old-tag" text="" class="loadout-replace__side-tag od-caption"/>
+                                <ui:Label name="replace-old-name" text="" class="loadout-replace__side-name od-body-md"/>
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+
+                        <ui:Label text="→" class="loadout-replace__arrow"/>
+
+                        <ui:VisualElement class="loadout-replace__side">
+                            <ui:VisualElement name="replace-new-icon" class="loadout-replace__icon">
+                                <ui:Label name="replace-new-letter" text="" class="loadout-replace__icon-letter"/>
+                            </ui:VisualElement>
+                            <ui:VisualElement class="loadout-replace__side-body">
+                                <ui:Label text="새 스킬" class="loadout-replace__side-tag loadout-replace__side-tag--new od-caption"/>
+                                <ui:Label name="replace-new-name" text="" class="loadout-replace__side-name od-body-md"/>
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="loadout-replace__buttons">
+                        <ui:Button name="replace-cancel-btn" text="취소" class="loadout-replace__btn loadout-replace__btn--ghost"/>
+                        <ui:Button name="replace-confirm-btn" text="교체" class="loadout-replace__btn loadout-replace__btn--primary"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

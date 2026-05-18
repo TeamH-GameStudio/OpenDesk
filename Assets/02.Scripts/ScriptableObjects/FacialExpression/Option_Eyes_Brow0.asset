@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6745ce7a0222044c3992dbe0734afb9d, type: 3}
+  m_Name: Option_Eyes_Brow0
+  m_EditorClassIdentifier: Assembly-CSharp::OpenDesk.Characters.Wardrobe.Expressions.EyeExpressionSetSO
+  _expressions:
+  - Key: 0
+    Texture: {fileID: 2800000, guid: 8e8f2e9f23d214dee95b8d9cf5c1076d, type: 3}
+    MouthTexture: {fileID: 2800000, guid: 180b34c94436f401bacec9e2e43feaca, type: 3}
+  - Key: 5
+    Texture: {fileID: 2800000, guid: 0de3fea58684841cda4bb48022a22777, type: 3}
+    MouthTexture: {fileID: 2800000, guid: b87342b90ebc046d0a33499d5ad6d7c1, type: 3}
+  - Key: 1
+    Texture: {fileID: 2800000, guid: 5bb62ec8086ba41489313f01c45783e6, type: 3}
+    MouthTexture: {fileID: 2800000, guid: 446054b67055a4a71b6ae90686488618, type: 3}
+  - Key: 4
+    Texture: {fileID: 2800000, guid: 1a71399bbb3e04cd7b3ed6b58f0ea609, type: 3}
+    MouthTexture: {fileID: 2800000, guid: cf0182f47cc7649efb9b6c7aeab1455b, type: 3}
+  - Key: 2
+    Texture: {fileID: 2800000, guid: 5bb62ec8086ba41489313f01c45783e6, type: 3}
+    MouthTexture: {fileID: 2800000, guid: d9075038ffadc4125aa03e238c1659e5, type: 3}
+  - Key: 9
+    Texture: {fileID: 2800000, guid: 8e8f2e9f23d214dee95b8d9cf5c1076d, type: 3}
+    MouthTexture: {fileID: 2800000, guid: cf0182f47cc7649efb9b6c7aeab1455b, type: 3}

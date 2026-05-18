@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using OpenDesk.Core;
 using OpenDesk.Core.Models;
 using OpenDesk.Core.Services;
 using R3;
@@ -12,7 +13,7 @@ using UnityEngine;
 namespace OpenDesk.Core.Implementations
 {
     /// <summary>
-    /// 메신저 채널 연동 — 봇 토큰 입력 → OpenClaw 설정 파일 수정 → 통신 개시
+    /// 메신저 채널 연동 — 봇 토큰 입력 → OpenDesk 채널 설정 파일 수정 → 통신 개시 (2026-04-27 ~/.openclaw에서 마이그레이션)
     /// </summary>
     public class ChannelService : IChannelService, IDisposable
     {
@@ -49,7 +50,7 @@ namespace OpenDesk.Core.Implementations
             {
                 try
                 {
-                    // OpenClaw 채널 설정 파일에 토큰 기록
+                    // OpenDesk 채널 설정 파일에 토큰 기록
                     var configPath = GetChannelConfigPath();
                     Directory.CreateDirectory(Path.GetDirectoryName(configPath));
 
@@ -101,14 +102,7 @@ channels:
             return ChannelStatus.Connected;
         }
 
-        private static string GetChannelConfigPath()
-        {
-            var basePath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openclaw")
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw");
-
-            return Path.Combine(basePath, "channels.yaml");
-        }
+        private static string GetChannelConfigPath() => OpenDeskPaths.ChannelsConfig;
 
         public void Dispose() => _statusChanged.Dispose();
     }

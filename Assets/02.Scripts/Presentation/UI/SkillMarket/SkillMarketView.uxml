@@ -1,0 +1,222 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss"/>
+    <Style src="SkillMarketView.uss"/>
+
+    <ui:VisualElement name="skill-market" class="skill-market" picking-mode="Position">
+        <ui:VisualElement class="skill-market__veil"/>
+
+        <ui:VisualElement class="skill-market__card" picking-mode="Position">
+
+            <!-- Header ────────────────────────────────────────────── -->
+            <ui:VisualElement class="skill-market__header">
+                <ui:VisualElement class="skill-market__header-row">
+                    <ui:Label name="skill-market-title"
+                              text="스킬 마켓"
+                              class="skill-market__title"/>
+                    <ui:VisualElement class="skill-market__header-spacer"/>
+                    <ui:Button name="skill-market-refresh"
+                               text="새로고침"
+                               class="skill-market__btn skill-market__btn--ghost"/>
+                    <ui:Button name="skill-market-close"
+                               text="✕"
+                               class="skill-market__btn skill-market__btn--close"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Tab bar ───────────────────────────────────────────── -->
+            <ui:ScrollView name="skill-market-tab-bar"
+                           class="skill-market__tabbar"
+                           mode="Horizontal"
+                           vertical-scroller-visibility="Hidden"
+                           horizontal-scroller-visibility="Hidden"/>
+
+            <!-- Body ──────────────────────────────────────────────── -->
+            <ui:VisualElement name="skill-market-body" class="skill-market__body">
+
+                <!-- ════════ Featured panel (추천 탭) ════════ -->
+                <ui:VisualElement name="skill-market-featured-panel"
+                                  class="skill-market__featured">
+
+                    <ui:VisualElement class="skill-market__featured-search-row">
+                        <ui:TextField name="skill-market-search-featured"
+                                      placeholder-text="스킬, 카테고리, 작업으로 검색"
+                                      class="skill-market__search"/>
+                    </ui:VisualElement>
+
+                    <ui:ScrollView name="skill-market-featured-scroll"
+                                   class="skill-market__featured-scroll"
+                                   mode="Vertical"
+                                   vertical-scroller-visibility="Auto"
+                                   horizontal-scroller-visibility="Hidden">
+
+                        <!-- Padding wrapper (UI Toolkit > child selector on ScrollView's
+                             content-container doesn't reliably match; use a named wrapper) -->
+                        <ui:VisualElement class="skill-market__featured-pad">
+
+                            <!-- Hero (role-recommended highlight) -->
+                            <ui:VisualElement name="skill-market-hero"
+                                              class="skill-market__hero">
+                                <ui:VisualElement class="skill-market__hero-body">
+                                    <ui:Label name="skill-market-hero-kicker"
+                                              text="이주의 추천"
+                                              class="skill-market__hero-kicker od-caption"/>
+                                    <ui:VisualElement class="skill-market__hero-headline">
+                                        <ui:VisualElement name="skill-market-hero-mono"
+                                                          class="skill-market__hero-mono">
+                                            <ui:Label name="skill-market-hero-mono-char"
+                                                      text="·"
+                                                      class="skill-market__hero-mono-char"/>
+                                        </ui:VisualElement>
+                                        <ui:VisualElement class="skill-market__hero-title-wrap">
+                                            <ui:Label name="skill-market-hero-title"
+                                                      text="추천 스킬"
+                                                      class="skill-market__hero-title od-heading-lg"/>
+                                            <ui:Label name="skill-market-hero-meta"
+                                                      text=""
+                                                      class="skill-market__hero-meta od-caption"/>
+                                        </ui:VisualElement>
+                                    </ui:VisualElement>
+                                    <ui:Label name="skill-market-hero-desc"
+                                              text=""
+                                              class="skill-market__hero-desc od-body-md"/>
+                                </ui:VisualElement>
+                                <ui:VisualElement class="skill-market__hero-preview">
+                                    <ui:Label text="preview"
+                                              class="skill-market__hero-preview-label"/>
+                                </ui:VisualElement>
+                            </ui:VisualElement>
+
+                            <!-- Recommended section (role-recs grid) -->
+                            <ui:VisualElement name="skill-market-recommended-section"
+                                              class="skill-market__section">
+                                <ui:VisualElement class="skill-market__section-row">
+                                    <ui:Label name="skill-market-recommended-header"
+                                              text="추천"
+                                              class="skill-market__section-title od-heading-md"/>
+                                    <ui:Label name="skill-market-recommended-hint"
+                                              text=""
+                                              class="skill-market__section-hint od-caption"/>
+                                </ui:VisualElement>
+                                <ui:VisualElement name="skill-market-recommended"
+                                                  class="skill-market__grid-4"/>
+                            </ui:VisualElement>
+
+                            <!-- New / All section -->
+                            <ui:VisualElement class="skill-market__section">
+                                <ui:VisualElement class="skill-market__section-row">
+                                    <ui:Label name="skill-market-newly-header"
+                                              text="새로 추가된 스킬"
+                                              class="skill-market__section-title od-heading-md"/>
+                                    <ui:Label name="skill-market-newly-hint"
+                                              text=""
+                                              class="skill-market__section-hint od-caption"/>
+                                </ui:VisualElement>
+                                <ui:VisualElement name="skill-market-newly"
+                                                  class="skill-market__grid-3"/>
+                            </ui:VisualElement>
+
+                        </ui:VisualElement>
+                    </ui:ScrollView>
+                </ui:VisualElement>
+
+                <!-- ════════ Category two-pane panel ════════ -->
+                <ui:VisualElement name="skill-market-category-panel"
+                                  class="skill-market__category-panel">
+
+                    <!-- Left: search + list -->
+                    <ui:VisualElement class="skill-market__list-pane">
+                        <ui:VisualElement class="skill-market__list-search">
+                            <ui:TextField name="skill-market-search-list"
+                                          placeholder-text="검색"
+                                          class="skill-market__search"/>
+                        </ui:VisualElement>
+                        <ui:ScrollView name="skill-market-list"
+                                       class="skill-market__list-scroll"
+                                       mode="Vertical"
+                                       vertical-scroller-visibility="Auto"
+                                       horizontal-scroller-visibility="Hidden"/>
+                        <ui:Label name="skill-market-list-empty"
+                                  text="검색 결과가 없어요."
+                                  class="skill-market__list-empty od-body-sm"/>
+                    </ui:VisualElement>
+
+                    <!-- Right: detail -->
+                    <ui:ScrollView name="skill-market-detail-scroll"
+                                   class="skill-market__detail-scroll"
+                                   mode="Vertical"
+                                   vertical-scroller-visibility="Auto"
+                                   horizontal-scroller-visibility="Hidden">
+                        <ui:VisualElement class="skill-market__detail-pad">
+                            <ui:VisualElement name="skill-market-detail"
+                                              class="skill-market__detail"/>
+                            <ui:Label name="skill-market-detail-empty"
+                                      text="왼쪽에서 스킬을 선택하세요."
+                                      class="skill-market__detail-empty od-body-md"/>
+                        </ui:VisualElement>
+                    </ui:ScrollView>
+
+                </ui:VisualElement>
+
+            </ui:VisualElement>
+
+            <!-- Permission Modal (설치 클릭 시) ───────────────────── -->
+            <ui:VisualElement name="skill-market-perm-modal"
+                              class="skill-market__modal"
+                              picking-mode="Position">
+                <ui:VisualElement name="skill-market-perm-veil"
+                                  class="skill-market__modal-veil"
+                                  picking-mode="Position"/>
+                <ui:VisualElement class="skill-market__modal-card" picking-mode="Position">
+
+                    <ui:VisualElement class="skill-market__modal-head">
+                        <ui:VisualElement class="skill-market__modal-mono">
+                            <ui:Label name="skill-market-perm-mono"
+                                      text="·"
+                                      class="skill-market__modal-mono-char"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="skill-market__modal-title-wrap">
+                            <ui:Label name="skill-market-perm-title"
+                                      text="설치"
+                                      class="skill-market__modal-title od-heading-md"/>
+                            <ui:Label name="skill-market-perm-author"
+                                      text=""
+                                      class="skill-market__modal-author od-caption"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:Label text="이 스킬은 다음 권한을 요청해요. 설치 후에도 설정에서 언제든 끌 수 있어요."
+                              class="skill-market__modal-lead od-body-md"/>
+
+                    <ui:VisualElement name="skill-market-perm-list"
+                                      class="skill-market__modal-perms"/>
+
+                    <ui:VisualElement class="skill-market__modal-foot">
+                        <ui:Label text="설치 후 동료가 이 스킬을 사용하기 전 매번 알려드릴 수 있어요."
+                                  class="skill-market__modal-footnote od-caption"/>
+                        <ui:VisualElement class="skill-market__modal-foot-actions">
+                            <ui:Button name="skill-market-perm-cancel"
+                                       text="취소"
+                                       class="skill-market__modal-btn skill-market__modal-btn--ghost"/>
+                            <ui:Button name="skill-market-perm-confirm"
+                                       text="설치"
+                                       class="skill-market__modal-btn skill-market__modal-btn--primary"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Toast 알림 (우측 상단, absolute) — 마지막 자식이라
+                 z-order 상 다른 자식 위에 그려짐 (UI Toolkit 은 sibling 순서로 stacking) -->
+            <ui:VisualElement name="skill-market-toast"
+                              class="skill-market__toast"
+                              picking-mode="Ignore">
+                <ui:VisualElement class="skill-market__toast-dot"/>
+                <ui:Label name="skill-market-toast-text"
+                          text=""
+                          class="skill-market__toast-text od-body-sm"/>
+            </ui:VisualElement>
+
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

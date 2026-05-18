@@ -1,3 +1,4 @@
+using OpenDesk.Characters.Wardrobe.Expressions;
 using OpenDesk.Presentation.Character.Context;
 using UnityEngine;
 using UnityEngine.AI;
@@ -26,7 +27,7 @@ namespace OpenDesk.Presentation.Character.States
         public void Enter()
         {
             Debug.Log($"[{_ctx.AgentName}] Thinking 진입 -- 컴퓨터 앞으로 이동");
-            _ctx.Expression?.SetExpression("Puzzled");
+            _ctx.Expression?.SetExpression(AgentExpressionKey.Closed);
 
             if (TryFindNearestChair(out var chairPos, out var chairFwd))
             {
@@ -60,7 +61,7 @@ namespace OpenDesk.Presentation.Character.States
         public void Exit()
         {
             _ctx.StopMoving();
-            _ctx.Expression?.SetExpression("Neutral");
+            _ctx.Expression?.SetExpression(AgentExpressionKey.Default);
         }
 
         private void StartThinkingInPlace()

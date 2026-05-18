@@ -14,6 +14,7 @@ namespace OpenDesk.Pipeline
     /// - 크래프팅 완료 시 DisketteShelfUI에 카드 추가
     /// - 프리셋 디스켓도 ShelfUI에 등록
     /// </summary>
+    [System.Obsolete("디스켓 메타포 제거에 따라 비활성. 크래프팅(자연어 → Skill) UI 는 추후 마켓플레이스 안의 'Create Skill' 패널로 이전 예정. 가역 보존용.")]
     public class DiskettePrinterController : MonoBehaviour
     {
         [Header("디스켓 선반 UI")]
@@ -30,10 +31,10 @@ namespace OpenDesk.Pipeline
         [SerializeField] private TextMeshProUGUI _toggleLabel;
 
         // ── DI ──
-        private IClaudeService _claudeService;
+        private IAiChatService _claudeService;
 
         [Inject]
-        public void Construct(IClaudeService claudeService)
+        public void Construct(IAiChatService claudeService)
         {
             _claudeService = claudeService;
         }

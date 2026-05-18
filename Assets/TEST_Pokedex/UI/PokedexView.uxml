@@ -1,0 +1,59 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="PokedexStyles.uss" />
+    <ui:VisualElement name="root" class="root">
+        <ui:VisualElement name="header" class="header">
+            <ui:Label text="Pokedex" class="title" />
+            <ui:VisualElement class="toolbar">
+                <ui:TextField name="search-field" class="search-field" />
+                <ui:Toggle name="favorites-toggle" label="Favorites Only" class="favorites-toggle" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="content" class="content">
+            <ui:VisualElement name="list-pane" class="list-pane">
+                <ui:ListView name="pokemon-list" class="pokemon-list" show-border="false" reorderable="false" virtualization-method="FixedHeight" fixed-item-height="56" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="detail-panel" class="detail-panel">
+                <ui:VisualElement name="detail-empty" class="detail-empty">
+                    <ui:Label text="Select a Pokemon" class="detail-empty-text" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="detail-content" class="detail-content">
+                    <ui:VisualElement class="detail-header">
+                        <ui:Label name="detail-number" class="detail-number" />
+                        <ui:Label name="detail-name" class="detail-name" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="detail-types">
+                        <ui:Label name="detail-type1" class="type-pill" />
+                        <ui:Label name="detail-type2" class="type-pill" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="stats">
+                        <ui:VisualElement class="stat-row">
+                            <ui:Label text="HP" class="stat-label" />
+                            <ui:Label name="detail-hp" class="stat-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="stat-row">
+                            <ui:Label text="Attack" class="stat-label" />
+                            <ui:Label name="detail-attack" class="stat-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="stat-row">
+                            <ui:Label text="Defense" class="stat-label" />
+                            <ui:Label name="detail-defense" class="stat-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="stat-row">
+                            <ui:Label text="Speed" class="stat-label" />
+                            <ui:Label name="detail-speed" class="stat-value" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:Label name="detail-description" class="detail-description" />
+
+                    <ui:Button name="detail-favorite-button" class="favorite-button" text="Add Favorite" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

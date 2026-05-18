@@ -46,8 +46,9 @@ namespace OpenDesk.Editor
 
         private void OnEnable()
         {
-            // 현재 저장된 Mock 모드 상태 반영
-            _useMockMode = PlayerPrefs.GetInt("OpenDesk_MockMode", 0) == 1;
+            // DEPRECATED 2026-04-27: OpenClaw Mock 모드 — legacy.
+            // _useMockMode = PlayerPrefs.GetInt("OpenDesk_MockMode", 0) == 1;
+            _useMockMode = false;
         }
         private Vector2 _scrollPos;
 
@@ -106,7 +107,8 @@ namespace OpenDesk.Editor
             if (GUILayout.Button("완료 상태로 설정", GUILayout.Height(28)))
             {
                 PlayerPrefs.SetInt("OpenDesk_IsFirstRun", 0);
-                PlayerPrefs.SetString("OpenDesk_GatewayUrl", "ws://localhost:18789/events");
+                // DEPRECATED 2026-04-27: OpenClaw Gateway URL 저장 비활성.
+                // PlayerPrefs.SetString("OpenDesk_GatewayUrl", "ws://localhost:18789/events");
                 PlayerPrefs.Save();
                 Debug.Log("[Debug] PlayerPrefs 완료 상태 설정 — 다음 Play 시 온보딩 건너뜀");
             }
@@ -272,17 +274,18 @@ namespace OpenDesk.Editor
 
         private static void EnableMockMode()
         {
-            // 스크립팅 심볼로 Mock 모드 활성화
-            PlayerPrefs.SetInt("OpenDesk_MockMode", 1);
-            PlayerPrefs.Save();
-            Debug.Log("[Debug] Mock 모드 활성화 — 실제 설치 명령 실행하지 않음");
+            // DEPRECATED 2026-04-27: OpenClaw Mock 모드 — legacy.
+            // PlayerPrefs.SetInt("OpenDesk_MockMode", 1);
+            // PlayerPrefs.Save();
+            Debug.Log("[Debug] Mock 모드 — DEPRECATED. OpenClaw legacy 비활성.");
         }
 
         private static void DisableMockMode()
         {
+            // DEPRECATED 2026-04-27: OpenClaw Mock 모드 — legacy.
             PlayerPrefs.DeleteKey("OpenDesk_MockMode");
             PlayerPrefs.Save();
-            Debug.Log("[Debug] Mock 모드 비활성화 — 실제 명령 실행됨");
+            Debug.Log("[Debug] Mock 모드 — DEPRECATED.");
         }
 
         private static void ResetPlayerPrefs()

@@ -1,0 +1,97 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss"/>
+    <Style src="AnthropicAuthModal.uss"/>
+
+    <ui:VisualElement name="anthropic-auth-modal" class="anthropic-auth-modal" picking-mode="Position">
+        <ui:VisualElement class="anthropic-auth-modal__veil"/>
+
+        <ui:VisualElement class="anthropic-auth-modal__card" picking-mode="Position">
+
+            <ui:VisualElement class="anthropic-auth-modal__header">
+                <ui:Label text="Anthropic 인증"
+                          class="anthropic-auth-modal__title od-heading-md"/>
+                <ui:Label text="OpenDesk 전용 격리 디렉토리에 자격증명을 보관합니다. 글로벌 ~/.claude/ 는 변경되지 않습니다."
+                          class="anthropic-auth-modal__subtitle od-caption"/>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="anthropic-auth-modal__tabs">
+                <ui:Button name="anthropic-auth-tab-key"
+                           text="API Key"
+                           class="anthropic-auth-modal__tab anthropic-auth-modal__tab--active"/>
+                <ui:Button name="anthropic-auth-tab-oauth"
+                           text="Claude 계정 로그인"
+                           class="anthropic-auth-modal__tab"/>
+            </ui:VisualElement>
+
+            <!-- ── API Key 탭 ───────────────────────────────────── -->
+            <ui:VisualElement name="anthropic-auth-key-pane" class="anthropic-auth-modal__pane">
+                <ui:Label text="ANTHROPIC_API_KEY"
+                          class="anthropic-auth-field__label od-body-sm"/>
+                <ui:TextField name="anthropic-auth-key-input"
+                              password="true"
+                              class="anthropic-auth-field__input"/>
+                <ui:Label text="https://console.anthropic.com/settings/keys 에서 발급받은 키를 붙여넣으세요."
+                          class="anthropic-auth-field__hint od-caption"/>
+
+                <ui:VisualElement class="anthropic-auth-modal__row-buttons">
+                    <ui:Button name="anthropic-auth-key-delete"
+                               text="삭제"
+                               class="anthropic-auth-modal__btn anthropic-auth-modal__btn--ghost"/>
+                    <ui:Button name="anthropic-auth-key-save"
+                               text="저장"
+                               class="anthropic-auth-modal__btn anthropic-auth-modal__btn--primary"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- ── OAuth 탭 ─────────────────────────────────────── -->
+            <ui:VisualElement name="anthropic-auth-oauth-pane" class="anthropic-auth-modal__pane anthropic-auth-modal__pane--hidden">
+                <ui:Label text="Claude 계정으로 로그인"
+                          class="anthropic-auth-field__label od-body-sm"/>
+                <ui:Label name="anthropic-auth-oauth-status"
+                          text="시작 버튼을 누르면 격리 환경에서 'claude login' 이 실행됩니다."
+                          class="anthropic-auth-modal__status od-body-sm"/>
+
+                <ui:VisualElement name="anthropic-auth-oauth-code-row"
+                                  class="anthropic-auth-modal__code-row anthropic-auth-modal__pane--hidden">
+                    <ui:Label text="인증 코드"
+                              class="anthropic-auth-field__label od-caption"/>
+                    <ui:Label name="anthropic-auth-oauth-code"
+                              text=""
+                              class="anthropic-auth-modal__code od-heading-md"/>
+                    <ui:Button name="anthropic-auth-oauth-copy-code"
+                               text="복사"
+                               class="anthropic-auth-modal__btn anthropic-auth-modal__btn--ghost"/>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="anthropic-auth-oauth-url-row"
+                                  class="anthropic-auth-modal__url-row anthropic-auth-modal__pane--hidden">
+                    <ui:Label name="anthropic-auth-oauth-url"
+                              text=""
+                              class="anthropic-auth-modal__url od-caption"/>
+                    <ui:Button name="anthropic-auth-oauth-open"
+                               text="브라우저 열기"
+                               class="anthropic-auth-modal__btn anthropic-auth-modal__btn--primary"/>
+                </ui:VisualElement>
+
+                <ui:VisualElement class="anthropic-auth-modal__row-buttons">
+                    <ui:Button name="anthropic-auth-oauth-cancel"
+                               text="취소"
+                               class="anthropic-auth-modal__btn anthropic-auth-modal__btn--ghost"/>
+                    <ui:Button name="anthropic-auth-oauth-start"
+                               text="시작"
+                               class="anthropic-auth-modal__btn anthropic-auth-modal__btn--primary"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="anthropic-auth-modal__footer">
+                <ui:Label name="anthropic-auth-error"
+                          text=""
+                          class="anthropic-auth-modal__error od-caption"/>
+                <ui:Button name="anthropic-auth-close"
+                           text="닫기"
+                           class="anthropic-auth-modal__btn anthropic-auth-modal__btn--ghost"/>
+            </ui:VisualElement>
+
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

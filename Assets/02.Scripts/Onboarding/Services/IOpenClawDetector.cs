@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 
@@ -7,6 +8,7 @@ namespace OpenDesk.Onboarding.Services
     /// OpenClaw 설치 여부 및 버전 감지
     /// 순수 탐색 전용 — 설치/실행 없음
     /// </summary>
+    [Obsolete("OpenClaw legacy. Replaced by Claude CLI/Anthropic API path (IClaudeService). Will be removed once Anthropic-direct migration is fully verified.", error: false)]
     public interface IOpenClawDetector
     {
         // 설치 여부

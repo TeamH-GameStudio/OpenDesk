@@ -103,7 +103,8 @@ namespace OpenDesk.Presentation.UI.OfficeWizard
         // ── DI ──────────────────────────────────────────────
         [Inject] private IApiKeyVaultService _vault;
         [Inject] private IChannelService     _channelService;
-        [Inject] private IOpenClawBridgeService _bridge;
+        // DEPRECATED 2026-04-27: OpenClaw bridge DI 제거. 테스트 채팅은 IClaudeService 경로로 이전.
+        // [Inject] private IOpenClawBridgeService _bridge;
 
         // ── 상태 ────────────────────────────────────────────
         private OfficeWizardState _currentState = OfficeWizardState.Hidden;
@@ -490,18 +491,20 @@ namespace OpenDesk.Presentation.UI.OfficeWizard
         {
             if (_testChatInput != null) _testChatInput.text = message;
 
-            if (_bridge != null && _bridge.IsConnected)
-            {
-                _bridge.SendMessageAsync("main", message).Forget();
-                if (_testChatResponseText != null)
-                    _testChatResponseText.text = "AI 비서가 생각하고 있어요...";
-            }
-            else
-            {
-                // Mock 응답
-                if (_testChatResponseText != null)
-                    _testChatResponseText.text = $"(Mock 모드) \"{message}\"를 받았어요!\n실제 연결 시 AI가 답변합니다.";
-            }
+            // DEPRECATED 2026-04-27: OpenClaw bridge 제거. 테스트 채팅은 ChatPanel(IClaudeService)로 이전.
+            if (_testChatResponseText != null)
+                _testChatResponseText.text = $"(Legacy) \"{message}\"를 받았어요. 실제 채팅은 ChatPanel을 사용하세요.";
+            // if (_bridge != null && _bridge.IsConnected)
+            // {
+            //     _bridge.SendMessageAsync("main", message).Forget();
+            //     if (_testChatResponseText != null)
+            //         _testChatResponseText.text = "AI 비서가 생각하고 있어요...";
+            // }
+            // else
+            // {
+            //     if (_testChatResponseText != null)
+            //         _testChatResponseText.text = $"(Mock 모드) \"{message}\"를 받았어요!\n실제 연결 시 AI가 답변합니다.";
+            // }
 
             if (_testChatDoneBtn != null) _testChatDoneBtn.gameObject.SetActive(true);
         }

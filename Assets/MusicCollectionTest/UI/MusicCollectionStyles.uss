@@ -1,0 +1,349 @@
+/* ============================================================
+   Music Collection — Polished UI Toolkit Styles
+   Transitions live on BASE selectors; modifier classes flip
+   values so animations are symmetric in both directions.
+   ============================================================ */
+
+.root {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: rgba(14, 16, 24, 0);
+    color: rgb(232, 236, 244);
+}
+
+/* ----------- Header ----------- */
+.header {
+    flex-direction: column;
+    padding: 22px 28px 18px 28px;
+    background-color: rgba(20, 22, 32, 0.85);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(40, 44, 60, 0.85);
+}
+
+.title {
+    font-size: 28px;
+    -unity-font-style: bold;
+    color: rgb(255, 222, 130);
+    margin-bottom: 14px;
+    letter-spacing: 1px;
+}
+
+.toolbar {
+    flex-direction: row;
+    align-items: center;
+}
+
+.search-field {
+    flex-grow: 1;
+    margin-right: 18px;
+}
+
+.search-field > .unity-text-field__input {
+    background-color: rgb(30, 34, 50);
+    border-width: 1px;
+    border-color: rgb(56, 62, 84);
+    border-radius: 10px;
+    padding: 8px 14px;
+    color: rgb(232, 236, 244);
+    font-size: 13px;
+    transition-property: border-color, background-color;
+    transition-duration: 0.18s, 0.18s;
+    transition-timing-function: ease-out, ease-out;
+}
+
+.search-field > .unity-text-field__input:focus {
+    border-color: rgb(255, 200, 110);
+    background-color: rgb(38, 42, 60);
+}
+
+.favorites-toggle {
+    flex-shrink: 0;
+}
+
+.favorites-toggle Label {
+    color: rgb(210, 216, 228);
+    margin-left: 6px;
+    font-size: 13px;
+}
+
+/* ----------- Content layout ----------- */
+.content {
+    flex-grow: 1;
+    flex-direction: row;
+    overflow: hidden;
+}
+
+.album-scroll {
+    flex-grow: 1;
+    background-color: rgba(14, 16, 24, 0.65);
+}
+
+.album-scroll > .unity-scroll-view__content-container {
+    padding: 22px;
+}
+
+.album-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+}
+
+/* ----------- Album Card ----------- */
+.album-card {
+    width: 178px;
+    margin: 10px;
+    padding: 12px;
+    border-radius: 14px;
+    background-color: rgba(26, 30, 44, 0.88);
+    border-width: 1px;
+    border-color: rgba(40, 46, 64, 0.9);
+    align-items: stretch;
+
+    /* Base-state transitions (apply both directions) */
+    transition-property: translate, scale, background-color, border-color;
+    transition-duration: 0.22s, 0.12s, 0.22s, 0.22s;
+    transition-timing-function: ease-out, ease-out, ease-out, ease-out;
+    translate: 0 0;
+    scale: 1 1;
+}
+
+.album-card:hover {
+    translate: 0 -6px;
+    background-color: rgba(34, 38, 56, 0.94);
+    border-color: rgba(86, 96, 132, 0.95);
+}
+
+.album-card:active {
+    scale: 0.97 0.97;
+}
+
+.album-card--selected {
+    border-color: rgb(255, 200, 110);
+    background-color: rgba(40, 38, 52, 0.94);
+}
+
+/* ----------- Cover ----------- */
+.album-cover-wrapper {
+    height: 154px;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+/* Cover is a flex container that centers its in-flow content
+   (the initial letter). The sheen is position: absolute, removed
+   from flow, so it doesn't affect centering. */
+.album-cover {
+    flex-grow: 1;
+    background-color: rgb(54, 58, 76);
+    border-radius: 10px;
+    align-items: center;
+    justify-content: center;
+}
+
+.album-cover-initial {
+    -unity-text-align: middle-center;
+    font-size: 78px;
+    -unity-font-style: bold;
+    color: rgba(255, 255, 255, 0.22);
+    letter-spacing: -2px;
+    margin: 0;
+    padding: 0;
+}
+
+.album-cover-sheen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background-color: rgba(255, 255, 255, 0.06);
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+}
+
+/* Title fixed to two-line height so cards align regardless of
+   wrapping. Artist is single-line below. */
+.album-title {
+    font-size: 13px;
+    -unity-font-style: bold;
+    color: rgb(238, 240, 248);
+    white-space: normal;
+    height: 36px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.album-artist {
+    font-size: 12px;
+    color: rgb(150, 158, 178);
+    white-space: nowrap;
+    overflow: hidden;
+    height: 16px;
+}
+
+/* ----------- Heart / Favorite ----------- */
+.favorite-icon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 30px;
+    height: 30px;
+    -unity-text-align: middle-center;
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.85);
+    background-color: rgba(0, 0, 0, 0.42);
+    border-radius: 15px;
+    scale: 1 1;
+
+    transition-property: color, background-color, scale;
+    transition-duration: 0.18s, 0.18s, 0.22s;
+    transition-timing-function: ease-out, ease-out, ease-out;
+}
+
+.favorite-icon:hover {
+    color: rgb(255, 120, 150);
+    background-color: rgba(0, 0, 0, 0.7);
+    scale: 1.08 1.08;
+}
+
+.favorite-icon--active {
+    color: rgb(255, 88, 128);
+    background-color: rgba(255, 255, 255, 0.92);
+}
+
+.favorite-icon--pulsing {
+    scale: 1.55 1.55;
+}
+
+/* ----------- Detail Panel (Slide Transition) ----------- */
+.detail-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 340px;
+    flex-direction: column;
+    padding: 24px;
+    background-color: rgba(20, 22, 32, 0.92);
+    border-left-width: 1px;
+    border-left-color: rgba(40, 44, 60, 0.92);
+    overflow: hidden;
+
+    /* Base-state slide-in + fade */
+    translate: 100% 0;
+    opacity: 0;
+    transition-property: translate, opacity;
+    transition-duration: 0.34s, 0.34s;
+    transition-timing-function: ease-out, ease-out;
+}
+
+.detail-panel--visible {
+    translate: 0 0;
+    opacity: 1;
+}
+
+.detail-empty {
+    flex-grow: 1;
+    align-items: center;
+    justify-content: center;
+}
+
+.detail-empty-text {
+    font-size: 15px;
+    color: rgb(120, 128, 148);
+    -unity-font-style: italic;
+}
+
+.detail-content {
+    flex-grow: 1;
+    flex-direction: column;
+    display: none;
+}
+
+.detail-close-button {
+    align-self: flex-end;
+    width: 30px;
+    height: 30px;
+    margin-bottom: 8px;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: rgb(150, 158, 178);
+    -unity-font-style: bold;
+    font-size: 14px;
+    border-radius: 15px;
+
+    transition-property: background-color, color;
+    transition-duration: 0.15s, 0.15s;
+    transition-timing-function: ease-out, ease-out;
+}
+
+.detail-close-button:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    color: rgb(255, 255, 255);
+}
+
+/* Detail cover uses same flex-centering trick */
+.detail-cover {
+    width: 100%;
+    height: 260px;
+    background-color: rgb(54, 58, 76);
+    border-radius: 14px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    align-items: center;
+    justify-content: center;
+}
+
+.detail-cover-initial {
+    font-size: 140px;
+    color: rgba(255, 255, 255, 0.22);
+    letter-spacing: -4px;
+}
+
+.detail-cover-sheen {
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+}
+
+.detail-title {
+    font-size: 24px;
+    -unity-font-style: bold;
+    color: rgb(255, 222, 130);
+    white-space: normal;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+}
+
+.detail-artist {
+    font-size: 15px;
+    color: rgb(200, 208, 220);
+    white-space: normal;
+    margin-bottom: 22px;
+}
+
+.detail-meta-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: rgb(30, 34, 50);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgb(40, 46, 64);
+    margin-bottom: 10px;
+}
+
+.detail-meta-label {
+    color: rgb(150, 158, 178);
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+.detail-meta-value {
+    color: rgb(255, 222, 130);
+    -unity-font-style: bold;
+    font-size: 14px;
+}

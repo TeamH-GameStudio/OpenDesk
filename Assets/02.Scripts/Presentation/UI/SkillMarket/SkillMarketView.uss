@@ -1,0 +1,1621 @@
+/* ============================================================
+   SkillMarket — UI Toolkit styles
+   Matches Claude Design "OpenDesk Skill Market v2 (B+C 하이브리드)".
+   Uses opendesk-tokens.uss only (warm clay + warm stone + Pretendard).
+   No rainbow category stripes. No glass. No gradients.
+   ============================================================ */
+
+.skill-market {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.skill-market__veil {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(20, 20, 19, 0.55);
+}
+
+.skill-market__card {
+    width: 100%;
+    height: 100%;
+    background-color: var(--n0);
+    border-radius: 0;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ──────────────── Header ──────────────── */
+
+.skill-market__header {
+    background-color: var(--n0);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n200);
+    padding: 0 var(--space-lg);
+    height: 60px;
+    flex-shrink: 0;
+    justify-content: center;
+}
+
+.skill-market__header-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-market__title {
+    color: var(--n900);
+    font-size: 20px;
+    -unity-font-style: bold;
+    letter-spacing: -0.4px;
+    margin-right: 10px;
+}
+
+.skill-market__header-spacer {
+    flex-grow: 1;
+}
+
+.skill-market__btn {
+    padding: 6px 12px;
+    border-radius: var(--r-md);
+    color: var(--n0);
+    background-color: var(--brand-signature);
+    border-width: 0;
+    font-size: 13px;
+    margin-left: 8px;
+}
+
+.skill-market__btn:hover { background-color: var(--brand-hover); }
+.skill-market__btn:active { background-color: var(--brand-pressed); }
+
+.skill-market__btn--ghost {
+    background-color: transparent;
+    color: var(--n600);
+    border-width: 1px;
+    border-color: var(--n200);
+}
+.skill-market__btn--ghost:hover {
+    background-color: var(--n100);
+    color: var(--n900);
+}
+
+.skill-market__btn--close {
+    background-color: transparent;
+    color: var(--n600);
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: var(--r-full);
+    font-size: 14px;
+}
+.skill-market__btn--close:hover {
+    background-color: var(--n100);
+    color: var(--n900);
+}
+
+/* ──────────────── Tab bar ──────────────── */
+
+.skill-market__tabbar {
+    flex-shrink: 0;
+    height: 46px;
+    background-color: var(--n0);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n200);
+    padding: 0 var(--space-md);
+}
+
+.skill-market__tabbar > .unity-scroll-view__content-container {
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.skill-market__tab {
+    flex-direction: row;
+    align-items: center;
+    padding: 0 14px;
+    background-color: transparent;
+    border-width: 0;
+    height: 45px;
+    flex-shrink: 0;
+    margin: 0;
+}
+
+.skill-market__tab:hover { background-color: transparent; }
+
+/* UI Toolkit USS 는 color: inherit 미지원 — 자식 라벨에 명시 색 부여 */
+.skill-market__tab-label {
+    color: var(--n500);
+    -unity-text-align: middle-center;
+    font-size: 13px;
+}
+
+.skill-market__tab:hover .skill-market__tab-label { color: var(--n700); }
+
+.skill-market__tab-count {
+    color: var(--n400);
+    margin-left: 6px;
+    font-size: 11px;
+    -unity-text-align: middle-center;
+}
+
+.skill-market__tab-underline {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: -1px;
+    height: 2px;
+    background-color: var(--brand-signature);
+    border-radius: 2px;
+    display: none;
+}
+
+.skill-market__tab--selected .skill-market__tab-label {
+    color: var(--n900);
+    -unity-font-style: bold;
+}
+
+.skill-market__tab--selected .skill-market__tab-count {
+    color: var(--brand-pressed);
+}
+
+.skill-market__tab--selected .skill-market__tab-underline {
+    display: flex;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Permission Modal (설치 클릭 시 표시)
+   ════════════════════════════════════════════════════════════ */
+
+.skill-market__modal {
+    position: absolute;
+    top: 0; bottom: 0; left: 0; right: 0;
+    align-items: center;
+    justify-content: center;
+    display: none;
+}
+
+.skill-market__modal--visible {
+    display: flex;
+}
+
+.skill-market__modal-veil {
+    position: absolute;
+    top: 0; bottom: 0; left: 0; right: 0;
+    background-color: rgba(20, 20, 19, 0.30);
+}
+
+.skill-market__modal-card {
+    width: 480px;
+    background-color: var(--n0);
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: var(--n200);
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.skill-market__modal-head {
+    padding: 24px 24px 16px 24px;
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-market__modal-mono {
+    width: 44px;
+    height: 44px;
+    border-radius: 11px;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    align-items: center;
+    justify-content: center;
+    margin-right: 14px;
+    flex-shrink: 0;
+}
+
+.skill-market__modal-mono-char {
+    font-size: 17px;
+    -unity-font-style: bold;
+    color: var(--n700);
+    letter-spacing: -0.3px;
+}
+
+.skill-market__modal-title-wrap {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.skill-market__modal-title {
+    color: var(--n900);
+    font-size: 17px;
+    -unity-font-style: bold;
+}
+
+.skill-market__modal-author {
+    color: var(--n500);
+    margin-top: 2px;
+}
+
+.skill-market__modal-lead {
+    color: var(--n700);
+    padding: 0 24px 12px 24px;
+    white-space: normal;
+}
+
+.skill-market__modal-perms {
+    padding: 0 24px;
+    flex-direction: column;
+}
+
+.skill-market__perm-row {
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-top-width: 1px;
+    border-top-color: var(--n100);
+}
+
+.skill-market__perm-row--first {
+    border-top-color: var(--n200);
+}
+
+.skill-market__perm-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.skill-market__perm-icon-char {
+    color: var(--n600);
+    font-size: 13px;
+    -unity-font-style: bold;
+}
+
+.skill-market__perm-body {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.skill-market__perm-row-head {
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-market__perm-label {
+    color: var(--n900);
+    font-size: 14px;
+    -unity-font-style: bold;
+    margin-right: 8px;
+}
+
+.skill-market__risk {
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-market__risk-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--r-full);
+    background-color: var(--brand-signature);
+    margin-right: 4px;
+}
+
+/* v4 위험도 3단계 — 회색(낮음) · 노랑(보통) · 빨강(높음). 디자인 토큰 안에서만 사용. */
+.skill-market__risk-dot--low    { background-color: var(--n400); }
+.skill-market__risk-dot--medium { background-color: var(--warning); }
+.skill-market__risk-dot--high   { background-color: var(--error); }
+
+.skill-market__risk-label {
+    color: var(--n600);
+    font-size: 11px;
+}
+
+/* v4 비가역 액션 잠금 칩 — 위험도와 무관하게 mail 발송 · 삭제 · 결제 등에 항상 부착 */
+.skill-market__perm-lock {
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: var(--r-full);
+    background-color: var(--chip-error-bg);
+    color: var(--chip-error-fg);
+    font-size: 11px;
+    -unity-font-style: bold;
+}
+
+.skill-market__perm-detail {
+    color: var(--n500);
+    font-size: 13px;
+    margin-top: 2px;
+    white-space: normal;
+}
+
+.skill-market__modal-foot {
+    padding: 14px 24px;
+    background-color: var(--n50);
+    border-top-width: 1px;
+    border-top-color: var(--n200);
+    margin-top: 16px;
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-market__modal-footnote {
+    flex-grow: 1;
+    color: var(--n500);
+    white-space: normal;
+    margin-right: 10px;
+}
+
+.skill-market__modal-foot-actions {
+    flex-direction: row;
+}
+
+.skill-market__modal-btn {
+    padding: 8px 14px;
+    border-radius: var(--r-md);
+    font-size: 13px;
+    margin-left: 8px;
+}
+
+.skill-market__modal-btn--ghost {
+    background-color: transparent;
+    color: var(--n700);
+    border-width: 1px;
+    border-color: var(--n200);
+}
+.skill-market__modal-btn--ghost:hover { background-color: var(--n100); }
+
+.skill-market__modal-btn--primary {
+    padding: 8px 18px;
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    -unity-font-style: bold;
+}
+.skill-market__modal-btn--primary:hover {
+    background-color: var(--brand-hover);
+    border-color: var(--brand-hover);
+}
+
+/* ════════════════════════════════════════════════════════════
+   Inline install progress (detail panel install button 자리)
+   ════════════════════════════════════════════════════════════ */
+
+.skill-detail__install-progress {
+    padding: 6px 14px 8px 12px;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    border-radius: var(--r-md);
+    min-width: 200px;
+    flex-direction: column;
+    display: none;
+}
+
+.skill-detail__install-progress--visible {
+    display: flex;
+}
+
+.skill-detail__install-progress--done {
+    border-color: var(--n200);
+}
+
+.skill-detail__progress-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.skill-detail__progress-spinner {
+    width: 12px;
+    height: 12px;
+    border-radius: var(--r-full);
+    background-color: var(--brand-signature);
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.skill-detail__progress-spinner--done {
+    background-color: var(--success);
+}
+
+.skill-detail__progress-phase {
+    color: var(--brand-pressed);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.skill-detail__progress-phase--done {
+    color: var(--n600);
+}
+
+.skill-detail__progress-percent {
+    color: var(--n500);
+    font-size: 12px;
+    margin-left: 6px;
+}
+
+.skill-detail__progress-bar {
+    height: 3px;
+    background-color: var(--n100);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.skill-detail__progress-bar-fill {
+    height: 100%;
+    background-color: var(--brand-signature);
+    width: 0%;
+}
+
+.skill-detail__progress-bar-fill--done {
+    background-color: var(--success);
+    width: 100%;
+}
+
+/* ──────────────── Toast (우측 상단 알림) ──────────────── */
+
+.skill-market__toast {
+    position: absolute;
+    top: 76px;
+    right: 24px;
+    padding: 12px 16px;
+    background-color: var(--n0);
+    border-radius: var(--r-lg);
+    border-width: 1px;
+    border-color: var(--n200);
+    flex-direction: row;
+    align-items: center;
+    max-width: 360px;
+    /* UI Toolkit 은 box-shadow 미지원 — 보더 + 흰 배경으로 떠있는 느낌만 표현 */
+    display: none;
+    /* 토스트는 어떤 컨테이너보다 위에 표시 */
+}
+
+.skill-market__toast--visible {
+    display: flex;
+}
+
+.skill-market__toast--success { border-color: var(--success); }
+.skill-market__toast--error   { border-color: var(--error); }
+
+.skill-market__toast-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--r-full);
+    background-color: var(--brand-signature);
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.skill-market__toast--success .skill-market__toast-dot { background-color: var(--success); }
+.skill-market__toast--error   .skill-market__toast-dot { background-color: var(--error); }
+
+.skill-market__toast-text {
+    color: var(--n800);
+    white-space: normal;
+    -unity-text-align: middle-left;
+}
+
+/* ──────────────── Body container ──────────────── */
+
+.skill-market__body {
+    flex-grow: 1;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: var(--n0);
+}
+
+/* ════════════════════════════════════════════════════════════
+   Featured panel (추천 탭)
+   ════════════════════════════════════════════════════════════ */
+
+.skill-market__featured {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.skill-market__featured-search-row {
+    padding: 14px var(--space-xl) 0;
+    flex-shrink: 0;
+}
+
+.skill-market__featured-scroll {
+    flex-grow: 1;
+}
+
+/* Padding wrapper inside the ScrollView (자식 셀렉터로 contentContainer 매칭이
+   안정적이지 않아 별도 wrapper 사용) */
+.skill-market__featured-pad {
+    padding: 18px 32px 28px 32px;
+    flex-direction: column;
+}
+
+/* Hero */
+.skill-market__hero {
+    background-color: var(--brand-tint);
+    border-radius: var(--r-xl);
+    border-width: 1px;
+    border-color: #F2DDD0;
+    padding: var(--space-lg);
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 28px;
+}
+
+.skill-market__hero-body {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.skill-market__hero-kicker {
+    color: var(--brand-pressed);
+    -unity-font-style: bold;
+    letter-spacing: 0.6px;
+    margin-bottom: var(--space-sm);
+}
+
+.skill-market__hero-headline {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+}
+
+.skill-market__hero-mono {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--r-lg);
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: #F2DDD0;
+    align-items: center;
+    justify-content: center;
+    margin-right: 14px;
+    flex-shrink: 0;
+}
+
+.skill-market__hero-mono-char {
+    font-size: 22px;
+    -unity-font-style: bold;
+    color: var(--brand-pressed);
+    letter-spacing: -0.4px;
+}
+
+.skill-market__hero-title-wrap {
+    flex-direction: column;
+}
+
+.skill-market__hero-title {
+    color: var(--n900);
+    font-size: 22px;
+    -unity-font-style: bold;
+    letter-spacing: -0.4px;
+}
+
+.skill-market__hero-meta {
+    color: var(--n600);
+    margin-top: 2px;
+}
+
+.skill-market__hero-desc {
+    color: var(--n700);
+    max-width: 540px;
+    white-space: normal;
+    margin-bottom: 0;
+}
+
+.skill-market__hero-preview {
+    width: 220px;
+    height: 140px;
+    border-radius: var(--r-lg);
+    border-width: 1px;
+    border-color: #ECCBB8;
+    background-color: #F4E0D2;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-left: var(--space-lg);
+}
+
+.skill-market__hero-preview-label {
+    color: var(--brand-pressed);
+    font-size: 11px;
+    letter-spacing: 0.4px;
+}
+
+/* Section header */
+.skill-market__section {
+    width: 100%;
+    margin-bottom: 28px;
+    flex-direction: column;
+}
+
+.skill-market__section-row {
+    width: 100%;
+    flex-direction: row;
+    align-items: flex-end;
+    margin-bottom: 12px;
+    justify-content: space-between;
+}
+
+.skill-market__section-title {
+    color: var(--n900);
+    font-size: 17px;
+    -unity-font-style: bold;
+}
+
+.skill-market__section-hint {
+    color: var(--n500);
+}
+
+/* Grid containers — UI Toolkit lacks CSS grid; emulate via flex-wrap on row.
+   width:100% + align-content:flex-start ensures wrapped rows stack from the top
+   and 부모 ScrollView 의 contentContainer 폭에 종속되어 wrap 기준이 안정적. */
+.skill-market__grid-3,
+.skill-market__grid-4 {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: flex-start;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Category two-pane panel
+   ════════════════════════════════════════════════════════════ */
+
+.skill-market__category-panel {
+    flex-grow: 1;
+    flex-direction: row;
+    display: none;
+}
+
+.skill-market__list-pane {
+    width: 380px;
+    flex-shrink: 0;
+    background-color: var(--n50);
+    border-right-width: 1px;
+    border-right-color: var(--n200);
+    flex-direction: column;
+}
+
+.skill-market__list-search {
+    padding: 14px var(--space-md);
+    background-color: var(--n0);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n200);
+}
+
+.skill-market__list-scroll {
+    flex-grow: 1;
+}
+
+.skill-market__list-empty {
+    color: var(--n500);
+    padding: 40px var(--space-lg);
+    -unity-text-align: middle-center;
+    display: none;
+}
+
+.skill-market__list-empty--visible {
+    display: flex;
+}
+
+.skill-market__detail-scroll {
+    flex-grow: 1;
+}
+
+/* Padding wrapper inside the ScrollView */
+.skill-market__detail-pad {
+    padding: 28px 36px;
+    flex-direction: column;
+}
+
+.skill-market__detail {
+    flex-direction: column;
+}
+
+.skill-market__detail-empty {
+    color: var(--n500);
+    -unity-text-align: middle-center;
+    padding: 60px 0;
+    display: none;
+}
+
+.skill-market__detail-empty--visible {
+    display: flex;
+}
+
+/* ──────────────── Search input ──────────────── */
+
+.skill-market__search {
+    flex-grow: 1;
+}
+
+.skill-market__search > .unity-base-text-field__input {
+    background-color: var(--n50);
+    border-radius: var(--r-md);
+    border-width: 1px;
+    border-color: var(--n200);
+    padding: 10px 12px;
+    color: var(--n900);
+    font-size: 14px;
+}
+
+.skill-market__search > .unity-base-text-field__input:focus {
+    border-color: var(--brand-signature);
+    background-color: var(--n0);
+}
+
+/* ════════════════════════════════════════════════════════════
+   Skill Card (compact monogram + name + desc + actions)
+   ════════════════════════════════════════════════════════════ */
+
+.skill-card {
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-lg);
+    padding: 14px;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.skill-card:hover {
+    border-color: var(--n300);
+}
+
+.skill-card__head {
+    flex-direction: row;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.skill-card__mono {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-right: 10px;
+}
+
+.skill-card__mono-char {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: var(--n700);
+    letter-spacing: -0.3px;
+}
+
+/* v4: "스킬" 타입 뱃지 — PluginCard 의 "플러그인" 뱃지와 대칭, warm clay 톤, 둥근 사각형 */
+.skill-card__type-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 2px 8px;
+    background-color: var(--brand-tint);
+    border-width: 1px;
+    border-color: #F2DDD0;
+    border-radius: var(--r-sm);
+    color: var(--brand-pressed);
+    font-size: 10px;
+    -unity-font-style: bold;
+}
+
+.skill-card__head-text {
+    flex-grow: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.skill-card__name {
+    color: var(--n900);
+    font-size: 15px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.skill-card__author {
+    color: var(--n500);
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.skill-card__desc {
+    color: var(--n600);
+    font-size: 13px;
+    white-space: normal;
+    margin-bottom: var(--space-sm);
+    min-height: 32px;
+}
+
+.skill-card__foot {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+}
+
+.skill-card__metrics {
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-card__metric {
+    color: var(--n500);
+    font-size: 12px;
+    margin-right: 10px;
+}
+
+.skill-card__dot {
+    color: var(--n300);
+    font-size: 12px;
+    margin-right: 10px;
+}
+
+/* Outlined warm-clay "설치" button */
+.skill-card__install {
+    padding: 6px 12px;
+    border-radius: var(--r-md);
+    background-color: var(--n0);
+    color: var(--brand-signature);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    font-size: 13px;
+}
+
+.skill-card__install:hover {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+}
+
+.skill-card__install--installed {
+    background-color: transparent;
+    color: var(--n500);
+    border-color: var(--n200);
+}
+
+.skill-card__install--installed:hover {
+    background-color: transparent;
+    color: var(--n500);
+    border-color: var(--n200);
+}
+
+.skill-card__equip {
+    padding: 6px 12px;
+    border-radius: var(--r-md);
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    border-width: 0;
+    font-size: 13px;
+    margin-left: 6px;
+    display: none;
+}
+
+.skill-card__equip:hover {
+    background-color: var(--brand-hover);
+}
+
+.skill-card__equip--visible {
+    display: flex;
+}
+
+.skill-card__equip--equipped {
+    background-color: transparent;
+    color: var(--n600);
+    border-width: 1px;
+    border-color: var(--n200);
+}
+
+.skill-card__progress {
+    height: 4px;
+    background-color: var(--n100);
+    border-radius: 2px;
+    margin-bottom: var(--space-sm);
+    overflow: hidden;
+    display: none;
+}
+
+.skill-card__progress--visible {
+    display: flex;
+}
+
+.skill-card__progress-fill {
+    height: 100%;
+    background-color: var(--brand-signature);
+    width: 0%;
+}
+
+/* ════════════════════════════════════════════════════════════
+   List row (left pane in category two-pane)
+   ════════════════════════════════════════════════════════════ */
+
+.skill-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 14px 18px;
+    background-color: transparent;
+    border-width: 0;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n200);
+    border-left-width: 3px;
+    border-left-color: transparent;
+}
+
+.skill-row:hover {
+    background-color: var(--n100);
+}
+
+.skill-row--selected {
+    background-color: var(--n0);
+    border-left-color: var(--brand-signature);
+}
+
+.skill-row--selected:hover {
+    background-color: var(--n0);
+}
+
+.skill-row__mono {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-right: 12px;
+}
+
+/* v4: 스킬 row 이름 줄 (스킬명 + "스킬" 뱃지) */
+.skill-row__name-line {
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-row__type-badge {
+    margin-left: 6px;
+    padding: 1px 6px;
+    background-color: var(--brand-tint);
+    border-width: 1px;
+    border-color: #F2DDD0;
+    border-radius: var(--r-sm);
+    color: var(--brand-pressed);
+    font-size: 10px;
+    -unity-font-style: bold;
+}
+
+/* v4: 우측 detail pane 제목 줄 (제목 + "스킬" 뱃지) */
+.skill-detail__title-line {
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-detail__type-badge {
+    margin-left: 8px;
+    padding: 2px 8px;
+    background-color: var(--brand-tint);
+    border-width: 1px;
+    border-color: #F2DDD0;
+    border-radius: var(--r-sm);
+    color: var(--brand-pressed);
+    font-size: 11px;
+    -unity-font-style: bold;
+}
+
+.skill-row__mono-char {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: var(--n700);
+    letter-spacing: -0.3px;
+}
+
+.skill-row__text {
+    flex-grow: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.skill-row__name {
+    color: var(--n900);
+    font-size: 14px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.skill-row__desc {
+    color: var(--n500);
+    font-size: 12px;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.skill-row__right {
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.skill-row__rating {
+    color: var(--n500);
+    font-size: 12px;
+}
+
+.skill-row__installed {
+    color: var(--success);
+    font-size: 11px;
+    -unity-font-style: bold;
+    margin-top: 2px;
+    display: none;
+}
+
+.skill-row__installed--visible {
+    display: flex;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Detail panel (right pane)
+   ════════════════════════════════════════════════════════════ */
+
+.skill-detail__head {
+    flex-direction: row;
+    align-items: flex-start;
+    margin-bottom: 18px;
+}
+
+.skill-detail__mono {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-right: 18px;
+}
+
+.skill-detail__mono-char {
+    font-size: 22px;
+    -unity-font-style: bold;
+    color: var(--n700);
+    letter-spacing: -0.4px;
+}
+
+.skill-detail__title-wrap {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.skill-detail__title {
+    color: var(--n900);
+    font-size: 22px;
+    -unity-font-style: bold;
+    letter-spacing: -0.4px;
+}
+
+.skill-detail__meta {
+    color: var(--n500);
+    font-size: 13px;
+    margin-top: 4px;
+    flex-direction: row;
+}
+
+.skill-detail__actions {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: var(--space-md);
+}
+
+.skill-detail__install {
+    padding: 9px 18px;
+    border-radius: var(--r-md);
+    background-color: var(--n0);
+    color: var(--brand-signature);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    font-size: 14px;
+    -unity-font-style: bold;
+}
+
+.skill-detail__install:hover {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+}
+
+.skill-detail__install--installed {
+    color: var(--n500);
+    border-color: var(--n200);
+}
+
+.skill-detail__install--installed:hover {
+    background-color: transparent;
+    color: var(--n500);
+    border-color: var(--n200);
+}
+
+.skill-detail__equip {
+    padding: 9px 18px;
+    border-radius: var(--r-md);
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    border-width: 0;
+    font-size: 14px;
+    -unity-font-style: bold;
+    margin-left: var(--space-sm);
+    display: none;
+}
+
+.skill-detail__equip:hover { background-color: var(--brand-hover); }
+.skill-detail__equip--visible { display: flex; }
+
+.skill-detail__equip--equipped {
+    background-color: transparent;
+    color: var(--n600);
+    border-width: 1px;
+    border-color: var(--n200);
+}
+
+.skill-detail__desc {
+    color: var(--n700);
+    font-size: 15px;
+    margin-bottom: 22px;
+    max-width: 580px;
+    white-space: normal;
+}
+
+.skill-detail__preview {
+    height: 180px;
+    border-radius: var(--r-lg);
+    border-width: 1px;
+    border-color: var(--n200);
+    background-color: var(--n50);
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 22px;
+}
+
+.skill-detail__preview-label {
+    color: var(--n400);
+    font-size: 12px;
+    letter-spacing: 0.4px;
+}
+
+.skill-detail__section {
+    margin-bottom: 20px;
+    flex-direction: column;
+}
+
+.skill-detail__section-title {
+    color: var(--n500);
+    font-size: 12px;
+    -unity-font-style: bold;
+    letter-spacing: 0.6px;
+    margin-bottom: var(--space-sm);
+}
+
+.skill-detail__chip {
+    padding: 4px 10px;
+    background-color: var(--n100);
+    border-radius: var(--r-sm);
+    color: var(--n700);
+    font-size: 12px;
+    margin-right: 8px;
+    margin-bottom: 4px;
+}
+
+.skill-detail__chips {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.skill-detail__bullet {
+    color: var(--n700);
+    font-size: 14px;
+    margin-bottom: 4px;
+    white-space: normal;
+}
+
+/* ============================================================
+   v4: 통합 마켓 — 스킬 + 플러그인
+   필터 칩 (전체·스킬·플러그인) + 차가운 슬레이트 톤 플러그인 카드 +
+   "플러그인" 섹션 헤더. 스킬은 따뜻 클레이, 플러그인은 쿨 슬레이트.
+   ============================================================ */
+
+.skill-market__kind-bar {
+    flex-direction: row;
+    padding: 14px 24px 0 24px;
+    flex-wrap: wrap;
+}
+
+.skill-market__kind-chip {
+    margin-right: 6px;
+    padding: 5px 14px;
+    border-radius: var(--r-full);
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    color: var(--n700);
+    font-size: 12px;
+}
+
+.skill-market__kind-chip:hover {
+    border-color: var(--n400);
+}
+
+.skill-market__kind-chip--active {
+    background-color: var(--n900);
+    border-color: var(--n900);
+    color: var(--n0);
+    -unity-font-style: bold;
+}
+
+/* Plugin section — featured 패널 최하단 */
+.skill-market__plugins-section {
+    margin: 16px 24px 24px 24px;
+    flex-direction: column;
+}
+
+.skill-market__plugins-head {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.skill-market__plugins-title {
+    color: var(--n900);
+}
+
+.skill-market__plugins-hint {
+    color: var(--n500);
+}
+
+.skill-market__plugins-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.skill-market__plugins-empty {
+    color: var(--n500);
+    padding: 18px 0;
+    -unity-text-align: middle-center;
+}
+
+/* ============================================================
+   Plugin card — 사각 둥근 타일, 차가운 슬레이트 토큰
+   ============================================================ */
+
+.plugin-card {
+    flex-direction: column;
+    padding: 16px;
+    background-color: #ECF0F5;          /* cool slate tint — palette 안 한쪽 끝만 쿨 */
+    border-width: 1px;
+    border-color: #D5DDE6;
+    border-radius: var(--r-md);          /* 사각 둥근 — 도구 느낌 */
+    position: relative;
+}
+
+.plugin-card:hover {
+    border-color: #BFC9D6;
+}
+
+.plugin-card__type-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 2px 8px;
+    background-color: #DFE6EE;
+    border-width: 1px;
+    border-color: #D5DDE6;
+    border-radius: var(--r-sm);
+    color: #48607A;
+    font-size: 10px;
+    -unity-font-style: bold;
+}
+
+.plugin-card__head {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 10px;
+    margin-right: 60px;                  /* 우상단 type-badge 회피 */
+}
+
+.plugin-card__mono {
+    width: 40px;
+    height: 40px;
+    background-color: #DFE6EE;
+    border-width: 1px;
+    border-color: #D5DDE6;
+    border-radius: 10px;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.plugin-card__mono-char {
+    color: #48607A;
+    font-size: 17px;
+    -unity-font-style: bold;
+}
+
+.plugin-card__head-text {
+    flex-direction: column;
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.plugin-card__name {
+    color: var(--n900);
+    font-size: 15px;
+    -unity-font-style: bold;
+}
+
+.plugin-card__vendor {
+    color: #48607A;
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.plugin-card__desc {
+    color: #37485B;
+    font-size: 13px;
+    white-space: normal;
+    margin-bottom: 12px;
+}
+
+.plugin-card__foot {
+    flex-direction: row;
+}
+
+.plugin-card__install {
+    padding: 6px 14px;
+    background-color: var(--n0);
+    color: #48607A;
+    border-width: 1px;
+    border-color: #5E7894;
+    border-radius: var(--r-md);
+    font-size: 13px;
+    -unity-font-style: bold;
+    margin-right: 6px;
+}
+
+.plugin-card__install:hover {
+    background-color: #5E7894;
+    color: var(--n0);
+}
+
+.plugin-card__install--installed {
+    background-color: transparent;
+    color: var(--n500);
+    border-color: var(--n200);
+}
+
+.plugin-card__equip {
+    display: none;
+    padding: 6px 14px;
+    background-color: var(--n0);
+    color: #48607A;
+    border-width: 1px;
+    border-color: var(--n300);
+    border-radius: var(--r-md);
+    font-size: 13px;
+}
+
+.plugin-card__equip--visible {
+    display: flex;
+}
+
+.plugin-card__equip--equipped {
+    background-color: #5E7894;
+    color: var(--n0);
+    border-color: #5E7894;
+}
+
+/* ============================================================
+   v4: 스킬 설치 모달 — 필요/선택 플러그인 의존성 섹션
+   ============================================================ */
+
+.skill-market__plugin-deps {
+    padding: 16px 24px 0 24px;
+    flex-direction: column;
+    border-top-width: 1px;
+    border-top-color: var(--n200);
+    margin-top: 12px;
+}
+
+.skill-market__plugin-dep-group {
+    flex-direction: column;
+    margin-bottom: 8px;
+}
+
+.skill-market__plugin-dep-title {
+    color: var(--n500);
+    -unity-font-style: bold;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.skill-market__plugin-dep-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background-color: #ECF0F5;             /* cool slate — 플러그인은 항상 차가운 톤 */
+    border-width: 1px;
+    border-color: #D5DDE6;
+    border-radius: var(--r-md);
+}
+
+.skill-market__plugin-dep-mono {
+    width: 28px;
+    height: 28px;
+    -unity-text-align: middle-center;
+    background-color: #DFE6EE;
+    border-radius: 7px;
+    color: #48607A;
+    -unity-font-style: bold;
+    font-size: 13px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.skill-market__plugin-dep-body {
+    flex-grow: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.skill-market__plugin-dep-name {
+    color: var(--n900);
+    font-size: 13px;
+    -unity-font-style: bold;
+}
+
+.skill-market__plugin-dep-sub {
+    color: #48607A;
+    margin-top: 1px;
+}
+
+.skill-market__plugin-dep-toggle {
+    margin-left: 8px;
+}
+
+.skill-market__plugin-dep-ok {
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: var(--r-full);
+    background-color: var(--chip-success-bg);
+    color: var(--chip-success-fg);
+    font-size: 11px;
+    -unity-font-style: bold;
+}
+
+/* ============================================================
+   v4: 카테고리 two-pane 안 플러그인 인라인 row + 섹션 헤더
+   ============================================================ */
+
+.skill-market__list-section-head {
+    color: var(--n500);
+    -unity-font-style: bold;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 12px 12px 4px 12px;
+}
+
+.skill-market__plugin-list-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    margin: 0 0 6px 0;
+    background-color: #ECF0F5;
+    border-width: 1px;
+    border-color: #D5DDE6;
+    border-radius: var(--r-md);
+}
+
+.skill-market__plugin-list-row:hover {
+    border-color: #BFC9D6;
+}
+
+.skill-market__plugin-list-mono {
+    width: 30px;
+    height: 30px;
+    -unity-text-align: middle-center;
+    background-color: #DFE6EE;
+    border-radius: 7px;
+    color: #48607A;
+    -unity-font-style: bold;
+    font-size: 14px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.skill-market__plugin-list-body {
+    flex-grow: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.skill-market__plugin-list-name-line {
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-market__plugin-list-name {
+    color: var(--n900);
+    font-size: 14px;
+    -unity-font-style: bold;
+    margin-right: 6px;
+}
+
+.skill-market__plugin-list-badge {
+    padding: 1px 6px;
+    background-color: #DFE6EE;
+    border-radius: var(--r-sm);
+    color: #48607A;
+    font-size: 10px;
+    -unity-font-style: bold;
+}
+
+.skill-market__plugin-list-desc {
+    color: #37485B;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+}
+
+.skill-market__plugin-list-action {
+    padding: 5px 12px;
+    background-color: var(--n0);
+    color: #48607A;
+    border-width: 1px;
+    border-color: #5E7894;
+    border-radius: var(--r-md);
+    font-size: 12px;
+    -unity-font-style: bold;
+    margin-left: 8px;
+}
+
+.skill-market__plugin-list-action:hover {
+    background-color: #5E7894;
+    color: var(--n0);
+}
+
+.skill-market__plugin-list-action--installed {
+    color: var(--n500);
+    border-color: var(--n200);
+    background-color: transparent;
+}

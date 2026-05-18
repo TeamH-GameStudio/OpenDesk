@@ -1,0 +1,448 @@
+/* ============================================================
+   OpenDesk Onboarding — Shell Styles
+   Web prototype mock 기반. 모든 토큰은 opendesk-tokens.uss에서 정의된
+   --onb-* 네임스페이스를 사용한다.
+   ============================================================ */
+
+/* ── Layer 0: Shell ─────────────────────────────────────── */
+
+.onb-shell {
+    flex-grow: 1;
+    background-color: var(--n0);
+    overflow: hidden;
+}
+
+/* ── Layer 1: Step root toggling ───────────────────────── */
+
+.onb-step {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: stretch;
+    display: none;
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 320ms;
+    transition-timing-function: ease-out;
+}
+.onb-step--active {
+    display: flex;
+    opacity: 1;
+}
+
+/* ── Layer 2: Page chrome (white-bg flow steps: §2/§3/§4) */
+
+.onb-page {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: var(--n0);
+}
+.onb-page-header {
+    height: 56px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n100);
+}
+.onb-page-body {
+    flex-grow: 1;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 24px 24px 24px 24px;
+}
+.onb-page-scroll {
+    flex-grow: 1;
+}
+.onb-page-scroll > .unity-scroll-view__content-and-vertical-scroll-container {
+    flex-grow: 1;
+}
+/* content-container를 viewport 전체 높이로 늘리고 자식을 vertical center 정렬.
+   컨텐츠가 짧으면 중앙, 길어지면 자연스레 위→아래로 흐르며 스크롤이 생긴다. */
+.onb-page-scroll .unity-scroll-view__content-container {
+    flex-grow: 1;
+    align-items: center;
+    justify-content: center;
+    padding-top: 16px;
+    padding-bottom: 16px;
+}
+
+/* ── Layer 3: Frame (full-bleed background art) ──────── */
+
+.onb-frame {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+.onb-frame--blurred {
+    background-color: var(--n100);
+    /* Source 이미지는 OnboardingShellView 컨트롤러가 런타임에 할당한다.
+       (Resources/Onboarding/onboarding-bg-blurred.png — 사전 블러 처리) */
+    -unity-background-scale-mode: scale-and-crop;
+}
+.onb-frame--veil {
+    background-color: rgba(248, 246, 243, 0.55);
+}
+.onb-frame--veil-strong {
+    background-color: rgba(248, 246, 243, 0.65);
+}
+
+/* ── Layer 4: Center card ────────────────────────────── */
+
+.onb-center-card {
+    width: 480px;
+    align-self: center;
+    flex-direction: column;
+    background-color: var(--n0);
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: var(--n100);
+    padding: 40px;
+    /* 세로 중앙 정렬은 page-scroll content-container의 justify-content:center가 담당.
+       카드 자체에 auto margin이 있으면 ScrollView가 자식 크기 계산에 혼선이 생긴다. */
+}
+.onb-center-card--narrow {
+    width: 460px;
+}
+.onb-center-card--transparent {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    padding: 0;
+    align-items: center;
+}
+
+/* §1, §6 — onb-step의 직계 자식 카드는 절대좌표로 정중앙 정렬 */
+.onb-step > .onb-center-card {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+}
+
+/* ── Layer 5: Typography helpers ─────────────────────── */
+
+.onb-text-center { -unity-text-align: middle-center; }
+/* "기본 검은색" — 사용자 요청에 따라 secondary도 검정으로 통일. */
+.onb-text-secondary { color: var(--n900); }
+.onb-text-primary { color: var(--n900); }
+
+/* 모든 온보딩 텍스트의 기본 컬러 = 검정 */
+.onb-display,
+.onb-heading-lg,
+.onb-title,
+.onb-body,
+.onb-meta,
+.onb-caption {
+    color: var(--n900);
+}
+
+/* ── Layer 6: Spacing helpers ────────────────────────── */
+
+.onb-mt-xs { margin-top: 4px; }
+.onb-mt-sm { margin-top: 8px; }
+.onb-mt-md { margin-top: 16px; }
+.onb-mt-lg { margin-top: 24px; }
+.onb-mt-xl { margin-top: 32px; }
+
+/* ── Layer 7: Buttons ────────────────────────────────── */
+
+.onb-btn {
+    height: 44px;
+    padding-left: 16px;
+    padding-right: 16px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0);
+    -unity-text-align: middle-center;
+    font-size: 15px;
+    -unity-font-style: bold;
+    cursor: link;
+    transition-property: background-color, border-color, scale;
+    transition-duration: 150ms;
+}
+.onb-btn:hover { scale: 1.01 1.01; }
+.onb-btn:active { scale: 0.99 0.99; }
+.onb-btn--full { width: 100%; }
+.onb-btn--grow { flex-grow: 1; }
+
+.onb-btn--primary {
+    background-color: var(--onb-brand-signature);
+    color: var(--n0);
+}
+.onb-btn--primary:hover { background-color: var(--onb-brand-pressed); }
+.onb-btn--primary:disabled,
+.onb-btn--primary.onb-btn--disabled {
+    background-color: var(--n200);
+    color: var(--n400);
+    cursor: not-allowed;
+}
+
+.onb-btn--secondary {
+    background-color: var(--n0);
+    color: var(--n700);
+    border-color: var(--n200);
+    min-width: 96px;
+}
+.onb-btn--secondary:hover { border-color: var(--n300); }
+
+.onb-btn--google {
+    background-color: var(--n0);
+    color: var(--n700);
+    border-color: var(--n300);
+    width: 100%;
+    height: 48px;
+    -unity-font-style: normal;
+}
+.onb-btn--google:hover { border-color: var(--n400); background-color: var(--n50); }
+
+/* ── Layer 8: Nav row ────────────────────────────────── */
+
+.onb-nav-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    width: 460px;
+    align-self: center;
+    margin-top: 24px;
+}
+.onb-nav-row > .onb-btn { margin-left: 8px; }
+
+.onb-plan__nav,
+.onb-user__nav,
+.onb-auth__nav {
+    width: 460px;
+}
+
+/* ── Layer 9: Plan cards (§2) ────────────────────────── */
+
+.onb-plan-cards {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+.onb-plan-card {
+    width: 240px;
+    flex-direction: column;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: 10px;
+    padding: 20px;
+    margin-left: 10px;
+    margin-right: 10px;
+    transition-property: border-color, background-color, scale;
+    transition-duration: 150ms;
+}
+.onb-plan-card:hover {
+    border-color: var(--n300);
+    scale: 1.01 1.01;
+}
+.onb-plan-card--selected {
+    border-width: 2px;
+    border-color: var(--onb-brand-signature);
+    background-color: var(--onb-brand-tint);
+}
+.onb-plan-card--disabled {
+    opacity: 0.55;
+}
+.onb-plan-card__name {
+    font-size: 16px;
+    -unity-font-style: bold;
+    color: var(--n900);
+}
+.onb-plan-card__price {
+    font-size: 13px;
+    color: var(--n900);
+    margin-top: 4px;
+}
+.onb-plan-card__hook {
+    font-size: 13px;
+    color: var(--n900);
+    margin-top: 12px;
+    white-space: normal;
+}
+.onb-plan-card__features {
+    flex-direction: column;
+    margin-top: 12px;
+}
+.onb-plan-card__feature {
+    font-size: 12px;
+    color: var(--n900);
+    margin-top: 4px;
+    white-space: normal;
+}
+.onb-plan-card__badge {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    translate: -50% 0;
+    background-color: var(--onb-brand-tint);
+    color: var(--onb-brand-pressed);
+    border-radius: 100px;
+    font-size: 11px;
+    -unity-font-style: bold;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+}
+
+/* ── Layer 10: Auth (§3) ─────────────────────────────── */
+
+.onb-auth__pane {
+    flex-direction: column;
+    align-items: stretch;
+}
+.onb-auth__pane--hidden {
+    display: none;
+}
+
+.onb-spinner {
+    width: 32px;
+    height: 32px;
+    align-self: center;
+}
+
+.onb-error-banner {
+    flex-direction: column;
+    background-color: var(--onb-brand-tint);
+    border-left-width: 4px;
+    border-left-color: var(--onb-error);
+    padding: 12px 14px;
+    border-radius: 6px;
+}
+
+/* ── Layer 11: User form (§4) ────────────────────────── */
+
+/* Wrapper로 input과 placeholder를 함께 담아 absolute positioning이 wrapper 기준이 되도록.
+   UI Toolkit의 position:absolute는 직계 부모 기준이므로 wrapper가 anchor 역할. */
+.onb-input-wrapper {
+    flex-direction: column;
+    height: 44px;
+}
+
+.onb-input {
+    height: 44px;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: 10px;
+    padding-left: 14px;
+    padding-right: 14px;
+    font-size: 15px;
+    color: var(--n900);
+    transition-property: border-color;
+    transition-duration: 150ms;
+}
+.onb-input:focus,
+.onb-input.onb-input--focused {
+    border-color: var(--onb-brand-signature);
+}
+.onb-input > .unity-text-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    -unity-text-align: middle-left;
+    color: var(--n900);
+    font-size: 15px;
+}
+/* TextField의 실제 텍스트는 자식 TextElement가 렌더한다. PanelSettings의 ThemeStyleSheet가
+   기본 회색을 강제하는 경우를 차단하기 위해 자식까지 명시한다. */
+.onb-input .unity-base-text-field__input,
+.onb-input .unity-text-element,
+.onb-input TextElement,
+.onb-input .unity-text-field__input--multiline {
+    color: var(--n900);
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* 플레이스홀더는 wrapper 내부에 absolute로 띄워 input 위에 겹친다. */
+.onb-input-placeholder {
+    position: absolute;
+    left: 14px;
+    top: 0;
+    height: 44px;
+    -unity-text-align: middle-left;
+    color: var(--n400);
+    font-size: 15px;
+}
+.onb-input-placeholder--hidden { display: none; }
+
+.onb-radio-row {
+    flex-direction: row;
+    align-items: center;
+}
+.onb-radio-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+.onb-radio {
+    flex-direction: row;
+    align-items: center;
+    margin-right: 16px;
+    margin-bottom: 8px;
+    padding: 4px 0;
+    cursor: link;
+}
+.onb-radio__bullet {
+    width: 18px;
+    height: 18px;
+    border-radius: 100px;
+    border-width: 1px;
+    border-color: var(--n300);
+    background-color: var(--n0);
+    margin-right: 8px;
+    align-items: center;
+    justify-content: center;
+}
+.onb-radio--selected .onb-radio__bullet {
+    border-width: 2px;
+    border-color: var(--onb-brand-signature);
+}
+.onb-radio__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 100px;
+    background-color: var(--onb-brand-signature);
+    display: none;
+}
+.onb-radio--selected .onb-radio__dot {
+    display: flex;
+}
+.onb-radio__label {
+    font-size: 15px;
+    color: var(--n900);
+}
+
+/* 3열 그리드를 위해 width 1/3 (동일 폭) */
+.onb-radio-grid > .onb-radio {
+    width: 33%;
+}
+
+.onb-privacy-notice {
+    flex-direction: row;
+    align-items: center;
+    background-color: var(--onb-brand-tint);
+    border-radius: 10px;
+    padding: 14px 18px 14px 18px;
+}
+.onb-privacy-notice__icon {
+    font-size: 14px;
+    margin-right: 12px;
+    color: var(--onb-brand-pressed);
+}
+.onb-privacy-notice__text {
+    color: var(--n900);
+    flex-grow: 1;
+    -unity-text-align: middle-left;
+    margin: 0;
+    padding: 0;
+    white-space: normal;
+}

@@ -114,3 +114,13 @@ Thumbs.db
 /Assets/Packages/
 /Assets/Packages.meta
 /.claude
+
+# Python middleware — venv / caches / build artifacts (개발용. 배포는 PyInstaller dist/Middleware → StreamingAssets)
+/Middleware/.venv/
+/Middleware/__pycache__/
+/Middleware/**/__pycache__/
+/Middleware/.pytest_cache/
+/Middleware/build/
+/Middleware/dist/
+/Middleware/*.spec.bak
+/Middleware.zip

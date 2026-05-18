@@ -6,6 +6,7 @@ using R3;
 
 namespace OpenDesk.Core.Services
 {
+    [Obsolete("OpenClaw legacy. Replaced by Claude CLI/Anthropic API path (IClaudeService). Will be removed once Anthropic-direct migration is fully verified.", error: false)]
     public interface IOpenClawBridgeService : IDisposable
     {
         // 연결 상태

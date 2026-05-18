@@ -11,6 +11,7 @@ namespace OpenDesk.SkillDiskette
     /// 디스켓 3D 오브젝트의 비주얼 + 드래그&드롭 인터랙션.
     /// Update에서 Physics.Raycast로 직접 처리 (UI Canvas 간섭 회피).
     /// </summary>
+    [System.Obsolete("디스켓 메타포는 마켓플레이스 카드 UI 로 대체되었다. 가역 보존용 — 새 코드는 PluginsMarketView 또는 SkillMarketView 를 사용.")]
     [RequireComponent(typeof(BoxCollider))]
     public class SkillDisketteView : MonoBehaviour
     {

@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="CreditBalanceBadge.uss"/>
+    <ui:VisualElement name="credit-balance-badge" class="credit-badge">
+        <ui:VisualElement class="credit-badge__icon"/>
+        <ui:VisualElement class="credit-badge__content">
+            <ui:Label name="credit-balance-badge__amount" class="credit-badge__amount" text="0"/>
+            <ui:Label name="credit-balance-badge__held" class="credit-badge__held" text=""/>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

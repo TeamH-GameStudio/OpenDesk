@@ -1,26 +1,30 @@
 using Cysharp.Threading.Tasks;
 using OpenDesk.Onboarding.Models;
 using OpenDesk.Onboarding.Services;
+using OpenDesk.Presentation.SceneLoading;
 using R3;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using VContainer.Unity;
 
 namespace OpenDesk.Onboarding.Installers
 {
     /// <summary>
-    /// 온보딩 씬 시작 시 자동 실행
-    /// 완료되면 오피스 씬으로 전환
+    /// [Deprecated] 구 온보딩 자동 부팅 EntryPoint. OnboardingInstaller 가 의도적으로 등록하지 않으며,
+    /// 신규 흐름은 OnboardingFlowController 가 상태 머신과 씬 전환을 모두 담당한다.
+    /// 가역 보존을 위해 [Obsolete] 만 부착.
     /// </summary>
+    [System.Obsolete("OnboardingFlowController 로 대체됨. OnboardingInstaller 가 이 EntryPoint 를 등록하지 않습니다.")]
     public class OnboardingBootstrapper : IStartable
     {
         private readonly IOnboardingService _onboarding;
+        private readonly IGameSceneLoader _sceneLoader;
 
-        private const string OfficSceneName = "OfficeScene";
+        private const string OfficeSceneName = "AgentOfficeScene_Moon";
 
-        public OnboardingBootstrapper(IOnboardingService onboarding)
+        public OnboardingBootstrapper(IOnboardingService onboarding, IGameSceneLoader sceneLoader)
         {
             _onboarding = onboarding;
+            _sceneLoader = sceneLoader;
         }
 
         public void Start()
@@ -40,7 +44,7 @@ namespace OpenDesk.Onboarding.Installers
             if (state == OnboardingState.ReadyToEnter)
             {
                 Debug.Log("[Onboarding] 완료 → 오피스 씬으로 전환");
-                SceneManager.LoadScene(OfficSceneName);
+                _sceneLoader.ChangeSceneAsync(OfficeSceneName).Forget();
             }
 
             if (state == OnboardingState.FatalError)

@@ -11,10 +11,10 @@ using VContainer.Unity;
 namespace OpenDesk.Presentation.Installers
 {
     /// <summary>
-    /// Office 씬 전용 LifetimeScope
-    /// Core 서비스는 부모 Scope(CoreInstaller)에서 주입받음
-    /// 씬 내 MonoBehaviour에 [Inject] 주입
+    /// [Deprecated] 구 OfficeScene 전용 LifetimeScope. 메인 씬은 AgentOfficeScene_Moon + AgentOfficeInstaller 로 대체됨.
+    /// OfficeScene 자체가 레거시이므로 본 Installer 도 미사용. 가역 보존을 위해 [Obsolete] 만 부착.
     /// </summary>
+    [System.Obsolete("구 OfficeScene 전용. 메인 오피스는 AgentOfficeInstaller (AgentOfficeScene_Moon) 를 사용합니다.")]
     public class OfficeInstaller : LifetimeScope
     {
         protected override void Configure(IContainerBuilder builder)

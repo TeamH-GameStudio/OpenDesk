@@ -1,8 +1,11 @@
+using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+
+#pragma warning disable CS0618 // SceneLoader.PendingScene 가 Obsolete — Loading 씬 컨트롤러가 짝.
 
 namespace OpenDesk.Presentation.SceneLoading
 {
@@ -15,6 +18,7 @@ namespace OpenDesk.Presentation.SceneLoading
     ///   - Canvas > StatusText (TextMeshPro)
     ///   - Canvas > LogoImage (Image) — 선택
     /// </summary>
+    [Obsolete("Use LoadingManager (persistent overlay) instead. 이 컨트롤러는 별도 Loading 씬 패턴 전용이지만 Loading.unity 가 Build Settings 에 없어 사실상 죽은 코드.")]
     public class LoadingSceneController : MonoBehaviour
     {
         [Header("UI")]

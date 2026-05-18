@@ -37,6 +37,10 @@ async def main():
         manager.create_agent(agent_id, config)
 
     ws_server.set_message_handler(manager.handle_unity_message)
+    ws_server.set_all_disconnected_handler(manager.on_client_disconnect)
+
+    # 백그라운드 스케줄러 / 큐 시동
+    manager.start()
 
     logger.info("=" * 50)
     logger.info("  OpenDesk Agent Middleware Server")
@@ -60,7 +64,10 @@ async def main():
     except NotImplementedError:
         pass  # Windows
 
-    await ws_server.start()
+    try:
+        await ws_server.start()
+    finally:
+        await manager.shutdown()
 
 
 if __name__ == "__main__":

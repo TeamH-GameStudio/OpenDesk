@@ -19,6 +19,7 @@ namespace OpenDesk.Onboarding.Implementations
     /// 5. 데몬 등록 (openclaw onboard --install-daemon)
     /// 6. 설치 완료 → 관리자 권한 강등
     /// </summary>
+    [Obsolete("OpenClaw legacy. Replaced by Claude CLI/Anthropic API path (IClaudeService). Will be removed once Anthropic-direct migration is fully verified.", error: false)]
     public class OpenClawInstaller : IOpenClawInstaller, IDisposable
     {
         private readonly INodeEnvironmentService _nodeEnv;

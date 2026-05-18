@@ -32,11 +32,17 @@ namespace OpenDesk.Presentation.Dashboard
         [SerializeField] private GameObject _alertPanel;       // 비용 초과 경고 패널
         [SerializeField] private TMP_Text   _alertText;
 
+        [Header("Telemetry (hook chain — middleware)")]
+        [SerializeField] private TMP_Text  _ttftText;           // "TTFT 412 ms"
+        [SerializeField] private TMP_Text  _cacheHitText;       // "Cache 41%"
+        [SerializeField] private TMP_Text  _retryText;          // "Retries 0"
+
         [Header("설정")]
         [SerializeField] private float _costMaxDisplay = 50f;  // 슬라이더 최대값 (USD)
         [SerializeField] private float _ramMaxMb       = 4096f; // RAM 최대 표시 (MB)
 
         [Inject] private ICostMonitorService _costMonitor;
+        [Inject] private IAgentTelemetryService _telemetry;
 
         private void Start()
         {
@@ -91,6 +97,29 @@ namespace OpenDesk.Presentation.Dashboard
                 if (_alertPanel != null) _alertPanel.SetActive(true);
                 if (_alertText != null)  _alertText.text = $"[!] API 비용 ${cost:F2} 초과!";
             }).AddTo(this);
+
+            // Telemetry — 미들웨어 hook chain 측정값. ChatPanelView 또는 별도 디버그 HUD 에서 표시.
+            if (_telemetry != null)
+            {
+                _telemetry.LastTtftMs.Subscribe(ms =>
+                {
+                    if (_ttftText != null)
+                        _ttftText.text = ms > 0 ? $"TTFT {ms} ms" : "TTFT --";
+                }).AddTo(this);
+
+                _telemetry.LastCacheHitRatio.Subscribe(ratio =>
+                {
+                    if (_cacheHitText == null) return;
+                    var available = _telemetry.TelemetryAvailable.CurrentValue;
+                    _cacheHitText.text = available ? $"Cache {ratio * 100f:F0}%" : "Cache n/a";
+                }).AddTo(this);
+
+                _telemetry.LastRetryCount.Subscribe(retries =>
+                {
+                    if (_retryText != null)
+                        _retryText.text = $"Retries {retries}";
+                }).AddTo(this);
+            }
         }
     }
 }

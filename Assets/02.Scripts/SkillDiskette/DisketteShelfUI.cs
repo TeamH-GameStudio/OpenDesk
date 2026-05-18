@@ -14,6 +14,7 @@ namespace OpenDesk.SkillDiskette
     /// 화면 구석에 세로 배열, 각 디스켓 카드(색상 + 이름) 표시.
     /// 카드를 드래그 → 3D 에이전트 위에 드롭 → 장착.
     /// </summary>
+    [System.Obsolete("디스켓 선반 UI 는 PluginsMarketView/SkillMarketView 마켓플레이스 카드 UI 로 대체되었다. 가역 보존용.")]
     public class DisketteShelfUI : MonoBehaviour
     {
         [Header("UI 참조")]

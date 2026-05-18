@@ -1,0 +1,142 @@
+/* PluginsMarketView — opendesk-tokens.uss 색상/타이포 토큰 상속 */
+
+.plugins-market {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.plugins-market__veil {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.55);
+}
+
+.plugins-market__card {
+    width: 80%;
+    height: 80%;
+    max-width: 1120px;
+    max-height: 760px;
+    background-color: var(--od-color-surface-0, #FAF6F0);
+    border-radius: 16px;
+    padding: 16px;
+    flex-direction: column;
+}
+
+.plugins-market__header {
+    flex-direction: column;
+    margin-bottom: 12px;
+}
+
+.plugins-market__title {
+    color: var(--od-color-text-primary, #2A2018);
+}
+
+.plugins-market__header-controls {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.plugins-market__search {
+    flex-grow: 1;
+    margin-right: 8px;
+}
+
+.plugins-market__btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    margin-left: 4px;
+}
+
+.plugins-market__btn--ghost {
+    background-color: transparent;
+    border-color: var(--od-color-border, #C9BFA9);
+    border-width: 1px;
+}
+
+.plugins-market__btn--close {
+    background-color: transparent;
+    border-width: 0;
+    width: 30px;
+}
+
+.plugins-market__status {
+    margin-top: 6px;
+    color: var(--od-color-text-secondary, #6B5A48);
+}
+
+.plugins-market__body {
+    flex-direction: row;
+    flex-grow: 1;
+}
+
+.plugins-market__rail {
+    width: 180px;
+    margin-right: 12px;
+}
+
+.plugins-market__main {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.plugins-market__section {
+    flex-direction: column;
+}
+
+.plugins-market__section--grow {
+    flex-grow: 1;
+}
+
+.plugins-market__section-title {
+    margin-bottom: 8px;
+}
+
+.plugins-market__catalog {
+    flex-grow: 1;
+}
+
+/* ── Card ─────────────────────────────────────────── */
+
+.plugin-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 8px;
+    background-color: var(--od-color-surface-1, #F2EAD9);
+    border-radius: 12px;
+}
+
+.plugin-card__icon {
+    width: 40px;
+    height: 40px;
+    margin-right: 10px;
+    border-radius: 8px;
+    background-color: var(--od-color-surface-2, #E5D9BF);
+}
+
+.plugin-card__info {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.plugin-card__name {
+    color: var(--od-color-text-primary, #2A2018);
+}
+
+.plugin-card__vendor {
+    color: var(--od-color-text-secondary, #6B5A48);
+}
+
+.plugin-card__action {
+    padding: 6px 14px;
+    border-radius: 8px;
+}

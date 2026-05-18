@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using OpenDesk.Core;
 using OpenDesk.Core.Models;
 using OpenDesk.Core.Services;
 using R3;
@@ -15,7 +16,7 @@ namespace OpenDesk.Core.Implementations
     /// <summary>
     /// ClawHub 스킬 마켓플레이스
     /// - 스킬 목록은 내장 카탈로그 + 로컬 디렉토리 스캔
-    /// - 설치: ~/.openclaw/skills/{name}/SKILL.md 생성
+    /// - 설치: ~/.opendesk/skills/{name}/SKILL.md 생성 (2026-04-27 ~/.openclaw에서 마이그레이션)
     /// - 샌드박스: agents.defaults.sandbox 설정 제어
     /// </summary>
     public class SkillMarketService : ISkillMarketService, IDisposable
@@ -27,11 +28,11 @@ namespace OpenDesk.Core.Implementations
 
         private static readonly List<SkillEntry> BuiltInCatalog = new()
         {
-            new() { Id = "google-calendar",   Name = "Google Calendar",   Description = "일정 조회/생성/수정",           Category = "생산성", Author = "openclaw", Rating = 4.5f, Downloads = 12000 },
-            new() { Id = "web-search",        Name = "Web Search",        Description = "웹 검색 및 요약",              Category = "정보",   Author = "openclaw", Rating = 4.7f, Downloads = 25000 },
-            new() { Id = "browser-control",   Name = "Browser Control",   Description = "브라우저 자동화 (열기/클릭/입력)", Category = "브라우저", Author = "openclaw", Rating = 4.3f, Downloads = 8000 },
-            new() { Id = "file-manager",      Name = "File Manager",      Description = "파일 읽기/쓰기/검색",           Category = "시스템", Author = "openclaw", Rating = 4.6f, Downloads = 15000 },
-            new() { Id = "code-executor",     Name = "Code Executor",     Description = "Python/Node.js 코드 실행",     Category = "개발",   Author = "openclaw", Rating = 4.4f, Downloads = 10000 },
+            new() { Id = "google-calendar",   Name = "Google Calendar",   Description = "일정 조회/생성/수정",           Category = "생산성", Author = "opendesk", Rating = 4.5f, Downloads = 12000 },
+            new() { Id = "web-search",        Name = "Web Search",        Description = "웹 검색 및 요약",              Category = "정보",   Author = "opendesk", Rating = 4.7f, Downloads = 25000 },
+            new() { Id = "browser-control",   Name = "Browser Control",   Description = "브라우저 자동화 (열기/클릭/입력)", Category = "브라우저", Author = "opendesk", Rating = 4.3f, Downloads = 8000 },
+            new() { Id = "file-manager",      Name = "File Manager",      Description = "파일 읽기/쓰기/검색",           Category = "시스템", Author = "opendesk", Rating = 4.6f, Downloads = 15000 },
+            new() { Id = "code-executor",     Name = "Code Executor",     Description = "Python/Node.js 코드 실행",     Category = "개발",   Author = "opendesk", Rating = 4.4f, Downloads = 10000 },
             new() { Id = "email-assistant",   Name = "Email Assistant",   Description = "이메일 읽기/작성/발송",         Category = "커뮤니케이션", Author = "community", Rating = 4.1f, Downloads = 5000 },
             new() { Id = "notion-sync",       Name = "Notion Sync",       Description = "Notion 페이지 읽기/편집",       Category = "생산성", Author = "community", Rating = 4.0f, Downloads = 3000 },
             new() { Id = "zapier-mcp",        Name = "Zapier MCP",        Description = "Zapier 5000+ 앱 연동",         Category = "통합",   Author = "zapier",   Rating = 4.2f, Downloads = 7000 },
@@ -208,17 +209,7 @@ sandbox: true
             }, cancellationToken: ct);
         }
 
-        private static string GetSkillsBasePath()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "openclaw", "skills");
-
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".openclaw", "skills");
-        }
+        private static string GetSkillsBasePath() => OpenDeskPaths.Skills;
 
         private static SkillEntry CloneEntry(SkillEntry s) => new()
         {

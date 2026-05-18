@@ -7,20 +7,15 @@ EditorBuildSettings:
   m_Scenes:
   - enabled: 1
     path: Assets/01.Scenes/OnboardingScene.unity
-    guid: f7612c878faa57a4eafebbfc589f7653
-  - enabled: 1
-    path: Assets/01.Scenes/OfficeScene.unity
-    guid: b94f43b22f59838448cfefa0ea290efa
-  - enabled: 1
-    path: Assets/01.Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    guid: df58f3f3af28946de9367da50a43cd26
   - enabled: 1
     path: Assets/01.Scenes/AgentCreationScene.unity
-    guid: 79862e3b24c118b4b8948e16e6112cdb
+    guid: a1bcf03f26e5c48d585160ff989450a1
   - enabled: 1
-    path: Assets/01.Scenes/AgentOfficeScene.unity
-    guid: ef90f86afb6e3e94da6e3fe012ad96e0
+    path: Assets/01.Scenes/AgentOfficeScene_Moon.unity
+    guid: 99c9720ab356a0642a771bea13969a05
   m_configObjects:
+    com.unity.addressableassets: {fileID: 11400000, guid: 4d4fa7891c6de45329328c665e62cadb, type: 2}
     com.unity.dt.app-ui: {fileID: 11400000, guid: 7d18bd580c3c7424c838db80cf365d5d, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

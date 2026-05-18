@@ -1,0 +1,1021 @@
+/* ============================================================
+   Agent Creation — implements §5 of opendesk-ui-onboarding
+   Source of truth: opendesk-onboarding.jsx (OnbAgent)
+   All values use tokens from ../../02.Scripts/UI/Theme/opendesk-tokens.uss
+   ============================================================ */
+
+.root {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: var(--n0);
+    color: var(--n900);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Header — progress dots only (centered). The "이전" button lives
+   in each step's nav-row alongside "다음", not in the header.
+   ───────────────────────────────────────────────────────────── */
+.creation-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    height: 56px;
+    padding: 0 20px;
+    flex-shrink: 0;
+}
+
+.progress-dots {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    background-color: var(--n200);
+    margin: 0 3px;
+    transition-property: width, background-color;
+    transition-duration: 240ms, 240ms;
+    transition-timing-function: ease-out-cubic, ease-out-cubic;
+}
+/* Steps already passed — same brand colour as active, but stays at 6px wide. */
+.progress-dot--done {
+    background-color: var(--brand-signature);
+}
+.progress-dot--active {
+    width: 18px;
+    background-color: var(--brand-signature);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Body row — left 40 % preview, right 60 % step content
+   ───────────────────────────────────────────────────────────── */
+.creation-body {
+    flex-grow: 1;
+    flex-direction: row;
+    overflow: hidden;
+}
+
+.preview-pane {
+    width: 40%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px;
+}
+
+.preview-stack {
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Soft brand glow behind the avatar — UI Toolkit has no radial gradient,
+   so we approximate with a translucent capsule. */
+.avatar-glow {
+    position: absolute;
+    width: 340px;
+    height: 340px;
+    border-radius: 170px;
+    background-color: var(--brand-tint);
+    opacity: 0.55;
+}
+
+.avatar-frame {
+    width: 320px;
+    height: 420px;
+    align-items: center;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+.avatar-stage {
+    width: 200px;
+    height: 400px;
+    align-self: center;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Avatar parts
+   ───────────────────────────────────────────────────────────── */
+.avatar-head {
+    position: absolute;
+    left: 23px;
+    top: 0;
+    width: 64px;
+    height: 64px;
+    border-radius: 32px;
+    overflow: visible;
+}
+
+.avatar-hair {
+    position: absolute;
+    left: 50%;
+    width: 60px;
+    height: 28px;
+    margin-left: -30px;
+    top: -4px;
+}
+.avatar-hair--rounded { width: 60px; height: 28px; margin-left: -30px; top: -4px;
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+.avatar-hair--spiky   { width: 64px; height: 26px; margin-left: -32px; top: -6px;
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
+.avatar-hair--bowl    { width: 68px; height: 32px; margin-left: -34px; top: -2px;
+    border-top-left-radius: 34px; border-top-right-radius: 34px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+.avatar-hair--side    { width: 60px; height: 30px; margin-left: -30px; top: -4px;
+    border-top-left-radius: 40px; border-top-right-radius: 20px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 12px; }
+.avatar-hair--wavy    { width: 64px; height: 30px; margin-left: -32px; top: -4px;
+    border-top-left-radius: 24px; border-top-right-radius: 18px;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+.avatar-hair--bun     { width: 60px; height: 28px; margin-left: -30px; top: -4px;
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+.avatar-hair--short   { width: 58px; height: 18px; margin-left: -29px; top: 0;
+    border-top-left-radius: 28px; border-top-right-radius: 28px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+.avatar-hair--long    { width: 60px; height: 36px; margin-left: -30px; top: -6px;
+    border-top-left-radius: 28px; border-top-right-radius: 28px;
+    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
+.avatar-hair--split   { width: 60px; height: 28px; margin-left: -30px; top: -4px;
+    border-top-left-radius: 20px; border-top-right-radius: 20px;
+    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; }
+
+.avatar-bun-extra {
+    position: absolute;
+    left: 50%;
+    top: -16px;
+    margin-left: -11px;
+    width: 22px;
+    height: 22px;
+    border-radius: 11px;
+    display: none;
+}
+.avatar-hair-shape--bun .avatar-bun-extra { display: flex; }
+
+.avatar-eye {
+    position: absolute;
+    background-color: #2A201A;
+}
+.avatar-eye--left  { left: 18px; top: 30px; }
+.avatar-eye--right { right: 18px; top: 30px; }
+
+.avatar-mouth {
+    position: absolute;
+    left: 50%;
+    top: 44px;
+    background-color: transparent;
+}
+
+.avatar-top {
+    position: absolute;
+    left: 50%;
+    top: 70px;
+    margin-left: -43px;
+    width: 86px;
+    height: 70px;
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.avatar-bottom {
+    position: absolute;
+    left: 50%;
+    top: 138px;
+    margin-left: -39px;
+    width: 78px;
+    height: 60px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.avatar-leg-split {
+    position: absolute;
+    left: 50%;
+    top: 8px;
+    bottom: 0;
+    margin-left: -1px;
+    width: 2px;
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.avatar-shoes {
+    position: absolute;
+    left: 50%;
+    top: 196px;
+    margin-left: -39px;
+    width: 78px;
+    height: 12px;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.avatar-shoe {
+    width: 32px;
+    height: 12px;
+}
+.avatar-shoe--left  { border-top-left-radius: 4px; border-bottom-left-radius: 4px;
+                     border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+.avatar-shoe--right { border-top-left-radius: 8px; border-bottom-left-radius: 8px;
+                     border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+
+.avatar-shadow {
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    margin-left: -65px;
+    width: 130px;
+    height: 10px;
+    border-radius: 5px;
+    background-color: rgba(36, 33, 30, 0.12);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Preview overlays — name/role 버블은 캐릭터 머리 위, traits 칩 영역은 캐릭터 밑.
+   commit 전에는 둘 다 --hidden 으로 가려져 있고, "다음" 클릭으로 commit 되는
+   순간 등장 + 짧은 ding 펄스(scale 1.06, translate -4px)가 재생된다.
+   캐릭터 자체에는 펄스가 없다.
+   ───────────────────────────────────────────────────────────── */
+.preview-name-bubble {
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: 18px;
+    padding: 10px 16px;
+    align-items: center;
+    min-width: 160px;
+    max-width: 240px;
+    margin-bottom: 12px;
+    scale: 1 1;
+    translate: 0 0;
+    transition-property: scale, translate;
+    transition-duration: 420ms, 420ms;
+    transition-timing-function: ease-out-cubic, ease-out-cubic;
+}
+.preview-name-bubble--hidden { display: none; }
+.preview-name-bubble--ding {
+    scale: 1.06 1.06;
+    translate: 0 -4px;
+}
+
+.preview-name-bubble__name {
+    color: var(--n900);
+    -unity-text-align: middle-center;
+}
+
+.preview-name-bubble__role {
+    color: var(--n500);
+    margin-top: 2px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.preview-traits-bar {
+    margin-top: 4px;
+    align-items: center;
+    scale: 1 1;
+    translate: 0 0;
+    transition-property: scale, translate;
+    transition-duration: 420ms, 420ms;
+    transition-timing-function: ease-out-cubic, ease-out-cubic;
+}
+.preview-traits-bar--hidden { display: none; }
+.preview-traits-bar--ding {
+    scale: 1.06 1.06;
+    translate: 0 -4px;
+}
+
+.preview-traits-bar__chips {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 320px;
+}
+
+.preview-traits-bar__chip {
+    padding: 7px 16px;
+    border-radius: var(--r-lg);
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+    margin: 4px;
+    font-size: 14px;
+    -unity-font-style: bold;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Right pane — step content as a card
+   ───────────────────────────────────────────────────────────── */
+.step-pane {
+    width: 60%;
+    flex-direction: row;
+    align-items: stretch;     /* card fills body height */
+    justify-content: center;  /* horizontally centre the 560px-max card */
+    padding: 24px 56px 24px 24px;
+}
+
+.step-content {
+    width: 100%;
+    max-width: 560px;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+/* Step layout — no card chrome, just padded content.
+   Transition: when --active is added, the View also briefly applies
+   --entering (opacity 0, translateY 16px). Removing --entering after
+   ~60ms triggers a 320ms slide-up + fade-in. Mirrors the SlideUp
+   component's behaviour from the reference React design. */
+.step {
+    flex-direction: column;
+    flex-grow: 1;
+    justify-content: flex-start;
+    display: none;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    padding: 32px 32px 24px 32px;
+    opacity: 0;
+    translate: 0 0;
+    transition-property: opacity, translate;
+    transition-duration: 320ms, 320ms;
+    transition-timing-function: ease-out-cubic, ease-out-cubic;
+}
+.step--active {
+    display: flex;
+    opacity: 1;
+}
+.step--active.step--entering {
+    opacity: 0;
+    translate: 0 16px;
+}
+.step--wardrobe { justify-content: flex-start; }
+
+/* Pushes the nav-row to the bottom of the card when the body content
+   is shorter than the card. */
+.step-spacer {
+    flex-grow: 1;
+}
+
+.step-title-row {
+    align-items: flex-start;
+    margin-bottom: 24px;
+}
+
+.step-title {
+    color: var(--n900);
+    margin-bottom: 6px;
+    -unity-text-align: middle-left;
+}
+
+.step-subtitle {
+    color: var(--n500);
+    -unity-text-align: middle-left;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Inputs (TextField inside the row)
+   ───────────────────────────────────────────────────────────── */
+.field-input {
+    margin-bottom: 24px;
+}
+
+/* Underline-only input: no surrounding box, just a thin line at the
+   bottom that thickens / colours on focus. Background transparent so the
+   card surface shows through. */
+.field-input > .unity-text-field__input {
+    height: 56px;
+    background-color: rgba(0, 0, 0, 0);
+    border-top-width: 0;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 1px;
+    border-color: var(--n300);
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    padding: 0 4px;
+    color: var(--n900);
+    font-size: 18px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-left;
+    transition-property: border-color, border-bottom-width;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+}
+
+.field-input > .unity-text-field__input:focus {
+    border-bottom-width: 2px;
+    border-color: var(--brand-signature);
+}
+
+/* Force black text on the inner TextElement — Unity's default
+   `--unity-text-color` resolves to a mid-grey on TextField inputs. */
+.field-input .unity-text-element {
+    color: var(--n900);
+}
+.field-input {
+    color: var(--n900);
+}
+
+.field-input--with-helper {
+    margin-bottom: 8px;
+}
+
+.field-helper {
+    color: var(--n500);
+    margin-bottom: 24px;
+    white-space: normal;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Nav row — prev (n0) + next (brand-signature)
+   ───────────────────────────────────────────────────────────── */
+.nav-row {
+    flex-direction: row;
+    flex-shrink: 0;
+}
+
+.nav-btn {
+    height: 56px;
+    border-radius: var(--r-md);
+    border-width: 0;
+    font-size: 16px;
+    -unity-text-align: middle-center;
+    /* Press feedback: scale dips to 0.98 on :active over 80ms; background
+       transitions over 150ms. Matches the reference CTA timing. */
+    transition-property: background-color, scale;
+    transition-duration: 150ms, 80ms;
+    transition-timing-function: ease-out, ease-out;
+}
+.nav-btn:active {
+    scale: 0.98 0.98;
+}
+
+.nav-btn--prev {
+    width: 112px;
+    margin-right: 8px;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    color: var(--n700);
+}
+.nav-btn--prev:hover { background-color: var(--n50); }
+
+.nav-btn--next {
+    flex-grow: 1;
+    background-color: var(--brand-signature);
+    color: var(--n0);
+}
+.nav-btn--next:hover  { background-color: var(--brand-hover); }
+.nav-btn--next:active { background-color: var(--brand-pressed); }
+.nav-btn--next:disabled { background-color: var(--n200); color: var(--n400); opacity: 1; }
+
+/* "다음" 버튼 우측에 떠 있는 단축키 안내 (Ctrl/⌘ + ↵). 버튼이 비활성일 땐 같이 흐려진다.
+   pickingMode=Ignore 라 버튼 클릭을 가로채지 않는다. */
+.nav-shortcut-hint {
+    position: absolute;
+    right: 14px;
+    top: 0;
+    bottom: 0;
+    -unity-text-align: middle-center;
+    color: rgb(255, 255, 255);
+    opacity: 0.7;
+    font-size: 12px;
+}
+.nav-btn--next:disabled .nav-shortcut-hint {
+    color: var(--n400);
+    opacity: 0.7;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Trait chips
+   ───────────────────────────────────────────────────────────── */
+.trait-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.trait-chip {
+    padding: 7px 14px;
+    border-radius: var(--r-lg);
+    border-width: 1px;
+    border-color: var(--n200);
+    background-color: var(--n0);
+    color: var(--n700);
+    margin: 4px 8px 4px 0;
+    transition-property: background-color, border-color, color;
+    transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out, ease-out;
+}
+.trait-chip:hover {
+    border-color: var(--n300);
+}
+.trait-chip--selected {
+    border-color: var(--brand-signature);
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+}
+.trait-chip--disabled {
+    background-color: var(--n50);
+    color: var(--n300);
+    border-color: var(--n200);
+    opacity: 1;
+}
+
+.trait-chip__add {
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n500);
+    border-color: var(--n300);
+}
+
+.trait-input-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 6px 4px 12px;
+    border-radius: var(--r-lg);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    background-color: var(--n0);
+    margin: 4px 8px 4px 0;
+}
+
+.trait-input-row > .unity-text-field__input {
+    width: 110px;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: var(--n900);
+    font-size: 13px;
+    padding: 0;
+}
+
+/* Unity 의 TextField 는 내부 TextElement 가 자체 색을 잡기 때문에 컨테이너의 color 만으로는
+   타이핑 중 글자가 회색으로 보일 수 있다. inner element 에도 명시적으로 검정을 강제한다. */
+.trait-input-row .unity-text-element {
+    color: var(--n900);
+}
+
+.trait-input-cancel {
+    width: 22px;
+    height: 22px;
+    border-radius: 11px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n400);
+    margin-left: 2px;
+    -unity-text-align: middle-center;
+}
+
+.selected-traits-block {
+    margin-bottom: 20px;
+}
+
+.selected-traits-label {
+    color: var(--n500);
+    -unity-font-style: bold;
+    margin-bottom: 8px;
+}
+
+.selected-traits-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.selected-trait {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 8px 6px 12px;
+    border-radius: var(--r-lg);
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    margin: 3px 6px 3px 0;
+}
+
+.selected-trait__remove {
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--brand-pressed);
+    margin-left: 6px;
+    -unity-text-align: middle-center;
+    font-size: 12px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Wardrobe — part tabs + 3×3 option grid + randomise
+   ───────────────────────────────────────────────────────────── */
+.part-tabs {
+    flex-direction: row;
+    padding: 4px;
+    background-color: var(--n50);
+    border-radius: var(--r-md);
+    margin-bottom: 14px;
+    flex-shrink: 0;
+}
+
+/* Sliding white pill that snaps under the active tab. The View
+   sets `left` and `width` inline based on the active tab's resolved
+   layout; the USS transition handles the animation between states.
+   `--no-transition` is added during the very first positioning so the
+   indicator appears instantly under the initial tab instead of
+   sweeping in from `left:0, width:0`. */
+/* Underbar — thin black line under the active tab. Geometry (left,
+   top, width, height) is set inline by the View based on the active
+   tab's resolved layout; thickness/inset constants live in the C# so
+   visual tuning happens in one place. */
+.part-tab-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    background-color: var(--n900);
+    border-radius: 1px;
+    transition-property: left, top, width, height;
+    transition-duration: 280ms, 280ms, 280ms, 280ms;
+    transition-timing-function: ease-out-cubic, ease-out-cubic, ease-out-cubic, ease-out-cubic;
+}
+.part-tab-indicator--no-transition {
+    transition-duration: 0, 0, 0, 0;
+}
+
+.part-tab {
+    flex-grow: 1;
+    height: 32px;
+    border-width: 0;
+    color: var(--n500);
+    margin: 0 1px;
+    border-radius: var(--r-sm);
+    -unity-text-align: middle-center;
+    transition-property: color;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: ease-out;
+}
+/* Override Unity Button defaults so :hover, :focus, :active never
+   leave a stuck background colour on a previously-clicked tab. The
+   indicator alone signals which tab is active.
+   `.unity-button.part-tab` doubles class specificity (0,2,0) to beat
+   the default theme's `.unity-button:focus` (0,1,0) — without this,
+   Unity's focus background sits on top of the indicator and the
+   sliding pill stays hidden. */
+.unity-button.part-tab,
+.unity-button.part-tab:hover,
+.unity-button.part-tab:focus,
+.unity-button.part-tab:active {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+}
+.part-tab:hover { color: var(--n700); }
+.part-tab--active {
+    color: var(--n900);
+    -unity-font-style: bold;
+}
+
+.option-scroll {
+    flex-grow: 1;
+    margin-bottom: 12px;
+}
+
+.option-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.option-cell {
+    width: 30%;
+    height: 90px;
+    margin: 4px 1.5%;
+    border-radius: var(--r-md);
+    border-width: 2px;
+    border-color: var(--n200);
+    background-color: var(--n0);
+    align-items: center;
+    justify-content: center;
+    color: var(--n400);
+    transition-property: border-color, background-color;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+}
+.option-cell:hover {
+    border-color: var(--n300);
+}
+.option-cell--selected {
+    border-color: var(--brand-signature);
+    background-color: var(--brand-tint);
+}
+
+.option-swatch {
+    width: 54px;
+    height: 54px;
+    border-radius: var(--r-sm);
+    background-color: var(--n100);
+    align-items: center;
+    justify-content: center;
+    color: var(--n400);
+    -unity-font-style: bold;
+}
+
+/* "없음" cell swatch — empty look with a subtle X glyph. The cell border
+   still highlights when selected, just like any other option. */
+.option-swatch--none {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 1px;
+    border-color: var(--n300);
+    color: var(--n400);
+    font-size: 18px;
+}
+
+.option-check {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    -unity-text-align: middle-center;
+    font-size: 10px;
+    -unity-font-style: bold;
+    display: none;
+}
+.option-cell--selected .option-check { display: flex; }
+
+.randomize-btn {
+    height: 36px;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n300);
+    border-radius: var(--r-md);
+    color: var(--n700);
+    margin-bottom: 8px;
+    -unity-text-align: middle-center;
+    transition-property: background-color;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: ease-out;
+}
+.randomize-btn:hover { background-color: var(--n50); }
+
+/* ─────────────────────────────────────────────────────────────
+   Model cards
+   ───────────────────────────────────────────────────────────── */
+.model-list {
+    flex-direction: column;
+    margin-bottom: 24px;
+}
+
+.model-card {
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 14px;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    margin-bottom: 10px;
+    transition-property: background-color, border-color;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+}
+.model-card:hover {
+    border-color: var(--n300);
+}
+.model-card--selected {
+    background-color: var(--brand-tint);
+    border-color: var(--brand-signature);
+}
+.model-card--locked {
+    opacity: 0.7;
+}
+
+.model-radio {
+    width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    border-width: 1px;
+    border-color: var(--n300);
+    background-color: var(--n0);
+    margin-right: 12px;
+    margin-top: 2px;
+    align-items: center;
+    justify-content: center;
+}
+.model-card--selected .model-radio {
+    border-color: var(--brand-signature);
+}
+
+.model-radio__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background-color: var(--brand-signature);
+    display: none;
+}
+.model-card--selected .model-radio__dot { display: flex; }
+
+.model-text {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.model-name-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.model-name {
+    color: var(--n900);
+    -unity-font-style: bold;
+}
+.model-card--locked .model-name { color: var(--n400); }
+
+.model-lock {
+    color: var(--n400);
+    margin-left: 6px;
+    font-size: 12px;
+    display: none;
+}
+.model-card--locked .model-lock { display: flex; }
+
+.model-desc {
+    color: var(--n500);
+    margin-top: 2px;
+    white-space: normal;
+}
+.model-card--locked .model-desc { color: var(--n400); }
+
+.model-badge {
+    color: var(--success);
+    -unity-font-style: bold;
+    margin-left: 8px;
+    -unity-text-align: middle-right;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Action rails — twin scroll columns between the 3D preview and
+   the wardrobe form. Left rail drives facial expressions, right
+   rail fires animation states. Hidden on every step except step-4
+   (the wardrobe step) via .action-rails--hidden.
+   ───────────────────────────────────────────────────────────── */
+.action-rails {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: center;
+    padding: 24px 0;
+    margin: 0 8px;
+    flex-shrink: 0;
+}
+.action-rails--hidden {
+    display: none;
+}
+
+.action-rail {
+    width: 64px;
+    margin: 0 4px;
+    background-color: var(--n100);
+    border-radius: 18px;
+    padding: 8px 0;
+}
+
+.action-rail__list {
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Generic circular pill used by both rails. Variants only differ in
+   the active/hover tint. Buttons themselves carry text (emoji or 1-2
+   char label) so the rail stays asset-free for now. */
+.action-rail__btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    margin: 6px 0;
+    padding: 0;
+    border-width: 0;
+    background-color: var(--brand-tint);
+    color: var(--n900);
+    font-size: 14px;
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    transition-property: background-color, scale;
+    transition-duration: 160ms, 160ms;
+    transition-timing-function: ease-out, ease-out;
+}
+.action-rail__btn:hover {
+    scale: 1.06 1.06;
+}
+.action-rail__btn:active {
+    scale: 0.96 0.96;
+}
+.action-rail__btn--selected {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+}
+
+/* Per-rail accents — left rail (expressions) keeps the warm tint;
+   right rail (animations) shifts to a cooler neutral so the two
+   columns read as distinct purposes at a glance. */
+.action-rail--expression .action-rail__btn {
+    background-color: var(--brand-tint);
+}
+.action-rail--animation .action-rail__btn {
+    background-color: var(--n200);
+}
+.action-rail--animation .action-rail__btn--selected {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Hair-color rail — horizontal scroll of circular colour swatches,
+   wedged between the option grid and the 랜덤 button. Drives
+   WardrobeApplier.SetHairColor via AgentPreviewActionRail.
+   ───────────────────────────────────────────────────────────── */
+.hair-color-rail {
+    flex-shrink: 0;
+    max-height: 56px;
+    margin-bottom: 8px;
+}
+.hair-color-rail--hidden {
+    display: none;
+}
+
+.hair-color-list {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 4px;
+}
+
+/* The swatch itself reads as colour-only — no text, no border. Hover/active
+   scale matches the action-rail pills so the whole step-4 surface animates
+   with one visual language. */
+.hair-color-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    margin: 0 6px 0 0;
+    padding: 0;
+    border-width: 0;
+    background-color: var(--n200);
+    transition-property: scale, border-width;
+    transition-duration: 160ms, 160ms;
+    transition-timing-function: ease-out, ease-out;
+}
+.hair-color-swatch:hover {
+    scale: 1.08 1.08;
+}
+.hair-color-swatch:active {
+    scale: 0.94 0.94;
+}
+/* Stronger highlight so the active colour reads cleanly against the rail's
+   soft background. Outer ring spaced out with a transparent shadow so the
+   swatch hue stays unobstructed. */
+.hair-color-swatch--selected {
+    border-width: 2px;
+    border-color: var(--brand-signature);
+    scale: 1.12 1.12;
+}
+
+/* App UI Panel hosting the whole wizard — required so ColorField can open
+   its popup. Reset it to a transparent stretchy container so the brand
+   tokens / existing layout drive every pixel. */
+.creation-appui-panel {
+    flex-grow: 1;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* Free-pick ColorField anchored at the end of the preset row. App UI ships
+   it with its own swatch styling — we override size/border-radius so it
+   visually docks alongside the round preset swatches and is large enough
+   to click reliably (App UI's S size renders as a tiny strip otherwise). */
+.hair-color-custom {
+    margin: 0 0 0 6px;
+    align-self: center;
+    flex-shrink: 0;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+/* The inner swatch element App UI renders inside the field. Forcing every
+   descendant to fill the 32px parent keeps the colour disc round whichever
+   internal sub-element actually paints the swatch fill. */
+.hair-color-custom > * {
+    width: 100%;
+    height: 100%;
+    border-radius: 16px;
+}

@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using OpenDesk.AgentCreation.Models;
+using OpenDesk.AgentCreation.Soul;
+using OpenDesk.Presentation.SceneLoading;
 using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using VContainer;
 
 namespace OpenDesk.Presentation.UI.AgentCreation
 {
@@ -20,7 +23,7 @@ namespace OpenDesk.Presentation.UI.AgentCreation
     public class AgentCreationWizardController : MonoBehaviour
     {
         private const int TotalSteps = 6;
-        private const string OfficeSceneName = "AgentOfficeScene";
+        private const string OfficeSceneName = "AgentOfficeScene_Moon";
 
         // ── 루트 ────────────────────────────────────────────
         [Header("루트")]
@@ -87,6 +90,19 @@ namespace OpenDesk.Presentation.UI.AgentCreation
         private AgentCreationStep _currentStep = AgentCreationStep.Hidden;
         private readonly AgentCreationData _data = new();
         private GameObject[] _allStepPanels;
+
+        // ── DI ─────────────────────────────────────────────
+        // Optional 주입: 등록되지 않은 환경(예: 테스트 씬)에서도 위저드가 동작하도록.
+        // null이면 항상 FallbackSoulBuilder를 사용한다.
+        private ISoulGenerationService _soulGen;
+        private IGameSceneLoader _sceneLoader;
+
+        [Inject]
+        public void Construct(ISoulGenerationService soulGen, IGameSceneLoader sceneLoader)
+        {
+            _soulGen = soulGen;
+            _sceneLoader = sceneLoader;
+        }
 
         /// <summary>에이전트 생성 완료 시 발행</summary>
         public event Action<AgentCreationData> OnAgentCreated;
@@ -500,33 +516,74 @@ namespace OpenDesk.Presentation.UI.AgentCreation
             if (_createButton != null) _createButton.interactable = false;
             if (_creatingOverlay != null) _creatingOverlay.SetActive(true);
 
-            // 생성 연출
-            var messages = new[]
+            try
             {
-                "설정하신 두뇌와 외형을 연결하고 있어요...",
-                "에이전트를 초기화하고 있어요...",
-                "거의 다 됐어요!",
-            };
+                // 1단계: 두뇌·외형 연결 연출
+                await ShowStatus("설정하신 두뇌와 외형을 연결하고 있어요...", 800);
 
-            foreach (var msg in messages)
+                // 2단계: Haiku로 Soul 생성 (실패 시 폴백)
+                await ShowStatus("에이전트의 정체성을 설계하고 있어요...", 0);
+                var soulMarkdown = await GenerateSoulOrFallbackAsync(destroyCancellationToken);
+
+                // 3단계: 저장
+                // AgentDataStore(PlayerPrefs) 는 폐기됨 — 새 흐름은 AgentDraftJsonStore 사용.
+                // 이 레거시 위저드는 더 이상 라우팅되지 않으나 컴파일 유지를 위해 호출만 제거.
+                await ShowStatus("에이전트를 초기화하고 있어요...", 600);
+                SoulRepository.Save(_data.AgentName, soulMarkdown);
+
+                OnAgentCreated?.Invoke(_data);
+
+                if (_creatingStatusText != null)
+                    _creatingStatusText.text = $"'{_data.AgentName}' 에이전트가 생성되었습니다!\n사무실로 이동합니다...";
+
+                await UniTask.Delay(1200, cancellationToken: destroyCancellationToken);
+
+                Debug.Log($"[AgentWizard] 오피스 씬 로드: {OfficeSceneName}");
+                if (_sceneLoader != null)
+                {
+                    await _sceneLoader.ChangeSceneAsync(OfficeSceneName, destroyCancellationToken);
+                }
+                else
+                {
+                    // DI 미주입 환경(테스트 씬) 폴백 — 동기 로드.
+                    UnityEngine.SceneManagement.SceneManager.LoadScene(OfficeSceneName);
+                }
+            }
+            catch (OperationCanceledException)
             {
-                if (_creatingStatusText != null) _creatingStatusText.text = msg;
-                await UniTask.Delay(800, cancellationToken: destroyCancellationToken);
+                Debug.Log("[AgentWizard] 생성 취소됨 (씬 종료)");
+            }
+        }
+
+        /// <summary>Soul 생성 시도 → 실패 시 폴백. 항상 유효한 markdown을 반환.</summary>
+        private async UniTask<string> GenerateSoulOrFallbackAsync(CancellationToken ct)
+        {
+            if (_soulGen == null)
+            {
+                Debug.Log("[AgentWizard] ISoulGenerationService 미주입 — 폴백 사용");
+                return FallbackSoulBuilder.Build(_data);
             }
 
-            // PlayerPrefs 저장
-            AgentDataStore.Save(_data, _data.AvatarPrefabName);
+            try
+            {
+                return await _soulGen.GenerateAsync(_data, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AgentWizard] Soul 생성 실패, 폴백 사용: {e.Message}");
+                return FallbackSoulBuilder.Build(_data);
+            }
+        }
 
-            OnAgentCreated?.Invoke(_data);
-
-            if (_creatingStatusText != null)
-                _creatingStatusText.text = $"'{_data.AgentName}' 에이전트가 생성되었습니다!\n사무실로 이동합니다...";
-
-            await UniTask.Delay(1500, cancellationToken: destroyCancellationToken);
-
-            // 오피스 씬으로 전환
-            Debug.Log($"[AgentWizard] 오피스 씬 로드: {OfficeSceneName}");
-            SceneManager.LoadScene(OfficeSceneName);
+        private async UniTask ShowStatus(string message, int delayMs)
+        {
+            if (_creatingStatusText != null) _creatingStatusText.text = message;
+            if (delayMs > 0)
+                await UniTask.Delay(delayMs, cancellationToken: destroyCancellationToken);
         }
 
         // ================================================================

@@ -1,3 +1,4 @@
+using OpenDesk.Characters.Wardrobe.Expressions;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -77,10 +78,15 @@ namespace OpenDesk.Presentation.Character.Context
             NavAgent.velocity.sqrMagnitude > 0.01f;
     }
 
-    /// <summary>표정/이펙트 제어 인터페이스 (추후 구현)</summary>
+    /// <summary>
+    /// 표정/이펙트 제어 인터페이스. 캐릭터 프리팹의 <see cref="OpenDesk.Characters.Wardrobe.WardrobeApplier"/>
+    /// 가 실제 PSD eye/mouth 텍스처 swap 을 수행하며, 그 구현체는
+    /// <see cref="OpenDesk.Presentation.Character.WardrobeExpressionController"/> 가 어댑터로 제공한다.
+    /// FSM States 가 이 인터페이스를 통해 enum 키를 발행하면 시네마틱과 동일한 표정 시스템이 동작.
+    /// </summary>
     public interface IExpressionController
     {
-        void SetExpression(string expressionName);
+        void SetExpression(AgentExpressionKey key);
         void PlayEffect(string effectName);
     }
 }

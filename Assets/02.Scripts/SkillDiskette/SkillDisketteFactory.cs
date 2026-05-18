@@ -9,6 +9,7 @@ namespace OpenDesk.SkillDiskette
     /// - 프리셋 디스켓: Resources/SkillDisks/ 에서 로드
     /// - 커스텀 디스켓: CraftResult → 런타임 SO 생성 → 3D 오브젝트
     /// </summary>
+    [System.Obsolete("디스켓 메타포는 마켓플레이스 카드 UI 로 대체되었다. 가역 보존용 — 새 코드는 SkillCatalogService/SkillInstallerService 를 사용.")]
     public class SkillDisketteFactory
     {
         private GameObject _diskettePrefab;

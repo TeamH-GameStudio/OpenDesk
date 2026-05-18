@@ -18,6 +18,7 @@ namespace OpenDesk.Core.Implementations
     /// 4. {"type":"res","ok":true,...}                       → RPC 응답 (무시)
     /// 5. 기존 플랫 포맷 {"type":"task_started",...}         → 레거시 호환
     /// </summary>
+    [Obsolete("OpenClaw legacy. Replaced by Claude CLI/Anthropic API path (IClaudeService). Will be removed once Anthropic-direct migration is fully verified.", error: false)]
     public class EventParserService : IEventParserService
     {
         // JSON eventType 키 → ActionType 매핑 테이블 (레거시 플랫 포맷용)

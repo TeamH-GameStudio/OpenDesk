@@ -1,0 +1,30 @@
+/* Complexity hint segmented control — 라우터에게 user_complexity_hint 전달. */
+
+.complexity-hint {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgba(20, 20, 19, 0.06);
+    border-radius: 8px;
+    padding: 2px;
+    margin-right: 8px;
+}
+
+.complexity-hint__btn {
+    background-color: transparent;
+    color: rgb(91, 88, 81);
+    border-width: 0;
+    padding: 4px 10px;
+    border-radius: 6px;
+    -unity-text-align: middle-center;
+    font-size: 11px;
+}
+
+.complexity-hint__btn:hover {
+    color: rgb(20, 20, 19);
+}
+
+.complexity-hint__btn--active {
+    background-color: rgb(255, 252, 246);
+    color: rgb(20, 20, 19);
+    -unity-font-style: bold;
+}

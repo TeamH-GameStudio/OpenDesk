@@ -1,0 +1,303 @@
+/* ============================================================
+   OpenDesk Chat Panel — implements §2 of opendesk-ui-spec-v2
+   Source of truth: opendesk-design.md + opendesk-design-tokens.html
+   All values use tokens from ../../02.Scripts/UI/Theme/opendesk-tokens.uss
+   ============================================================ */
+
+.root {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n900);
+}
+
+/* Body splits into transparent decoration pane (40%) + chat (60%) */
+.body {
+    flex-grow: 1;
+    flex-direction: row;
+    overflow: hidden;
+}
+
+/* Left 40% intentionally empty — 3D office scene shows through.
+   picking-mode=Ignore in UXML so clicks pass through to 3D. */
+.decoration-pane {
+    width: 40%;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Chat pane — §2-1
+   White surface, 4px Warm Clay brand bar on left edge.
+   ───────────────────────────────────────────────────────────── */
+.chat-pane {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: var(--n0);
+    overflow: hidden;
+}
+
+.chat-pane__brand-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: var(--brand-signature);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Header — 56px, name · role + sessions + close
+   ───────────────────────────────────────────────────────────── */
+.chat-header {
+    flex-direction: row;
+    align-items: center;
+    height: 56px;
+    padding: 0 16px 0 28px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n200);
+}
+
+.chat-header__title-row {
+    flex-direction: row;
+    align-items: baseline;
+}
+
+.chat-header__name {
+    color: var(--n900);
+}
+
+.chat-header__sep {
+    color: var(--n400);
+    font-size: 14px;
+    margin: 0 6px;
+}
+
+.chat-header__role {
+    color: var(--n500);
+}
+
+.chat-header__spacer {
+    flex-grow: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Icon button — header sessions/close
+   ───────────────────────────────────────────────────────────── */
+.icon-btn {
+    width: 32px;
+    height: 32px;
+    margin-left: 4px;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: var(--r-md);
+    color: var(--n400);
+    -unity-text-align: middle-center;
+    font-size: 20px;
+    align-items: center;
+    justify-content: center;
+
+    transition-property: background-color, color;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+}
+
+.icon-btn:hover {
+    background-color: rgba(20, 20, 19, 0.04);
+    color: var(--n700);
+}
+
+/* Hamburger icon — 3 horizontal lines (sessions menu) */
+.hamburger-icon {
+    width: 18px;
+    height: 12px;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.hamburger-line {
+    height: 1.6px;
+    background-color: var(--n400);
+}
+
+.icon-btn:hover .hamburger-line {
+    background-color: var(--n700);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Messages
+   ───────────────────────────────────────────────────────────── */
+.chat-scroll {
+    flex-grow: 1;
+    background-color: var(--n0);
+}
+
+.messages-container {
+    flex-direction: column;
+    flex-grow: 1;
+    padding: var(--space-lg) var(--space-lg) var(--space-md-) var(--space-lg);
+}
+
+.message {
+    flex-direction: column;
+    margin-bottom: var(--space-md);
+
+    /* Base-state transition for entry animation (inline opacity 0→1 toggle) */
+    transition-property: opacity, translate;
+    transition-duration: var(--motion-base), var(--motion-base);
+    transition-timing-function: ease-out, ease-out;
+}
+
+.message--user {
+    align-items: flex-end;
+}
+
+.message--assistant {
+    align-items: flex-start;
+}
+
+/* Sender caption above assistant bubble — "Writer" */
+.message__sender-label {
+    font-size: 12px;
+    color: var(--n500);
+    margin-bottom: var(--space-xs);
+}
+
+/* Shared bubble defaults */
+.message__bubble {
+    max-width: 82%;
+    font-size: 15px;
+    white-space: normal;
+}
+
+/* User bubble — n900 background, n0 text, asymmetric radius (16/16/4/16) */
+.message--user > .message__bubble {
+    background-color: var(--n900);
+    color: var(--n0);
+    padding: 12px 16px;
+    border-top-left-radius: var(--r-xl);
+    border-top-right-radius: var(--r-xl);
+    border-bottom-right-radius: var(--r-sm);
+    border-bottom-left-radius: var(--r-xl);
+    max-width: 75%;
+}
+
+/* Assistant message — no bubble, just label + body text */
+.message--assistant > .message__bubble {
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n700);
+    padding: 0;
+    max-width: 85%;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Input area — n50 bg, n200 top border, 16px padding
+   ───────────────────────────────────────────────────────────── */
+.chat-input-area {
+    flex-direction: column;
+    padding: var(--space-md) var(--space-md) var(--space-md) var(--space-md);
+    background-color: var(--n50);
+    border-top-width: 1px;
+    border-top-color: var(--n200);
+}
+
+/* Input wrapper holds textarea + send button.
+   USS has no :focus-within, so the View toggles --focused class on focus events. */
+.chat-input-row {
+    flex-direction: row;
+    align-items: flex-end;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    padding: 4px 6px 4px 14px;
+
+    transition-property: border-color;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: ease-out;
+}
+
+.chat-input-row--focused {
+    border-color: var(--brand-signature);
+}
+
+/* TextField inside the row — strip its default chrome */
+.chat-input {
+    flex-grow: 1;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.chat-input > .unity-text-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    padding: 8px 0;
+    color: var(--n900);
+    font-size: 15px;
+    min-height: 24px;
+    max-height: 120px;
+    white-space: normal;
+}
+
+.chat-input > .unity-text-field__input:focus {
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Send button — Warm Clay when has draft, n100 when empty
+   ───────────────────────────────────────────────────────────── */
+.send-button {
+    width: 32px;
+    height: 32px;
+    margin-left: 8px;
+    margin-bottom: 4px;
+    padding: 0;
+    border-radius: var(--r-md);
+    background-color: var(--brand-signature);
+    border-width: 0;
+    align-items: center;
+    justify-content: center;
+
+    transition-property: background-color, scale;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+    scale: 1 1;
+}
+
+.send-button:hover {
+    background-color: var(--brand-hover);
+}
+
+.send-button:active {
+    scale: 0.94 0.94;
+    background-color: var(--brand-pressed);
+}
+
+.send-button:disabled {
+    background-color: var(--n100);
+    opacity: 1;
+}
+
+/* Up arrow rendered with two adjacent borders rotated 45° (chevron up) */
+.send-arrow {
+    width: 10px;
+    height: 10px;
+    border-top-width: 2px;
+    border-left-width: 2px;
+    border-color: var(--n0);
+    rotate: 45deg;
+    margin-top: 3px;
+}
+
+.send-button:disabled .send-arrow {
+    border-color: var(--n400);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Hint footer — caption-sized, n400, only visible early on
+   ───────────────────────────────────────────────────────────── */
+.chat-input-hint {
+    margin-top: var(--space-sm);
+    color: var(--n400);
+    -unity-text-align: middle-left;
+}
