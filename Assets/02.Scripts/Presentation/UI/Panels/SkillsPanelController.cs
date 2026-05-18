@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using OpenDesk.AgentCreation.Models;
 using OpenDesk.Core.Models;
 using OpenDesk.Core.Services;
+using OpenDesk.Presentation.UI.SkillMarket;
 using R3;
 using TMPro;
 using UnityEngine;
@@ -25,12 +27,23 @@ namespace OpenDesk.Presentation.UI.Panels
         [SerializeField] private GameObject    _skillCardPrefab;
         [SerializeField] private GameObject    _loadingIndicator;
 
+        [Header("신규 마켓 진입점")]
+        [Tooltip("새 SkillMarket 패널을 여는 진입 버튼. 비어 있으면 신규 마켓 통합 미사용.")]
+        [SerializeField] private Button _openMarketButton;
+
         [Inject] private ISkillMarketService _skillMarket;
+        private SkillMarketView _newMarketView;
 
         private int _currentTab; // 0=추천, 1=설치됨, 2=전체
 
         private void Start()
         {
+            // 신규 마켓 패널 진입 버튼 — 씬에 컴포넌트가 있을 때만 동작.
+            if (_openMarketButton != null)
+            {
+                _openMarketButton.onClick.AddListener(OnOpenNewMarketClicked);
+            }
+
             if (_skillMarket == null) return;
 
             _searchButton?.onClick.AddListener(() => RefreshSkills());
@@ -48,6 +61,22 @@ namespace OpenDesk.Presentation.UI.Panels
             _skillMarket.OnSkillChanged.Subscribe(_ => RefreshSkills()).AddTo(this);
 
             RefreshSkills();
+        }
+
+        private void OnOpenNewMarketClicked()
+        {
+            if (_newMarketView == null)
+                _newMarketView = FindFirstObjectByType<SkillMarketView>(FindObjectsInactive.Include);
+
+            if (_newMarketView == null)
+            {
+                Debug.LogWarning("[SkillsPanel] SkillMarketView 미발견 — 씬에 UIDocument + SkillMarketView 를 배치하세요.");
+                return;
+            }
+
+            // 진입 단계에선 에이전트 컨텍스트가 없을 수 있으므로 빈 컨텍스트로 오픈.
+            // ChatPanel 컨텍스트가 있을 때는 ChatPanelController 가 currentAgentId / role 을 전달.
+            _newMarketView.Open(agentId: string.Empty, role: AgentRole.None);
         }
 
         private async void RefreshSkills()

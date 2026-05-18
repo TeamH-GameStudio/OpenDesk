@@ -108,14 +108,21 @@ namespace OpenDesk.Characters.Wardrobe.Persistence
                 shoes:  ResolveIndex(catalog, WardrobePart.Shoes,  Shoes));
         }
 
+        // 명시적 "없음" 슬롯을 빈 문자열("카탈로그 기본값으로 폴백")과 구분하기 위한
+        // sentinel ID. 저장 시 index < 0 이면 이 값으로 직렬화되고, 로드 시 이 값을
+        // 보면 -1 (Wardrobe.None) 으로 복원된다.
+        private const string NoneId = "<none>";
+
         private static string ResolveId(WardrobeCatalogSO catalog, WardrobePart part, int index)
         {
+            if (index < 0) return NoneId;
             var option = catalog.Resolve(part, index);
             return option != null ? (option.Id ?? string.Empty) : string.Empty;
         }
 
         private static int ResolveIndex(WardrobeCatalogSO catalog, WardrobePart part, string id)
         {
+            if (id == NoneId) return WardrobeModel.None;
             if (string.IsNullOrEmpty(id)) return catalog.IndexOfDefault(part);
 
             var options = catalog.GetOptions(part);

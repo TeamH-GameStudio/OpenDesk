@@ -212,9 +212,13 @@ namespace OpenDesk.Characters.Wardrobe
 
         public WardrobePartOptionSO Resolve(WardrobePart part, int index)
         {
+            // -1 is the explicit "none / unequip" sentinel. Skip the slot
+            // entirely so callers see a null option and can short-circuit
+            // (e.g. WardrobeApplier clears the MPB or unequips the prefab).
+            if (index < 0) return null;
             var entry = FindSlot(part);
             if (entry == null) return null;
-            if (entry.Options != null && index >= 0 && index < entry.Options.Count)
+            if (entry.Options != null && index < entry.Options.Count)
             {
                 var picked = entry.Options[index];
                 if (picked != null) return picked;

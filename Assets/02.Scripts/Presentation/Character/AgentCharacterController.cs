@@ -112,6 +112,11 @@ namespace OpenDesk.Presentation.Character
                 animCtrl, _sessionId, _agentName,
                 _navAgent, transform);
 
+            // 표정 어댑터 — WardrobeExpressionController 가 자식에 붙어있으면 FSM 표정 호출이
+            // WardrobeApplier.SetEyeExpression(PSD 텍스처 swap) 으로 라우팅된다.
+            // 컴포넌트 없으면 ctx.Expression == null → States 의 ?. 호출이 no-op.
+            ctx.Expression = GetComponentInChildren<WardrobeExpressionController>(includeInactive: true);
+
             BuildFSM(ctx);
 
             // IAgentStateService 구독

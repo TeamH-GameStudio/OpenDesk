@@ -1,0 +1,213 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xmlns:appui="Unity.AppUI.UI" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss"/>
+    <Style src="OnboardingShellStyles.uss"/>
+
+    <appui:Panel name="onb-shell-panel" theme="light" scale="medium" style="flex-grow: 1;">
+    <ui:VisualElement name="onb-shell" class="onb-shell">
+
+        <!-- ====================================================
+             §1 Welcome
+             ==================================================== -->
+        <ui:VisualElement name="onb-step-welcome" class="onb-step onb-step--active">
+            <ui:VisualElement name="onb-welcome__bg" class="onb-frame onb-frame--blurred"/>
+            <ui:VisualElement class="onb-frame onb-frame--veil"/>
+            <ui:VisualElement class="onb-center-card">
+                <ui:Label class="onb-display"
+                          text="OpenDesk에 오신 걸&#10;환영합니다"/>
+                <ui:Label class="onb-body onb-text-center onb-text-secondary onb-mt-md"
+                          text="AI 동료가 있는 작은 사무실이에요&#10;곧 당신만의 동료를 만나게 돼요"/>
+                <ui:Button name="onb-welcome__cta" text="시작하기"
+                           class="onb-btn onb-btn--primary onb-btn--full onb-mt-xl"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ====================================================
+             §2 Plan
+             ==================================================== -->
+        <ui:VisualElement name="onb-step-plan" class="onb-step">
+            <ui:VisualElement class="onb-page">
+                <ui:VisualElement class="onb-page-header">
+                    <ui:Label class="onb-title" text="플랜을 선택해주세요"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="onb-page-body">
+                    <ui:ScrollView mode="Vertical" class="onb-page-scroll">
+                        <ui:VisualElement name="onb-plan__cards" class="onb-plan-cards"/>
+                    </ui:ScrollView>
+                    <ui:VisualElement class="onb-nav-row onb-plan__nav">
+                        <ui:Button name="onb-plan__prev" text="이전"
+                                   class="onb-btn onb-btn--secondary"/>
+                        <ui:Button name="onb-plan__next" text="다음"
+                                   class="onb-btn onb-btn--primary onb-btn--grow"/>
+                    </ui:VisualElement>
+                    <ui:Label class="onb-meta onb-text-center onb-mt-md"
+                              text="플랜은 나중에 언제든 바꿀 수 있어요"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ====================================================
+             §3 Auth (Google OAuth — UI stub)
+             ==================================================== -->
+        <ui:VisualElement name="onb-step-auth" class="onb-step">
+            <ui:VisualElement class="onb-page">
+                <ui:VisualElement class="onb-page-header">
+                    <ui:Label class="onb-title" text="계정으로 시작하기"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="onb-page-body">
+                    <ui:ScrollView mode="Vertical" class="onb-page-scroll">
+                        <ui:VisualElement name="onb-auth__card" class="onb-center-card onb-center-card--narrow">
+                            <!-- Idle state -->
+                            <ui:VisualElement name="onb-auth__idle" class="onb-auth__pane">
+                                <ui:Label class="onb-heading-lg onb-text-center"
+                                          text="Google 계정으로 시작해요"/>
+                                <ui:Label class="onb-body onb-text-center onb-mt-md"
+                                          text="대화 기록을 안전하게 저장하고&#10;다른 기기에서도 이어가기 위해 필요해요"/>
+                                <ui:Button name="onb-auth__google" text="Google로 계속하기"
+                                           class="onb-btn onb-btn--google onb-mt-xl"/>
+                            </ui:VisualElement>
+                            <!-- Pending state -->
+                            <ui:VisualElement name="onb-auth__pending" class="onb-auth__pane onb-auth__pane--hidden">
+                                <appui:CircularProgress name="onb-auth__spinner" class="onb-spinner"/>
+                                <ui:Label class="onb-body onb-text-center onb-mt-md"
+                                          text="브라우저에서 인증을 완료해주세요"/>
+                            </ui:VisualElement>
+                            <!-- Error state -->
+                            <ui:VisualElement name="onb-auth__error" class="onb-auth__pane onb-auth__pane--hidden">
+                                <ui:VisualElement class="onb-error-banner">
+                                    <ui:Label class="onb-body" text="인증을 완료하지 못했어요"/>
+                                    <ui:Label name="onb-auth__error-message" class="onb-meta"
+                                              text="다시 시도해주세요"/>
+                                </ui:VisualElement>
+                                <ui:Button name="onb-auth__retry" text="다시 시도"
+                                           class="onb-btn onb-btn--secondary onb-btn--full onb-mt-md"/>
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:ScrollView>
+                    <ui:VisualElement class="onb-nav-row onb-auth__nav">
+                        <ui:Button name="onb-auth__prev" text="이전"
+                                   class="onb-btn onb-btn--secondary"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ====================================================
+             §3.5 License Activation (OpenDesk hosted credit system)
+             ==================================================== -->
+        <ui:VisualElement name="onb-step-license" class="onb-step">
+            <ui:VisualElement class="onb-page">
+                <ui:VisualElement class="onb-page-header">
+                    <ui:Label class="onb-title" text="라이선스 활성화"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="onb-page-body">
+                    <ui:ScrollView mode="Vertical" class="onb-page-scroll">
+                        <ui:VisualElement class="onb-center-card onb-center-card--narrow">
+                            <ui:Label class="onb-heading-lg" text="라이선스 키"/>
+                            <ui:Label class="onb-meta onb-mt-xs"
+                                      text="결제 메일/Lemon Squeezy 영수증에 포함된 키를 입력하세요"/>
+
+                            <ui:VisualElement class="onb-input-wrapper onb-mt-md">
+                                <ui:TextField name="onb-license__key" class="onb-input"/>
+                                <ui:Label name="onb-license__key-placeholder"
+                                          class="onb-input-placeholder"
+                                          text="TEST-1000 (개발용)"
+                                          picking-mode="Ignore"/>
+                            </ui:VisualElement>
+
+                            <ui:Label class="onb-heading-lg onb-mt-xl" text="이 기기 이름"/>
+                            <ui:Label class="onb-meta onb-mt-xs"
+                                      text="라이선스 한 개당 최대 2대까지 등록 가능"/>
+
+                            <ui:VisualElement class="onb-input-wrapper onb-mt-md">
+                                <ui:TextField name="onb-license__device" class="onb-input"/>
+                                <ui:Label name="onb-license__device-placeholder"
+                                          class="onb-input-placeholder"
+                                          text="MacBook Pro"
+                                          picking-mode="Ignore"/>
+                            </ui:VisualElement>
+
+                            <ui:VisualElement name="onb-license__status" class="onb-mt-md">
+                                <ui:Label name="onb-license__message" class="onb-meta"/>
+                            </ui:VisualElement>
+
+                            <ui:Label class="onb-meta onb-mt-md onb-text-secondary"
+                                      text="라이선스가 없으면 BYOK(직접 API key) 모드를 사용할 수 있어요. 설정에서 백엔드를 anthropic_api 로 전환하세요."/>
+                        </ui:VisualElement>
+                    </ui:ScrollView>
+
+                    <ui:VisualElement class="onb-nav-row onb-license__nav">
+                        <ui:Button name="onb-license__prev" text="이전"
+                                   class="onb-btn onb-btn--secondary"/>
+                        <ui:Button name="onb-license__skip" text="건너뛰기 (BYOK)"
+                                   class="onb-btn onb-btn--secondary"/>
+                        <ui:Button name="onb-license__activate" text="활성화"
+                                   class="onb-btn onb-btn--primary onb-btn--grow"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ====================================================
+             §4 User Info
+             ==================================================== -->
+        <ui:VisualElement name="onb-step-user" class="onb-step">
+            <ui:VisualElement class="onb-page">
+                <ui:VisualElement class="onb-page-header">
+                    <ui:Label class="onb-title" text="당신에 대해 알려주세요"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="onb-page-body">
+                    <ui:ScrollView mode="Vertical" class="onb-page-scroll">
+                        <ui:VisualElement class="onb-center-card">
+                            <ui:Label class="onb-heading-lg" text="어떻게 부를까요?"/>
+                            <ui:Label class="onb-meta onb-mt-xs"
+                                      text="동료가 당신을 부르는 데 쓰여요"/>
+
+                            <ui:VisualElement class="onb-input-wrapper onb-mt-md">
+                                <ui:TextField name="onb-user__name" class="onb-input"/>
+                                <ui:Label name="onb-user__name-placeholder"
+                                          class="onb-input-placeholder"
+                                          text="홍길동"
+                                          picking-mode="Ignore"/>
+                            </ui:VisualElement>
+
+                            <ui:Label class="onb-heading-lg onb-mt-xl" text="성별"/>
+                            <ui:VisualElement name="onb-user__gender" class="onb-radio-row onb-mt-sm"/>
+
+                            <ui:Label class="onb-heading-lg onb-mt-xl" text="나이"/>
+                            <ui:VisualElement name="onb-user__age" class="onb-radio-grid onb-mt-sm"/>
+
+                            <ui:VisualElement class="onb-privacy-notice onb-mt-xl">
+                                <ui:Label class="onb-privacy-notice__icon" text="🔒"/>
+                                <ui:Label class="onb-meta onb-privacy-notice__text"
+                                          text="입력한 정보는 OpenDesk 서버에 저장되지 않아요"/>
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:ScrollView>
+
+                    <ui:VisualElement class="onb-nav-row onb-user__nav">
+                        <ui:Button name="onb-user__prev" text="이전"
+                                   class="onb-btn onb-btn--secondary"/>
+                        <ui:Button name="onb-user__next" text="다음"
+                                   class="onb-btn onb-btn--primary onb-btn--grow"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ====================================================
+             §6 Loading
+             ==================================================== -->
+        <ui:VisualElement name="onb-step-loading" class="onb-step">
+            <ui:VisualElement name="onb-loading__bg" class="onb-frame onb-frame--blurred"/>
+            <ui:VisualElement class="onb-frame onb-frame--veil-strong"/>
+            <ui:VisualElement class="onb-center-card onb-center-card--transparent">
+                <appui:CircularProgress name="onb-loading__spinner" class="onb-spinner"/>
+                <ui:Label name="onb-loading__message"
+                          class="onb-title onb-text-center onb-mt-md"
+                          text=""/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+    </appui:Panel>
+</ui:UXML>

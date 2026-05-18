@@ -4,6 +4,7 @@ using AgentCreationTest.Views;
 using Cysharp.Threading.Tasks;
 using OpenDesk.Characters.Wardrobe;
 using UnityEngine;
+using VContainer;
 
 namespace OpenDesk.AgentCreation.Persistence
 {
@@ -12,18 +13,29 @@ namespace OpenDesk.AgentCreation.Persistence
     // The save is fire-and-forget — the wizard completes regardless of write
     // outcome — but errors are logged so a missing catalogue or read-only disk
     // surfaces clearly during development.
+    //
+    // RequireComponent: Relay 가 같은 GameObject 에 자동 부착되도록 강제 — 위저드 완료 후
+    // Saved 이벤트 → 씬 전환/Bridge 발행을 누락 없이 처리한다.
+    [RequireComponent(typeof(AgentCreationCompletionRelay))]
     public sealed class AgentDraftSaveTrigger : MonoBehaviour
     {
         [SerializeField] private AgentCreationView _view;
-        [Tooltip("Override save root. Leave empty to use Application.persistentDataPath/agents.")]
-        [SerializeField] private string _rootDirectoryOverride;
 
+        // Saved 는 후방 호환만 — 신규 구독자는 IAgentRepository.OnChanged 를 쓰세요.
+        // Repository 가 Save 직후 동일한 record 를 OnChanged 로 발행하므로 정보 손실 없음.
+        [Obsolete("Subscribe to IAgentRepository.OnChanged instead. Kept for backwards compatibility.")]
         public event Action<AgentDraftRecord, string> Saved;
         public event Action<AgentDraft, Exception> SaveFailed;
 
-        private AgentDraftJsonStore _store;
+        private IAgentRepository _repository;
         private WardrobeCatalogSO _catalog;
         private bool _catalogReady;
+
+        [Inject]
+        public void Construct(IAgentRepository repository)
+        {
+            _repository = repository;
+        }
 
         private async void OnEnable()
         {
@@ -32,8 +44,12 @@ namespace OpenDesk.AgentCreation.Persistence
                 Debug.LogError("[AgentDraftSaveTrigger] AgentCreationView reference missing.");
                 return;
             }
-
-            _store = new AgentDraftJsonStore(string.IsNullOrEmpty(_rootDirectoryOverride) ? null : _rootDirectoryOverride);
+            if (_repository == null)
+            {
+                // DI 미주입(테스트 씬 등) 안전망 — 기본 경로로 폴백.
+                Debug.LogWarning("[AgentDraftSaveTrigger] IAgentRepository 미주입 — 기본 경로로 폴백.");
+                _repository = new AgentDraftJsonStore();
+            }
 
             try
             {
@@ -61,10 +77,15 @@ namespace OpenDesk.AgentCreation.Persistence
                 {
                     Debug.LogWarning("[AgentDraftSaveTrigger] Saving without catalog — wardrobe IDs will be null.");
                 }
+                // hairColor 는 AgentDraft.Wardrobe.HairColor → FromDraft 가 정식 경로로 매핑하므로
+                // 이전의 FindFirstObjectByType(WardrobeApplier) 우회는 제거됨.
                 var record = AgentDraftRecord.FromDraft(draft, _catalog);
-                var path = _store.Save(record);
-                Debug.Log($"[AgentDraftSaveTrigger] Saved {record.id} → {path}");
+
+                var path = _repository.Save(record);
+                Debug.Log($"[AgentDraftSaveTrigger] Saved {record.id} → {path} (hairColor={record.wardrobe?.hairColor ?? "(none)"})");
+#pragma warning disable CS0618 // Saved 는 후방 호환용
                 Saved?.Invoke(record, path);
+#pragma warning restore CS0618
             }
             catch (Exception ex)
             {

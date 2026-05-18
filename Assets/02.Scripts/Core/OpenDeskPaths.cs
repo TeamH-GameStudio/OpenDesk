@@ -30,13 +30,40 @@ namespace OpenDesk.Core
 
         public static string Skills => Path.Combine(Base, "skills");
 
+        public static string Plugins => Path.Combine(Base, "plugins");
+
         public static string ChannelsConfig => Path.Combine(Base, "channels.yaml");
 
         public static string SkillDir(string skillName) => Path.Combine(Skills, skillName);
+
+        public static string PluginDir(string pluginId) => Path.Combine(Plugins, pluginId);
+
+        /// <summary>
+        /// 원격 catalog.json 의 로컬 캐시 경로.
+        /// RemoteSkillRegistry 가 24h TTL + ETag 검사 후 갱신.
+        /// </summary>
+        public static string CatalogCache => Path.Combine(Skills, "catalog-cache.json");
+
+        /// <summary>
+        /// 원격 plugins-catalog.json 의 로컬 캐시 경로.
+        /// </summary>
+        public static string PluginCatalogCache => Path.Combine(Plugins, "catalog-cache.json");
+
+        /// <summary>
+        /// 스킬 zip 다운로드 임시 디렉토리. 검증 후 atomic move 로 Skills/{id}/ 로 이동.
+        /// </summary>
+        public static string SkillsTmp => Path.Combine(Skills, ".tmp");
 
         /// <summary>
         /// 영속 게임/앱 데이터 저장 루트 (LocalGameDataRepository).
         /// </summary>
         public static string GameData => Path.Combine(Base, "data");
+
+        /// <summary>
+        /// Claude Code CLI 격리 설정 디렉토리. CLAUDE_CONFIG_DIR 환경변수로 미들웨어와 자식 subprocess 에 주입.
+        /// 글로벌 ~/.claude/ 와 완전히 분리하기 위함이며, 첫 사용 시 별도 'claude login' 또는
+        /// ANTHROPIC_API_KEY 환경변수가 필요하다.
+        /// </summary>
+        public static string ClaudeConfigDir => Path.Combine(Base, "claude-cli");
     }
 }

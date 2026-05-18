@@ -1,0 +1,142 @@
+/* ============================================================
+   SessionListView — UI Toolkit styles
+   에이전트별 대화 세션 리스트. 우측 슬라이드 패널 형태.
+   ============================================================ */
+
+.session-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+.session-list__veil {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(20, 20, 19, 0.40);
+}
+
+.session-list__panel {
+    width: 360px;
+    height: 100%;
+    background-color: var(--n100);
+    flex-direction: column;
+    border-left-width: 1px;
+    border-left-color: var(--n200);
+}
+
+/* ──────────── Header ──────────── */
+
+.session-list__header {
+    flex-direction: row;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    background-color: var(--n0);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n200);
+}
+
+.session-list__header-info {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.session-list__agent-name {
+    color: var(--n900);
+}
+
+.session-list__agent-role {
+    color: var(--n500);
+}
+
+.session-list__btn {
+    margin-left: 6px;
+    padding: 6px 12px;
+    border-radius: var(--r-md);
+    border-width: 0;
+    -unity-font-style: bold;
+    font-size: 13px;
+}
+
+.session-list__btn--primary {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+}
+.session-list__btn--primary:hover { background-color: var(--brand-hover); }
+
+.session-list__btn--close {
+    background-color: transparent;
+    color: var(--n600);
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: var(--r-full);
+}
+.session-list__btn--close:hover { background-color: var(--n200); color: var(--n900); }
+
+/* ──────────── Scroll + items ──────────── */
+
+.session-list__scroll {
+    flex-grow: 1;
+}
+
+.session-list__scroll > .unity-scroll-view__content-container {
+    padding: var(--space-sm);
+}
+
+.session-list__empty {
+    color: var(--n500);
+    -unity-text-align: middle-center;
+    padding: var(--space-xl) var(--space-md);
+    white-space: normal;
+}
+
+.session-item {
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border-radius: var(--r-md);
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    flex-direction: column;
+}
+
+.session-item:hover {
+    border-color: var(--brand-signature);
+    background-color: var(--brand-tint);
+}
+
+.session-item--active {
+    border-color: var(--brand-signature);
+    background-color: var(--brand-tint);
+}
+
+.session-item__top {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.session-item__title {
+    color: var(--n900);
+    -unity-font-style: bold;
+    font-size: 13px;
+    flex-grow: 1;
+}
+
+.session-item__time {
+    color: var(--n500);
+    font-size: 11px;
+}
+
+.session-item__preview {
+    color: var(--n600);
+    font-size: 12px;
+    white-space: normal;
+}

@@ -1,0 +1,689 @@
+/* ============================================================
+   SkillLoadout — UI Toolkit styles
+   "RPG 액션바" 메타포. 좌측: 캐릭터 + 게이지 + 6 슬롯.
+   우측: 검색/카테고리 + 인벤토리. 게이밍 톤(네온/그라디언트) 금지.
+   Tokens: opendesk-tokens.uss 만 사용.
+   ============================================================ */
+
+.loadout-root {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.loadout-veil {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(20, 20, 19, 0.45);
+}
+
+.loadout-card-root {
+    width: 82%;
+    height: 84%;
+    max-width: 1180px;
+    max-height: 820px;
+    background-color: var(--n0);
+    border-radius: var(--r-lg);
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ──────────────── Header ──────────────── */
+
+.loadout-header {
+    flex-direction: row;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    background-color: var(--n0);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n200);
+}
+
+.loadout-header__titles {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.loadout-header__name {
+    color: var(--n900);
+    font-size: 20px;
+}
+
+.loadout-header__subtitle {
+    color: var(--n500);
+    margin-top: 2px;
+}
+
+/* Preset pills (visual placeholder — 기본 / 리서치 모드 / 글쓰기 모드) */
+.loadout-presets {
+    flex-direction: row;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-full);
+    padding: 3px;
+    margin-right: var(--space-md);
+}
+
+.loadout-preset-pill {
+    padding: 4px 14px;
+    border-radius: var(--r-full);
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n500);
+    font-size: 12px;
+}
+
+.loadout-preset-pill:hover {
+    color: var(--n700);
+}
+
+.loadout-preset-pill--active {
+    background-color: var(--n0);
+    color: var(--n900);
+    -unity-font-style: bold;
+}
+
+.loadout-close {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-full);
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n600);
+    border-width: 0;
+    -unity-font-style: bold;
+}
+
+.loadout-close:hover {
+    background-color: var(--n100);
+    color: var(--n900);
+}
+
+/* ──────────────── Body ──────────────── */
+
+.loadout-body {
+    flex-grow: 1;
+    flex-direction: row;
+}
+
+/* ─── Left pane ─── */
+
+.loadout-left {
+    width: 440px;
+    flex-shrink: 0;
+    background-color: var(--n50);
+    border-right-width: 1px;
+    border-right-color: var(--n200);
+    padding: var(--space-lg);
+    flex-direction: column;
+}
+
+.loadout-preview {
+    align-self: center;
+    width: 220px;
+    background-color: var(--brand-tint);
+    border-width: 1px;
+    border-color: #F2DDD0;
+    border-radius: var(--r-xl);
+    padding: var(--space-md);
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+
+.loadout-preview__frame {
+    width: 100%;
+    height: 240px;
+    background-color: var(--n0);
+    border-radius: var(--r-lg);
+    border-width: 1px;
+    border-color: var(--n200);
+}
+
+.loadout-preview__caption {
+    color: var(--brand-pressed);
+    margin-top: var(--space-sm);
+}
+
+/* Loadout gauge */
+.loadout-gauge {
+    margin-bottom: var(--space-md);
+}
+
+.loadout-gauge__row {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: var(--space-xs);
+}
+
+.loadout-gauge__label {
+    color: var(--n600);
+    -unity-font-style: bold;
+    letter-spacing: 0.5px;
+}
+
+.loadout-gauge__counts {
+    flex-direction: row;
+    align-items: baseline;
+}
+
+.loadout-gauge__used {
+    color: var(--brand-pressed);
+    -unity-font-style: bold;
+}
+
+.loadout-gauge__total {
+    color: var(--n400);
+}
+
+.loadout-gauge__bar {
+    height: 4px;
+    background-color: var(--n200);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.loadout-gauge__fill {
+    height: 100%;
+    width: 0;
+    background-color: var(--brand-signature);
+}
+
+.loadout-gauge__fill--full {
+    background-color: var(--n900);
+}
+
+/* Slot list */
+.loadout-slots {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.loadout-slots__hint {
+    color: var(--n500);
+    margin-top: var(--space-sm);
+    -unity-text-align: middle-center;
+}
+
+/* Slot button (numbered RPG hotbar) */
+.loadout-slot {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    margin-bottom: var(--space-sm);
+    border-radius: var(--r-md);
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+}
+
+.loadout-slot--empty {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-right-width: 0;
+}
+
+/* UI Toolkit USS does not support border-style:dashed.
+   For empty slots we fake the dashed feel with a thicker, lighter border. */
+.loadout-slot--empty.loadout-slot {
+    border-width: 1px;
+    border-color: var(--n300);
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.loadout-slot--drop-target {
+    border-color: var(--brand-signature);
+    border-width: 2px;
+}
+
+.loadout-slot:hover {
+    border-color: var(--brand-signature);
+}
+
+.loadout-slot__num {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: var(--r-sm);
+    background-color: var(--n900);
+    color: var(--n0);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    font-size: 11px;
+    margin-right: 10px;
+}
+
+.loadout-slot__num--empty {
+    background-color: var(--n100);
+    color: var(--n500);
+}
+
+.loadout-slot__icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-sm);
+    align-items: center;
+    justify-content: center;
+    margin-right: var(--space-sm);
+}
+
+.loadout-slot__icon-letter {
+    color: var(--n0);
+    -unity-font-style: bold;
+    font-size: 14px;
+}
+
+.loadout-slot__body {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.loadout-slot__title {
+    color: var(--n900);
+    -unity-font-style: bold;
+}
+
+.loadout-slot__sub {
+    color: var(--n500);
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.loadout-slot__placeholder-title {
+    color: var(--n500);
+}
+
+.loadout-slot__placeholder-sub {
+    color: var(--n400);
+    margin-top: 1px;
+}
+
+.loadout-slot__unequip {
+    padding: 4px 10px;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    color: var(--n600);
+    font-size: 12px;
+    margin-left: var(--space-sm);
+    display: none;
+}
+
+.loadout-slot:hover .loadout-slot__unequip {
+    display: flex;
+}
+
+.loadout-slot__unequip:hover {
+    border-color: var(--brand-signature);
+    color: var(--brand-pressed);
+}
+
+.loadout-slot__plus {
+    color: var(--n300);
+    -unity-font-style: bold;
+    margin-left: var(--space-sm);
+}
+
+/* ─── Right pane ─── */
+
+.loadout-right {
+    flex-grow: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.loadout-right__head {
+    padding: var(--space-md) var(--space-lg) var(--space-sm) var(--space-lg);
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+}
+
+.loadout-right__title {
+    color: var(--n900);
+}
+
+.loadout-right__count {
+    color: var(--n500);
+}
+
+.loadout-search {
+    margin: 0 var(--space-lg) var(--space-sm) var(--space-lg);
+    flex-direction: row;
+    align-items: center;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    padding: 4px 10px;
+}
+
+.loadout-search__icon {
+    color: var(--n400);
+    margin-right: var(--space-xs);
+    font-size: 13px;
+}
+
+.loadout-search__field {
+    flex-grow: 1;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.loadout-search__field > .unity-base-text-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    padding: 0;
+    color: var(--n900);
+    font-size: 13px;
+    -unity-text-align: middle-left;
+}
+
+.loadout-categories {
+    flex-shrink: 0;
+    max-height: 36px;
+    margin: 0 var(--space-lg) var(--space-sm) var(--space-lg);
+}
+
+.loadout-categories .unity-scroll-view__content-container {
+    flex-direction: row;
+}
+
+.loadout-cat-chip {
+    flex-shrink: 0;
+    padding: 4px 12px;
+    margin-right: 6px;
+    border-radius: var(--r-full);
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    color: var(--n700);
+    font-size: 12px;
+}
+
+.loadout-cat-chip:hover {
+    border-color: var(--n400);
+}
+
+.loadout-cat-chip--active {
+    background-color: var(--n900);
+    border-color: var(--n900);
+    color: var(--n0);
+    -unity-font-style: bold;
+}
+
+.loadout-inventory {
+    flex-grow: 1;
+    margin: 0 var(--space-lg);
+    min-height: 0;
+}
+
+.loadout-inventory__empty {
+    color: var(--n500);
+    padding: var(--space-md) var(--space-lg);
+    -unity-text-align: middle-center;
+}
+
+/* Inventory row */
+.loadout-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 11px 14px;
+    margin-bottom: var(--space-sm);
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+}
+
+.loadout-row:hover {
+    border-color: var(--brand-signature);
+}
+
+.loadout-row__icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r-sm);
+    align-items: center;
+    justify-content: center;
+    margin-right: var(--space-sm);
+}
+
+.loadout-row__icon-letter {
+    color: var(--n0);
+    -unity-font-style: bold;
+    font-size: 15px;
+}
+
+.loadout-row__body {
+    flex-grow: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.loadout-row__title-line {
+    flex-direction: row;
+    align-items: center;
+}
+
+.loadout-row__title {
+    color: var(--n900);
+    -unity-font-style: bold;
+}
+
+.loadout-row__desc {
+    color: var(--n500);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.loadout-row__equip-btn {
+    padding: 6px 14px;
+    background-color: var(--n0);
+    color: var(--brand-signature);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    border-radius: var(--r-md);
+    font-size: 13px;
+    -unity-font-style: bold;
+}
+
+.loadout-row__equip-btn:hover {
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+}
+
+.loadout-row__equipped {
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 10px 4px 6px;
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+    border-radius: var(--r-full);
+    font-size: 12px;
+}
+
+.loadout-row__equipped-num {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    font-size: 10px;
+    margin-right: 6px;
+}
+
+/* ─── CTA (open market) ─── */
+
+.loadout-cta {
+    margin: var(--space-sm) var(--space-lg) var(--space-md) var(--space-lg);
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n600);
+    border-radius: var(--r-md);
+    border-width: 1px;
+    border-color: var(--n300);
+}
+
+.loadout-cta:hover {
+    background-color: var(--brand-tint);
+    border-color: var(--brand-signature);
+    color: var(--brand-pressed);
+}
+
+/* ──────────────── Replace modal ──────────────── */
+
+.loadout-replace {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    display: none;
+}
+
+.loadout-replace--visible {
+    display: flex;
+}
+
+.loadout-replace__veil {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(20, 20, 19, 0.30);
+}
+
+.loadout-replace__card {
+    width: 460px;
+    max-width: 90%;
+    background-color: var(--n0);
+    border-radius: var(--r-lg);
+    padding: var(--space-lg);
+}
+
+.loadout-replace__title {
+    color: var(--n900);
+    margin-bottom: var(--space-sm);
+}
+
+.loadout-replace__sub {
+    color: var(--n700);
+    margin-bottom: var(--space-md);
+    white-space: normal;
+}
+
+.loadout-replace__row {
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 14px;
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    margin-bottom: var(--space-md);
+}
+
+.loadout-replace__side {
+    flex-direction: row;
+    align-items: center;
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.loadout-replace__icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r-sm);
+    align-items: center;
+    justify-content: center;
+    margin-right: var(--space-sm);
+    background-color: var(--n300);
+}
+
+.loadout-replace__icon-letter {
+    color: var(--n0);
+    -unity-font-style: bold;
+    font-size: 15px;
+}
+
+.loadout-replace__side-body {
+    flex-direction: column;
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.loadout-replace__side-tag {
+    color: var(--n500);
+}
+
+.loadout-replace__side-tag--new {
+    color: var(--brand-pressed);
+}
+
+.loadout-replace__side-name {
+    color: var(--n900);
+    -unity-font-style: bold;
+}
+
+.loadout-replace__arrow {
+    color: var(--n400);
+    padding: 0 var(--space-sm);
+    font-size: 18px;
+}
+
+.loadout-replace__buttons {
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+.loadout-replace__btn {
+    padding: 8px 16px;
+    margin-left: var(--space-sm);
+    border-radius: var(--r-md);
+    font-size: 13px;
+    -unity-font-style: bold;
+}
+
+.loadout-replace__btn--ghost {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 1px;
+    border-color: var(--n200);
+    color: var(--n700);
+}
+
+.loadout-replace__btn--ghost:hover {
+    border-color: var(--n400);
+    color: var(--n900);
+}
+
+.loadout-replace__btn--primary {
+    background-color: var(--brand-signature);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    color: var(--n0);
+}
+
+.loadout-replace__btn--primary:hover {
+    background-color: var(--brand-hover);
+    border-color: var(--brand-hover);
+}

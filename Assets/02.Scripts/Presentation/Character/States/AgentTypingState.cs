@@ -1,3 +1,4 @@
+using OpenDesk.Characters.Wardrobe.Expressions;
 using OpenDesk.Presentation.Character.Context;
 using UnityEngine;
 
@@ -19,7 +20,7 @@ namespace OpenDesk.Presentation.Character.States
         {
             _ctx.StopMoving();
             _ctx.Animation.PlayAnimation("Typing", loop: true);
-            _ctx.Expression?.SetExpression("Focused");
+            _ctx.Expression?.SetExpression(AgentExpressionKey.Talking);
             Debug.Log($"[{_ctx.AgentName}] Typing 진입 -- 타이핑 시작");
         }
 
@@ -30,7 +31,7 @@ namespace OpenDesk.Presentation.Character.States
 
         public void Exit()
         {
-            _ctx.Expression?.SetExpression("Neutral");
+            _ctx.Expression?.SetExpression(AgentExpressionKey.Default);
         }
     }
 }

@@ -5,6 +5,7 @@ using System.ComponentModel;
 using AgentCreationTest.Models;
 using AgentCreationTest.ViewModels;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 namespace AgentCreationTest.Views
@@ -21,9 +22,21 @@ namespace AgentCreationTest.Views
         // changes without racing the OnEnable order.
         public event Action<AgentCreationViewModel> ViewModelReady;
 
+        // Pointer drag delta (pixels) over the 3D preview frame. Bridges hook
+        // this to rotate the underlying character/rig.
+        public event Action<Vector2> PreviewDragged;
+
+        // Fires once after the visual tree is built and the rail list elements
+        // are queried, so an external controller (AgentPreviewActionRail) can
+        // populate the buttons without racing OnEnable.
+        public event Action ActionRailsReady;
+
         public AgentCreationViewModel ViewModel => _viewModel;
 
         private const string StepActiveClass = "step--active";
+        private const string StepEnteringClass = "step--entering";
+        private const string ProgressDotActiveClass = "progress-dot--active";
+        private const string ProgressDotDoneClass = "progress-dot--done";
         private const string TraitChipClass = "trait-chip";
         private const string TraitChipSelectedClass = "trait-chip--selected";
         private const string TraitChipDisabledClass = "trait-chip--disabled";
@@ -35,6 +48,14 @@ namespace AgentCreationTest.Views
         private const string ModelCardSelectedClass = "model-card--selected";
         private const string ModelCardLockedClass = "model-card--locked";
 
+        // Preview commit feedback. 캐릭터 머리 위 이름/역할 버블과 캐릭터 밑 트레잇 칩 영역은
+        // 각자 commit 시점에 등장 + 짧은 ding 펄스를 받는다. 캐릭터 자체는 펄스 없음.
+        private const string NameBubbleHiddenClass = "preview-name-bubble--hidden";
+        private const string NameBubbleDingClass = "preview-name-bubble--ding";
+        private const string TraitsBarHiddenClass = "preview-traits-bar--hidden";
+        private const string TraitsBarDingClass = "preview-traits-bar--ding";
+        private const long DingDwellMs = 180;
+
         private UIDocument _document;
         private AgentCreationViewModel _viewModel;
         private AgentAvatarPainter _avatarPainter;
@@ -43,6 +64,8 @@ namespace AgentCreationTest.Views
         private Label _previewName;
         private Label _previewRole;
         private VisualElement _previewTraits;
+        private VisualElement _nameBubble;
+        private VisualElement _traitsBar;
 
         private readonly VisualElement[] _stepRoots = new VisualElement[5];
 
@@ -64,6 +87,7 @@ namespace AgentCreationTest.Views
 
         // Step 4
         private VisualElement _partTabs;
+        private VisualElement _partTabIndicator;
         private VisualElement _optionGrid;
         private Button _randomizeBtn;
         private Button _step4Prev;
@@ -75,17 +99,50 @@ namespace AgentCreationTest.Views
         private Button _step5Prev;
         private Button _step5Next;
 
+        // Action rails — only visible during step-4 (wardrobe). Bound to
+        // AgentPreviewActionRail (or any external controller) via the public
+        // list accessors below.
+        private VisualElement _actionRails;
+        private VisualElement _expressionRailList;
+        private VisualElement _animationRailList;
+        private const string ActionRailsHiddenClass = "action-rails--hidden";
+
+        public VisualElement ExpressionRailList => _expressionRailList;
+        public VisualElement AnimationRailList => _animationRailList;
+
+        // Hair-colour rail lives inside the step-4 card (above 랜덤). Only the
+        // Hair part tab shows it — every other tab hides the rail so the form
+        // doesn't suggest those parts can be tinted.
+        private VisualElement _hairColorRail;
+        private VisualElement _hairColorList;
+        // App UI ColorField at the end of the row — free-pick fallback when
+        // none of the presets match. Typed as VisualElement on the View side
+        // so this file doesn't need to add a hard reference to Unity.AppUI
+        // just for the cache; controller (which already imports App UI)
+        // casts it back to ColorField for callback wiring.
+        private VisualElement _hairColorCustom;
+        public VisualElement HairColorList => _hairColorList;
+        public VisualElement HairColorCustom => _hairColorCustom;
+        private const string HairColorRailHiddenClass = "hair-color-rail--hidden";
+
         // 3D preview integration
         private VisualElement _avatarFrame;
         private VisualElement _avatarStage;
         private RenderTexture _previewTexture;
+        private bool _isDraggingPreview;
 
+        // Header — progress dots only
+        private readonly VisualElement[] _progressDots = new VisualElement[5];
+
+        // Mouth selection retired — facial expressions are now driven by the
+        // eye option's EyeExpressionSetSO (one PSD per emotion key). The Mouth
+        // enum value and persistence path stay around so existing saved drafts
+        // still load, but the wizard no longer surfaces a mouth picker.
         private static readonly (WardrobePart Part, string Label)[] PartDefs =
         {
             (WardrobePart.Skin,   "피부"),
             (WardrobePart.Hair,   "머리"),
             (WardrobePart.Eyes,   "눈"),
-            (WardrobePart.Mouth,  "입"),
             (WardrobePart.Top,    "상의"),
             (WardrobePart.Bottom, "하의"),
             (WardrobePart.Shoes,  "신발"),
@@ -109,8 +166,10 @@ namespace AgentCreationTest.Views
             BuildPartTabs();
             BuildModelList();
             RegisterCallbacks();
+            AttachShortcutHints();
             RenderTraitGrid();
             ViewModelReady?.Invoke(_viewModel);
+            ActionRailsReady?.Invoke();
             if (_previewTexture != null) ApplyPreviewTexture();
             RenderSelectedTraits();
             RenderOptionGrid();
@@ -132,6 +191,8 @@ namespace AgentCreationTest.Views
             _previewName   = root.Q<Label>("preview-name");
             _previewRole   = root.Q<Label>("preview-role");
             _previewTraits = root.Q<VisualElement>("preview-traits");
+            _nameBubble    = root.Q<VisualElement>("preview-name-bubble");
+            _traitsBar     = root.Q<VisualElement>("preview-traits-bar");
 
             for (int i = 0; i < _stepRoots.Length; i++)
             {
@@ -162,6 +223,18 @@ namespace AgentCreationTest.Views
 
             _avatarFrame = root.Q<VisualElement>(className: "avatar-frame");
             _avatarStage = root.Q<VisualElement>("avatar-stage");
+
+            _actionRails         = root.Q<VisualElement>("action-rails");
+            _expressionRailList  = root.Q<VisualElement>("expression-rail-list");
+            _animationRailList   = root.Q<VisualElement>("animation-rail-list");
+            _hairColorRail       = root.Q<VisualElement>("hair-color-rail");
+            _hairColorList       = root.Q<VisualElement>("hair-color-list");
+            _hairColorCustom     = root.Q<VisualElement>("hair-color-custom");
+
+            for (int i = 0; i < _progressDots.Length; i++)
+            {
+                _progressDots[i] = root.Q<VisualElement>($"progress-dot-{i + 1}");
+            }
         }
 
         // ─── 3D preview integration ────────────────────────────
@@ -214,10 +287,19 @@ namespace AgentCreationTest.Views
 
             if (_randomizeBtn != null) _randomizeBtn.clicked += OnRandomiseClicked;
 
+            if (_avatarFrame != null)
+            {
+                _avatarFrame.RegisterCallback<PointerDownEvent>(OnPreviewPointerDown);
+                _avatarFrame.RegisterCallback<PointerMoveEvent>(OnPreviewPointerMove);
+                _avatarFrame.RegisterCallback<PointerUpEvent>(OnPreviewPointerUp);
+                _avatarFrame.RegisterCallback<PointerCaptureOutEvent>(OnPreviewPointerCaptureOut);
+            }
+
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             _viewModel.Traits.CollectionChanged += OnTraitsCollectionChanged;
             _viewModel.AgentCompleted += OnAgentCompleted;
             _viewModel.OptionCountsChanged += OnOptionCountsChanged;
+            _viewModel.PreviewCommitted += OnPreviewCommitted;
         }
 
         private void UnregisterCallbacks()
@@ -237,13 +319,57 @@ namespace AgentCreationTest.Views
 
             if (_randomizeBtn != null) _randomizeBtn.clicked -= OnRandomiseClicked;
 
+            if (_avatarFrame != null)
+            {
+                _avatarFrame.UnregisterCallback<PointerDownEvent>(OnPreviewPointerDown);
+                _avatarFrame.UnregisterCallback<PointerMoveEvent>(OnPreviewPointerMove);
+                _avatarFrame.UnregisterCallback<PointerUpEvent>(OnPreviewPointerUp);
+                _avatarFrame.UnregisterCallback<PointerCaptureOutEvent>(OnPreviewPointerCaptureOut);
+            }
+            _isDraggingPreview = false;
+
             if (_viewModel != null)
             {
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
                 _viewModel.Traits.CollectionChanged -= OnTraitsCollectionChanged;
                 _viewModel.AgentCompleted -= OnAgentCompleted;
                 _viewModel.OptionCountsChanged -= OnOptionCountsChanged;
+                _viewModel.PreviewCommitted -= OnPreviewCommitted;
             }
+        }
+
+        // ─── 3D preview drag ───────────────────────────────────
+
+        private void OnPreviewPointerDown(PointerDownEvent evt)
+        {
+            // Only react when there's actually a 3D preview to rotate.
+            if (_previewTexture == null || _avatarFrame == null) return;
+            if (evt.button != 0) return;
+            _isDraggingPreview = true;
+            _avatarFrame.CapturePointer(evt.pointerId);
+            evt.StopPropagation();
+        }
+
+        private void OnPreviewPointerMove(PointerMoveEvent evt)
+        {
+            if (!_isDraggingPreview) return;
+            var delta = (Vector2)evt.deltaPosition;
+            if (delta.sqrMagnitude > 0f) PreviewDragged?.Invoke(delta);
+        }
+
+        private void OnPreviewPointerUp(PointerUpEvent evt)
+        {
+            if (!_isDraggingPreview) return;
+            _isDraggingPreview = false;
+            if (_avatarFrame != null && _avatarFrame.HasPointerCapture(evt.pointerId))
+            {
+                _avatarFrame.ReleasePointer(evt.pointerId);
+            }
+        }
+
+        private void OnPreviewPointerCaptureOut(PointerCaptureOutEvent evt)
+        {
+            _isDraggingPreview = false;
         }
 
         // ─── ViewModel reactions ───────────────────────────────
@@ -261,6 +387,13 @@ namespace AgentCreationTest.Views
                     break;
                 case nameof(AgentCreationViewModel.PreviewRole):
                     if (_previewRole != null) _previewRole.text = _viewModel.PreviewRole;
+                    break;
+                case nameof(AgentCreationViewModel.PreviewTraits):
+                    RefreshPreviewTraits();
+                    break;
+                case nameof(AgentCreationViewModel.HasCommittedNameOrRole):
+                case nameof(AgentCreationViewModel.HasCommittedTraits):
+                    RefreshPreviewVisibility();
                     break;
                 case nameof(AgentCreationViewModel.Wardrobe):
                     _avatarPainter?.Apply(_viewModel.Wardrobe);
@@ -282,9 +415,21 @@ namespace AgentCreationTest.Views
 
         private void OnTraitsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
+            // 라이브 trait 토글은 step 3 의 picker (trait-grid + selected-traits-row) 만 갱신한다.
+            // 좌측 미리보기 카드는 commit 시점(GoNext)에만 PreviewTraits PropertyChanged 로 갱신된다.
             RenderTraitGrid();
             RenderSelectedTraits();
+        }
+
+        private void OnPreviewCommitted()
+        {
+            // PropertyChanged 핸들러에 의존하지 않고 commit 직후에 직접 모든 미리보기를 갱신한다.
+            // (PropertyChanged 가 어떤 이유로 누락되어도 한 번의 commit 으로 카드/칩/가시성/펄스가 모두 적용된다.)
+            if (_previewName != null) _previewName.text = _viewModel.PreviewName;
+            if (_previewRole != null) _previewRole.text = _viewModel.PreviewRole;
             RefreshPreviewTraits();
+            RefreshPreviewVisibility();
+            PlayDing();
         }
 
         private void OnOptionCountsChanged()
@@ -324,6 +469,57 @@ namespace AgentCreationTest.Views
             _viewModel?.RandomizeWardrobe();
         }
 
+        // Ctrl + Enter (Win/Linux) 또는 ⌘ + Enter (Mac) → "다음".
+        //
+        // UI Toolkit 의 KeyDownEvent 는 포커스된 element 에만 dispatch 되어
+        // 페이지의 빈 영역에서 단축키가 안 잡힌다. New Input System 의 Keyboard.current 로
+        // Update 에서 폴링하면 포커스 위치와 무관하게 동작한다 (프로젝트 표준).
+        // CanAdvance 가 막으면 GoNext 가 알아서 noop.
+        private void Update()
+        {
+            if (_viewModel == null) return;
+            var kb = Keyboard.current;
+            if (kb == null) return;
+
+            bool ctrlOrCmd =
+                kb.ctrlKey.isPressed
+                || kb.leftCommandKey.isPressed
+                || kb.rightCommandKey.isPressed;
+            if (!ctrlOrCmd) return;
+
+            bool enterDown =
+                kb.enterKey.wasPressedThisFrame
+                || kb.numpadEnterKey.wasPressedThisFrame;
+            if (!enterDown) return;
+
+            _viewModel.GoNext();
+        }
+
+        // 모든 "다음" 버튼 우측에 단축키 안내 라벨을 동적으로 덧붙인다.
+        // Mac 은 ⌘ ↵, 그 외 OS 는 Ctrl ↵.
+        private void AttachShortcutHints()
+        {
+            string hintText = IsMacPlatform() ? "⌘ ↵" : "Ctrl ↵";
+            AttachShortcutHint(_step1Next, hintText);
+            AttachShortcutHint(_step2Next, hintText);
+            AttachShortcutHint(_step3Next, hintText);
+            AttachShortcutHint(_step4Next, hintText);
+            AttachShortcutHint(_step5Next, hintText);
+        }
+
+        private static bool IsMacPlatform() =>
+            Application.platform == RuntimePlatform.OSXEditor
+            || Application.platform == RuntimePlatform.OSXPlayer;
+
+        private static void AttachShortcutHint(Button btn, string hintText)
+        {
+            if (btn == null) return;
+            var hint = new Label(hintText);
+            hint.AddToClassList("nav-shortcut-hint");
+            hint.pickingMode = PickingMode.Ignore;   // 버튼 클릭을 가로채지 않게
+            btn.Add(hint);
+        }
+
         // ─── rendering ─────────────────────────────────────────
 
         private void RefreshAll()
@@ -336,6 +532,7 @@ namespace AgentCreationTest.Views
 
             _avatarPainter?.Apply(_viewModel.Wardrobe);
             RefreshPreviewTraits();
+            RefreshPreviewVisibility();
             RefreshStepVisibility();
             RefreshNavButtons();
             RenderModelSelectionState();
@@ -348,8 +545,58 @@ namespace AgentCreationTest.Views
                 var el = _stepRoots[i];
                 if (el == null) continue;
                 bool active = i + 1 == _viewModel.Step;
-                if (active) el.AddToClassList(StepActiveClass);
-                else el.RemoveFromClassList(StepActiveClass);
+                bool wasActive = el.ClassListContains(StepActiveClass);
+
+                if (active)
+                {
+                    if (!wasActive)
+                    {
+                        // Newly active step — kick the slide-up + fade-in.
+                        // Equivalent to React reference's:
+                        //   setShown(false); setTimeout(() => setShown(true), 60);
+                        el.AddToClassList(StepActiveClass);
+                        el.AddToClassList(StepEnteringClass);
+                        el.schedule
+                          .Execute(() => el.RemoveFromClassList(StepEnteringClass))
+                          .StartingIn(60);
+                    }
+                }
+                else
+                {
+                    el.RemoveFromClassList(StepActiveClass);
+                    el.RemoveFromClassList(StepEnteringClass);
+                }
+            }
+            RefreshProgressDots();
+            RefreshActionRailsVisibility();
+            RefreshHairColorRailVisibility();
+        }
+
+        // Action rails belong to the wardrobe step only. Toggling here keeps
+        // the rails out of layout on every other step so the preview pane
+        // reclaims the full body width.
+        private void RefreshActionRailsVisibility()
+        {
+            if (_actionRails == null) return;
+            const int WardrobeStep = 4;
+            bool show = _viewModel.Step == WardrobeStep;
+            if (show) _actionRails.RemoveFromClassList(ActionRailsHiddenClass);
+            else      _actionRails.AddToClassList(ActionRailsHiddenClass);
+        }
+
+        private void RefreshProgressDots()
+        {
+            int currentIndex = _viewModel.Step - 1;
+            for (int i = 0; i < _progressDots.Length; i++)
+            {
+                var dot = _progressDots[i];
+                if (dot == null) continue;
+                bool isActive = i == currentIndex;
+                bool isDone = i < currentIndex;
+                if (isActive) dot.AddToClassList(ProgressDotActiveClass);
+                else dot.RemoveFromClassList(ProgressDotActiveClass);
+                if (isDone) dot.AddToClassList(ProgressDotDoneClass);
+                else dot.RemoveFromClassList(ProgressDotDoneClass);
             }
         }
 
@@ -373,15 +620,38 @@ namespace AgentCreationTest.Views
         {
             if (_previewTraits == null) return;
             _previewTraits.Clear();
-            // Per spec, preview chips show only after step 3.
-            if (_viewModel.Step < 3) return;
+            // 트레잇 칩은 commit 된 trait 만 노출 — 트레잇 영역 가시성은 RefreshPreviewVisibility 가 따로 통제한다.
             foreach (var trait in _viewModel.PreviewTraits)
             {
                 var chip = new Label(trait);
-                chip.AddToClassList("preview-card__trait");
+                chip.AddToClassList("preview-traits-bar__chip");
                 chip.AddToClassList("od-caption");
                 _previewTraits.Add(chip);
             }
+        }
+
+        private void RefreshPreviewVisibility()
+        {
+            if (_viewModel == null) return;
+            _nameBubble?.EnableInClassList(NameBubbleHiddenClass, !_viewModel.HasCommittedNameOrRole);
+            _traitsBar?.EnableInClassList(TraitsBarHiddenClass, !_viewModel.HasCommittedTraits);
+        }
+
+        // commit 시점에 이름/역할 버블과 트레잇 바에 ding 클래스를 잠깐 부착했다 떼면
+        // USS 의 scale/translate 전환이 펄스로 재생된다. 캐릭터 자체에는 펄스 없음.
+        private void PlayDing()
+        {
+            PulseClass(_nameBubble, NameBubbleDingClass);
+            PulseClass(_traitsBar, TraitsBarDingClass);
+        }
+
+        private void PulseClass(VisualElement element, string dingClass)
+        {
+            if (element == null) return;
+            element.AddToClassList(dingClass);
+            element.schedule
+                .Execute(() => element.RemoveFromClassList(dingClass))
+                .StartingIn(DingDwellMs);
         }
 
         // ─── traits ────────────────────────────────────────────
@@ -543,6 +813,14 @@ namespace AgentCreationTest.Views
             if (_partTabs == null) return;
             _partTabs.Clear();
 
+            // Sliding indicator behind the tabs. Added first so it renders
+            // beneath the labels — pill positioned absolutely inside .part-tabs.
+            _partTabIndicator = new VisualElement();
+            _partTabIndicator.AddToClassList("part-tab-indicator");
+            // Skip the slide animation on the very first positioning.
+            _partTabIndicator.AddToClassList("part-tab-indicator--no-transition");
+            _partTabs.Add(_partTabIndicator);
+
             foreach (var def in PartDefs)
             {
                 var part = def.Part;
@@ -553,6 +831,28 @@ namespace AgentCreationTest.Views
                 btn.userData = part;
                 _partTabs.Add(btn);
             }
+
+            // Wait until the tab row has resolved its layout, then snap the
+            // indicator under the initial active tab. Subsequent changes use
+            // the USS transition (no-transition class is removed first).
+            _partTabs.RegisterCallback<GeometryChangedEvent>(OnPartTabsGeometry);
+        }
+
+        private void OnPartTabsGeometry(GeometryChangedEvent _)
+        {
+            UpdateTabIndicator();
+            if (_partTabIndicator == null) return;
+            // One-shot guard: while --no-transition is still on, schedule its
+            // removal 50ms later. The earlier resolvedStyle.width check was
+            // bogus — resolvedStyle doesn't update mid-frame after setting
+            // inline style, so the schedule never ran and the class stayed
+            // on permanently, freezing all subsequent tab transitions.
+            if (_partTabIndicator.ClassListContains("part-tab-indicator--no-transition"))
+            {
+                _partTabIndicator.schedule
+                    .Execute(() => _partTabIndicator.RemoveFromClassList("part-tab-indicator--no-transition"))
+                    .StartingIn(50);
+            }
         }
 
         private void SetActivePart(WardrobePart part)
@@ -560,7 +860,23 @@ namespace AgentCreationTest.Views
             if (_activePart == part) return;
             _activePart = part;
             RefreshPartTabClasses();
+            UpdateTabIndicator();
             RenderOptionGrid();
+            RefreshHairColorRailVisibility();
+        }
+
+        // Hair tint is the only part-level chrome that lives next to the
+        // wardrobe grid, so the rail tracks the active tab — show on Hair,
+        // hide everywhere else. Step-level visibility is handled separately
+        // because the rail also vanishes when the wizard moves off step-4.
+        private void RefreshHairColorRailVisibility()
+        {
+            if (_hairColorRail == null) return;
+            bool show = _viewModel != null
+                && _viewModel.Step == 4
+                && _activePart == WardrobePart.Hair;
+            if (show) _hairColorRail.RemoveFromClassList(HairColorRailHiddenClass);
+            else      _hairColorRail.AddToClassList(HairColorRailHiddenClass);
         }
 
         private void RefreshPartTabClasses()
@@ -576,6 +892,40 @@ namespace AgentCreationTest.Views
             }
         }
 
+        // Underbar — thin black line at the bottom of the active tab.
+        // Tweak these to taste; bumping inset trims both ends symmetrically,
+        // bumping thickness gives a chunkier line.
+        private const float TabIndicatorThickness = 2f;
+        private const float TabIndicatorInset     = 8f;
+
+        private void UpdateTabIndicator()
+        {
+            if (_partTabIndicator == null || _partTabs == null) return;
+            foreach (var child in _partTabs.Children())
+            {
+                if (child.userData is WardrobePart p && p == _activePart)
+                {
+                    var rect = child.layout;
+                    if (float.IsNaN(rect.width) || rect.width <= 0f)
+                    {
+                        Debug.Log($"[Indicator] active tab '{p}' has invalid layout (w={rect.width}) — skipping");
+                        return;
+                    }
+                    _partTabIndicator.style.left   = rect.x + TabIndicatorInset;
+                    _partTabIndicator.style.top    = rect.y + rect.height - TabIndicatorThickness;
+                    _partTabIndicator.style.width  = rect.width - (TabIndicatorInset * 2f);
+                    _partTabIndicator.style.height = TabIndicatorThickness;
+                    Debug.Log($"[Indicator] active='{p}' rect=({rect.x:F1},{rect.y:F1},{rect.width:F1}x{rect.height:F1})");
+                    return;
+                }
+            }
+        }
+
+        // Eyes/Mouth always have a face — every other slot (skin / hair / top /
+        // bottom / shoes) supports the explicit "none" sentinel (Wardrobe.None).
+        private static bool PartAllowsNone(WardrobePart part) =>
+            part != WardrobePart.Eyes && part != WardrobePart.Mouth;
+
         private void RenderOptionGrid()
         {
             if (_optionGrid == null) return;
@@ -583,6 +933,12 @@ namespace AgentCreationTest.Views
 
             int currentIndex = _viewModel.Wardrobe.Get(_activePart);
             int optionCount = _viewModel.GetOptionCount(_activePart);
+
+            if (PartAllowsNone(_activePart))
+            {
+                _optionGrid.Add(BuildNoneCell(currentIndex));
+            }
+
             for (int i = 0; i < optionCount; i++)
             {
                 int idx = i;
@@ -610,6 +966,26 @@ namespace AgentCreationTest.Views
 
                 _optionGrid.Add(cell);
             }
+        }
+
+        private Button BuildNoneCell(int currentIndex)
+        {
+            var cell = new Button(() => _viewModel.SetWardrobePart(_activePart, Wardrobe.None));
+            cell.text = string.Empty;
+            cell.AddToClassList(OptionCellClass);
+            if (currentIndex == Wardrobe.None) cell.AddToClassList(OptionCellSelectedClass);
+
+            var swatch = new Label("✕");
+            swatch.AddToClassList("option-swatch");
+            swatch.AddToClassList("option-swatch--none");
+            swatch.AddToClassList("od-body-sm");
+            cell.Add(swatch);
+
+            var check = new Label("✓");
+            check.AddToClassList("option-check");
+            cell.Add(check);
+
+            return cell;
         }
 
         private static Color? SwatchColorFor(WardrobePart part, int index)

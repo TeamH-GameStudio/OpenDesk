@@ -1,0 +1,60 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss"/>
+    <Style src="PluginsMarketView.uss"/>
+
+    <ui:VisualElement name="plugins-market" class="plugins-market" picking-mode="Position">
+        <ui:VisualElement class="plugins-market__veil"/>
+
+        <ui:VisualElement class="plugins-market__card" picking-mode="Position">
+
+            <!-- Header ────────────────────────────────────────────── -->
+            <ui:VisualElement class="plugins-market__header">
+                <ui:Label name="plugins-market-title"
+                          text="플러그인"
+                          class="plugins-market__title od-heading-lg"/>
+
+                <ui:VisualElement class="plugins-market__header-controls">
+                    <ui:TextField name="plugins-market-search"
+                                  placeholder-text="플러그인 검색..."
+                                  class="plugins-market__search"/>
+                    <ui:Button name="plugins-market-refresh"
+                               text="새로고침"
+                               class="plugins-market__btn plugins-market__btn--ghost"/>
+                    <ui:Button name="plugins-market-close"
+                               text="✕"
+                               class="plugins-market__btn plugins-market__btn--close"/>
+                </ui:VisualElement>
+
+                <ui:Label name="plugins-market-status"
+                          text=""
+                          class="plugins-market__status od-caption"/>
+            </ui:VisualElement>
+
+            <!-- Body ──────────────────────────────────────────────── -->
+            <ui:VisualElement class="plugins-market__body">
+
+                <!-- 좌측 벤더 탭 -->
+                <ui:ScrollView name="plugins-market-vendor-rail"
+                               class="plugins-market__rail"
+                               mode="Vertical"
+                               vertical-scroller-visibility="Auto"
+                               horizontal-scroller-visibility="Hidden"/>
+
+                <!-- 우측 카탈로그 -->
+                <ui:VisualElement class="plugins-market__main">
+                    <ui:VisualElement class="plugins-market__section plugins-market__section--grow">
+                        <ui:Label name="plugins-market-catalog-header"
+                                  text="전체"
+                                  class="plugins-market__section-title od-heading-md"/>
+                        <ui:ScrollView name="plugins-market-catalog"
+                                       class="plugins-market__catalog"
+                                       mode="Vertical"
+                                       vertical-scroller-visibility="Auto"
+                                       horizontal-scroller-visibility="Hidden"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

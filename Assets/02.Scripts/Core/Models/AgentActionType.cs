@@ -29,6 +29,10 @@ namespace OpenDesk.Core.Models
 
         // 연결
         Connected,
-        Disconnected
+        Disconnected,
+
+        // 라이선스 / 크레딧 (hybrid routing)
+        AwaitingLicense,    // 라이선스 활성화 대기 — 채팅 차단
+        InsufficientCredits // 잔액 부족 — 충전 또는 BYOK 전환 필요
     }
 }

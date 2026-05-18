@@ -57,8 +57,12 @@ namespace OpenDesk.Characters
                 var src = _sourceBones[i];
                 var dst = _targetBones[i];
                 if (src == null || dst == null) continue;
-                dst.localPosition = src.localPosition;
-                dst.localRotation = src.localRotation;
+                // Copy WORLD transform — local copy fails when source/target
+                // skeletons sit under different Armature roots (offsets in
+                // localPosition propagate through the chain). World copy
+                // anchors each bone absolutely so the part renders at the
+                // body's pose regardless of hierarchy alignment.
+                dst.SetPositionAndRotation(src.position, src.rotation);
                 // localScale intentionally skipped — bone scales are typically 1
                 // and copying them propagates float drift between rigs.
             }

@@ -89,7 +89,13 @@ AGENTS_CONFIG = {
                 "- 복잡한 주제: 단계적으로 풀어서 이해를 돕습니다"
             ),
         ),
-        "tools": ["web_search", "web_fetch", "read_file", "write_file", "list_files", "bash"],
+        "tools": [
+            "web_search", "web_fetch",
+            "read_file", "write_file", "edit_file", "list_files", "bash",
+            "ask_user", "spawn_agent",
+            "task_create", "task_get", "task_list", "task_update", "task_stop", "task_output",
+            "cron_create", "cron_list", "cron_delete",
+        ],
         "workspace": "~/opendesk/researcher",
     },
     "writer": {
@@ -136,7 +142,11 @@ AGENTS_CONFIG = {
                 "- 칭찬받으면: 감사하고 추가 개선 포인트를 제안합니다"
             ),
         ),
-        "tools": ["read_file", "write_file", "list_files", "bash"],
+        "tools": [
+            "read_file", "write_file", "edit_file", "list_files", "bash",
+            "ask_user",
+            "task_create", "task_get", "task_list", "task_output", "task_stop",
+        ],
         "workspace": "~/opendesk/writer",
     },
     "analyst": {
@@ -183,7 +193,12 @@ AGENTS_CONFIG = {
                 "- 좋은 결과: 긍정적 트렌드를 강조하되 지속 조건을 안내합니다"
             ),
         ),
-        "tools": ["read_file", "write_file", "list_files", "bash"],
+        "tools": [
+            "read_file", "write_file", "edit_file", "list_files", "bash",
+            "ask_user",
+            "task_create", "task_get", "task_list", "task_output", "task_stop",
+            "cron_create", "cron_list", "cron_delete",
+        ],
         "workspace": "~/opendesk/analyst",
     },
 }

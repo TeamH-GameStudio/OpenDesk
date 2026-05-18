@@ -50,6 +50,9 @@ class AgentRunner:
         self.messages: list[dict] = []
         self.current_session_id: Optional[str] = None
         self._is_busy = False
+        # 발화(talking) 상태 추적. talking_start emit 후 True, talking_stop 으로 False.
+        # 예외/disconnect 시 짝 맞추기 위해 send_message 의 finally 에서 검사.
+        self._talking_active = False
 
         self._restore_current_session()
 
@@ -111,6 +114,20 @@ class AgentRunner:
         if self._on_event:
             await self._on_event(event)
 
+    async def _emit_talking_start(self):
+        """첫 텍스트 토큰 직전에 1회 호출. 이미 활성이면 no-op."""
+        if self._talking_active:
+            return
+        self._talking_active = True
+        await self._emit("talking_start")
+
+    async def _emit_talking_stop(self, reason: str):
+        """발화 종료. _talking_active 가 True 일 때만 emit (짝 맞추기 보장)."""
+        if not self._talking_active:
+            return
+        self._talking_active = False
+        await self._emit("talking_stop", reason=reason)
+
     # ── 시스템 프롬프트 ──
 
     def _build_system_prompt(self) -> str:
@@ -150,13 +167,22 @@ class AgentRunner:
             result = await self._process_response()
             self._auto_save()
             return result
+        except asyncio.CancelledError:
+            # 클라이언트 disconnect / kill 등 외부 중단
+            await self._emit_talking_stop(reason="interrupted")
+            self._auto_save()
+            raise
         except Exception as e:
+            await self._emit_talking_stop(reason="error")
             await self._emit(
                 "agent_state", state="error", error="exception", message=str(e)
             )
             self._auto_save()
             return f"Error: {e}"
         finally:
+            # 안전망 — 위 분기에서 누락됐으면 interrupted 로 닫는다.
+            if self._talking_active:
+                await self._emit_talking_stop(reason="interrupted")
             self._is_busy = False
 
     async def _process_response(self) -> str:
@@ -192,6 +218,11 @@ class AgentRunner:
                         # 텍스트 청크 (delta)
                         elif event_name == "TextEvent":
                             response_text = event.snapshot
+                            # 첫 텍스트 토큰 직전에 talking_start (라운드별 1회)
+                            await self._emit_talking_start()
+                            # 캐릭터 입모양/타이핑 효과용 lightweight 채널
+                            await self._emit("text_delta", text=event.text)
+                            # 채팅 UI 누적용 legacy 채널 (호환 유지)
                             await self._emit(
                                 "agent_delta", text=event.text
                             )
@@ -199,6 +230,8 @@ class AgentRunner:
                     response = await stream.get_final_message()
 
             except anthropic.RateLimitError:
+                # 라운드 종료 — talking 이 열려 있었다면 error 로 닫는다.
+                await self._emit_talking_stop(reason="error")
                 await self._emit(
                     "agent_state",
                     state="error",
@@ -216,6 +249,7 @@ class AgentRunner:
                 if self.messages:
                     import json
                     logger.error(f"  Last message: {json.dumps(self.messages[-1], ensure_ascii=False, default=str)[:500]}")
+                await self._emit_talking_stop(reason="error")
                 await self._emit(
                     "agent_state", state="error", error="api_error", message=str(e)
                 )
@@ -226,6 +260,8 @@ class AgentRunner:
                 self.messages.append(
                     {"role": "assistant", "content": response.content}
                 )
+                # 발화가 열려 있었다면 정상 종료
+                await self._emit_talking_stop(reason="complete")
                 await self._emit("agent_message", message=response_text)
                 await self._emit("agent_state", state="complete")
                 await self._emit("agent_state", state="idle")
@@ -236,6 +272,9 @@ class AgentRunner:
                 self.messages.append(
                     {"role": "assistant", "content": response.content}
                 )
+
+                # 이번 라운드의 텍스트 발화는 일단 닫는다 (다음 텍스트 라운드에서 재개).
+                await self._emit_talking_stop(reason="complete")
 
                 if response_text:
                     await self._emit("agent_message", message=response_text)
@@ -278,6 +317,7 @@ class AgentRunner:
                 await self._emit("agent_state", state="thinking")
 
         # 최대 반복 초과
+        await self._emit_talking_stop(reason="error")
         await self._emit(
             "agent_state",
             state="error",

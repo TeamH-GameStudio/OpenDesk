@@ -13,6 +13,7 @@ namespace OpenDesk.Core.Installers
     /// 앱 시작 시 자동 실행되는 진입점
     /// - CostMonitor 백그라운드 시작
     /// - DEPRECATED: OpenClaw Bridge 의존성 2026-04-27 제거됨. 이벤트 파이프라인은 IClaudeService 경로로 일원화.
+    /// - 미들웨어 sub_agent_* 어댑팅은 별도 SubAgentEventBridge (Office scope) 가 담당 — 본 클래스는 Core scope.
     /// - IDisposable로 정리 보장
     /// </summary>
     public class AppBootstrapper : IStartable, IDisposable

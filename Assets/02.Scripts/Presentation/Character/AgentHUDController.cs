@@ -1,3 +1,4 @@
+using System;
 using OpenDesk.AgentCreation.Models;
 using OpenDesk.Core.Models;
 using OpenDesk.Core.Services;
@@ -9,10 +10,13 @@ using UnityEngine.UI;
 namespace OpenDesk.Presentation.Character
 {
     /// <summary>
-    /// World Space HUD — 에이전트 머리 위에 이름 + 상태바를 표시.
-    /// IAgentStateService 구독으로 실시간 상태 갱신.
-    /// Billboard 처리로 항상 카메라를 향함.
+    /// [Deprecated 2026-05-14] uGUI World Space HUD — UI Toolkit + AppUI 기반
+    /// <see cref="OpenDesk.Presentation.UI.Hud.AgentHudView"/> 로 대체.
+    ///
+    /// AgentSpawner 가 더 이상 HUD 프리팹을 인스턴스화하지 않으므로 런타임에 자동으로 붙지 않습니다.
+    /// 컴포넌트와 AgentPrefabBuilder 의 BuildHUDPrefab 메뉴는 다음 PR 에서 삭제 예정.
     /// </summary>
+    [Obsolete("Use OpenDesk.Presentation.UI.Hud.AgentHudView (UI Toolkit + AppUI).", error: false)]
     public class AgentHUDController : MonoBehaviour
     {
         [Header("HUD UI")]
@@ -20,6 +24,14 @@ namespace OpenDesk.Presentation.Character
         [SerializeField] private TMP_Text _statusText;
         [SerializeField] private Slider _statusBar;
         [SerializeField] private Image _statusBarFill;
+
+        [Header("Hover Fade")]
+        [Tooltip("이름을 제외한 상태바·상태 텍스트 영역. 호버 시 페이드 인, 이탈 시 페이드 아웃.")]
+        [SerializeField] private CanvasGroup _statusCanvasGroup;
+        [Tooltip("페이드 전환 시간 (초). 0 이면 즉시 토글.")]
+        [SerializeField] private float _hoverFadeDuration = 0.15f;
+        [Tooltip("에러/완료/연결끊김 상태 진입 시 호버와 무관하게 강제 가시 유지 시간 (초).")]
+        [SerializeField] private float _forceVisibleDuration = 3f;
 
         [Header("Settings")]
         [SerializeField] private float _pulseSpeed = 1.5f;
@@ -32,6 +44,10 @@ namespace OpenDesk.Presentation.Character
         private Camera _mainCamera;
         private IAgentStateService _stateService;
         private System.IDisposable _subscription;
+
+        // 호버 페이드 상태
+        private bool _isHovered;
+        private float _forceVisibleUntil;
 
         // ── 상태 → 표시 매핑 ────────────────────────────────
 
@@ -68,6 +84,15 @@ namespace OpenDesk.Presentation.Character
 
             ApplyState(AgentActionType.Idle);
 
+            // 상태바·상태 텍스트 초기 가시성: 호버 전까지 숨김.
+            // CanvasGroup 미할당 (구 프리팹) 일 경우 기존처럼 항상 보이도록 fallback.
+            if (_statusCanvasGroup != null)
+            {
+                _statusCanvasGroup.alpha = 0f;
+            }
+            _isHovered = false;
+            _forceVisibleUntil = 0f;
+
             // IAgentStateService 구독
             if (_stateService != null)
             {
@@ -75,6 +100,15 @@ namespace OpenDesk.Presentation.Character
                     .Where(e => e.SessionId == _sessionId)
                     .Subscribe(e => ApplyState(e.State));
             }
+        }
+
+        /// <summary>
+        /// 호버 페이드 토글. AgentHoverHandler 가 AgentPointerService.HoverChanged 구독으로 호출.
+        /// CanvasGroup 미할당이면 효과 없음 (구 프리팹 호환).
+        /// </summary>
+        public void SetHover(bool hovered)
+        {
+            _isHovered = hovered;
         }
 
         private void OnDestroy()
@@ -95,6 +129,23 @@ namespace OpenDesk.Presentation.Character
             // 펄스 애니메이션
             if (_isPulsing && _statusBar != null)
                 _statusBar.value = 0.3f + 0.4f * Mathf.PingPong(Time.time * _pulseSpeed, 1f);
+
+            // 상태바·상태 텍스트 alpha 페이드
+            if (_statusCanvasGroup != null)
+            {
+                var forced = Time.time < _forceVisibleUntil;
+                var targetAlpha = (_isHovered || forced) ? 1f : 0f;
+
+                if (_hoverFadeDuration <= 0f)
+                {
+                    _statusCanvasGroup.alpha = targetAlpha;
+                }
+                else
+                {
+                    var step = Time.deltaTime / _hoverFadeDuration;
+                    _statusCanvasGroup.alpha = Mathf.MoveTowards(_statusCanvasGroup.alpha, targetAlpha, step);
+                }
+            }
         }
 
         // ================================================================
@@ -117,7 +168,16 @@ namespace OpenDesk.Presentation.Character
 
             if (!pulse && _statusBar != null)
                 _statusBar.value = fillValue;
+
+            // 에러/완료/연결끊김 — 사용자가 호버하지 않아도 결과를 놓치지 않도록 일정 시간 강제 표시.
+            if (IsForceVisibleState(action))
+                _forceVisibleUntil = Time.time + _forceVisibleDuration;
         }
+
+        private static bool IsForceVisibleState(AgentActionType action)
+            => action == AgentActionType.TaskFailed
+            || action == AgentActionType.TaskCompleted
+            || action == AgentActionType.Disconnected;
 
         /// <summary>디버그/테스트용 — 외부에서 직접 상태 설정</summary>
         public void ForceState(AgentActionType action) => ApplyState(action);

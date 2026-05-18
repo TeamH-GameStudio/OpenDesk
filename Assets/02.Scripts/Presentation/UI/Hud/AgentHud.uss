@@ -1,0 +1,99 @@
+/* ============================================================
+   AgentHud — World-tracking name + status card per character
+   Layout: absolute-positioned card pinned over character head.
+   Cards-layer fills the screen; AgentHudView updates left/top per frame.
+   ============================================================ */
+
+.hud-cards-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 1;
+    /* 채팅 패널 진입/이탈 시 페이드 — AgentHudView.SetVisible 가 opacity 를 0/1 로 토글 */
+    transition-property: opacity;
+    transition-duration: 250ms;
+    transition-timing-function: ease-out;
+    /* 클릭/호버는 3D 캐릭터(AgentPointerService)가 처리 — UI 가 가로채면 안 됨 */
+}
+
+.hud-cards-layer--hidden {
+    opacity: 0;
+}
+
+.hud-card {
+    position: absolute;
+    /* 카드의 가로 중앙·세로 하단이 anchor 점(캐릭터 머리 위)에 맞도록 자기 자신을 시프트 */
+    translate: -50% -100%;
+    align-items: center;
+    padding: var(--space-xs) var(--space-sm);
+    background-color: rgba(20, 20, 19, 0.72);
+    border-radius: var(--r-md);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.08);
+    flex-direction: column;
+    /* 기본은 완전히 숨김 — 캐릭터 호버 시에만 .hud-card--reveal 클래스가 붙어 fade in.
+       포인터 hit 은 어차피 3D Raycast 가 처리하고 pickingMode=Ignore 라 invisible 상태에서도 호버 검출에는 영향 없음. */
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+}
+
+.hud-card--reveal {
+    opacity: 1;
+}
+
+.hud-card__name-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.hud-card__color-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    margin-right: var(--space-xs);
+}
+
+.hud-card__name {
+    color: var(--n0);
+    font-size: 13px;
+    -unity-font-style: bold;
+    margin-left: var(--space-xs);
+}
+
+.hud-card__status-section {
+    margin-top: var(--space-xs);
+    width: 110px;
+    /* 카드 전체가 .hud-card--reveal 로 fade 되므로 자체 opacity 전환은 불필요 */
+}
+
+.hud-card__status-text {
+    color: var(--n200);
+    font-size: 11px;
+    -unity-text-align: middle-left;
+    margin-bottom: var(--space-xs);
+}
+
+.hud-card__status-bar {
+    height: 4px;
+    border-radius: 2px;
+}
+
+/* AppUI LinearProgress 내부 progress fill 의 배경색을 상태별로 override.
+   AppUI 가 자체 USS 변수로 fill 색을 결정하지만, 상태 펄스 색을 손쉽게 바꾸기 위해
+   selector 깊이를 사용. (.appui-linearprogress__progress 는 AppUI 내부 클래스) */
+.hud-card--state-idle .appui-linearprogress__progress       { background-color: var(--n400); }
+.hud-card--state-thinking .appui-linearprogress__progress   { background-color: var(--warning); }
+.hud-card--state-planning .appui-linearprogress__progress   { background-color: #C97043; }
+.hud-card--state-executing .appui-linearprogress__progress  { background-color: var(--info); }
+.hud-card--state-reviewing .appui-linearprogress__progress  { background-color: #8B70A8; }
+.hud-card--state-tool .appui-linearprogress__progress       { background-color: #5C9BB0; }
+.hud-card--state-chat .appui-linearprogress__progress       { background-color: var(--brand-signature); }
+.hud-card--state-complete .appui-linearprogress__progress   { background-color: var(--success); }
+.hud-card--state-error .appui-linearprogress__progress      { background-color: var(--error); }
+
+/* 카메라 뒤쪽 / off-screen 시 숨김 */
+.hud-card--offscreen { display: none; }

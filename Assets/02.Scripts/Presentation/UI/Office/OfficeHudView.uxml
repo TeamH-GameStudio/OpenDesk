@@ -1,0 +1,34 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss"/>
+    <Style src="OfficeHudView.uss"/>
+
+    <ui:VisualElement name="office-hud" class="office-hud" picking-mode="Ignore">
+
+        <!-- 상단바 ─────────────────────────────────────────── -->
+        <ui:VisualElement name="office-hud-top" class="office-hud__top" picking-mode="Position">
+            <ui:VisualElement class="office-hud__top-left">
+                <ui:Label text="OpenDesk" class="office-hud__brand od-heading-md"/>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="office-hud__top-right">
+                <ui:Button name="office-hud-add-agent"
+                           text="+ 동료 추가"
+                           class="office-hud__btn office-hud__btn--ghost"/>
+                <ui:Button name="office-hud-open-market"
+                           text="+ 스킬 마켓"
+                           class="office-hud__btn office-hud__btn--primary"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- 좌측 사이드 — 에이전트 리스트 ──────────────────── -->
+        <ui:VisualElement name="office-hud-side" class="office-hud__side" picking-mode="Position">
+            <ui:Label text="동료" class="office-hud__side-title od-body-md"/>
+            <ui:ScrollView name="office-hud-agent-list"
+                           class="office-hud__agent-list"
+                           mode="Vertical"
+                           vertical-scroller-visibility="Auto"
+                           horizontal-scroller-visibility="Hidden"/>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,47 @@
+/* Credit balance badge — TopBar inset. */
+
+.credit-badge {
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 10px;
+    background-color: rgba(20, 20, 19, 0.06);
+    border-radius: 12px;
+    margin-right: 8px;
+}
+
+.credit-badge--low {
+    background-color: rgba(204, 51, 51, 0.16);
+}
+
+.credit-badge--insufficient {
+    background-color: rgba(204, 51, 51, 0.32);
+}
+
+.credit-badge__icon {
+    width: 14px;
+    height: 14px;
+    background-color: rgb(241, 161, 47);
+    border-radius: 7px;
+    margin-right: 6px;
+}
+
+.credit-badge__content {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.credit-badge__amount {
+    font-size: 13px;
+    color: rgb(20, 20, 19);
+    -unity-font-style: bold;
+}
+
+.credit-badge__held {
+    font-size: 10px;
+    color: rgb(91, 88, 81);
+    margin-top: 1px;
+}
+
+.credit-badge__held--hidden {
+    display: none;
+}

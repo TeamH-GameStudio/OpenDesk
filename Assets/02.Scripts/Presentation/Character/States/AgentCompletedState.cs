@@ -1,4 +1,5 @@
 using System;
+using OpenDesk.Characters.Wardrobe.Expressions;
 using OpenDesk.Presentation.Character.Context;
 using UnityEngine;
 
@@ -24,7 +25,7 @@ namespace OpenDesk.Presentation.Character.States
         {
             _ctx.StopMoving();
             _ctx.Animation.PlayAnimation("Celebrate", loop: false);
-            _ctx.Expression?.SetExpression("Happy");
+            _ctx.Expression?.SetExpression(AgentExpressionKey.Happy);
             _timer = CompleteDuration;
             Debug.Log($"[{_ctx.AgentName}] Completed 진입");
         }

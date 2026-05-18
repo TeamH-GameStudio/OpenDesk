@@ -73,6 +73,10 @@ namespace OpenDesk.Cinematic
         [Min(0.1f)]
         [SerializeField] private float _totalDuration = 8f;
 
+        [Header("Expression-only Timeline (no animation change)")]
+        [Tooltip("Independent track that only swaps eye/mouth textures — the active pose clip keeps playing without restarting. Useful for emotional beats during a single looping animation.")]
+        [SerializeField] private List<ExpressionOnlyKeyframe> _expressionTimeline = new List<ExpressionOnlyKeyframe>();
+
         [Header("Tweens (object reveals, character spin, camera moves)")]
         [SerializeField] private List<TimedTween> _tweens = new List<TimedTween>();
 
@@ -111,6 +115,9 @@ namespace OpenDesk.Cinematic
         // TimeSeconds <= elapsed). -1 means we haven't entered the first
         // keyframe yet — bumped to 0 immediately at Start().
         private int _currentIndex = -1;
+        // Same semantics, but for the expression-only timeline. Tracked
+        // separately so it can fire independently of pose keyframes.
+        private int _expressionIndex = -1;
         private bool _finished;
 
         // Per-tween state. _tweenStarted = "we've already snapped From-values
@@ -158,6 +165,7 @@ namespace OpenDesk.Cinematic
                 _currentIndex = newIndex;
             }
 
+            AdvanceExpressionTimeline(elapsed);
             AdvanceTweens(elapsed);
             AdvanceCameraMoves(elapsed);
 
@@ -165,6 +173,34 @@ namespace OpenDesk.Cinematic
             {
                 FinishSequence();
             }
+        }
+
+        // ─── Expression-only timeline ──────────────────────────────────────
+
+        // Scan the expression-only track for any keyframe we just crossed and
+        // apply its expression. Never touches the Animator — the current pose
+        // clip keeps playing uninterrupted.
+        private void AdvanceExpressionTimeline(float elapsed)
+        {
+            if (_expressionTimeline == null || _expressionTimeline.Count == 0) return;
+
+            int newIndex = _expressionIndex;
+            for (int i = 0; i < _expressionTimeline.Count; i++)
+            {
+                if (_expressionTimeline[i].TimeSeconds <= elapsed) newIndex = i;
+                else break;
+            }
+
+            if (newIndex <= _expressionIndex) return;
+
+            for (int i = _expressionIndex + 1; i <= newIndex; i++)
+            {
+                var entry = _expressionTimeline[i];
+                ApplyExpression(entry.Expression);
+                if (_logProgress)
+                    Debug.Log($"[CinematicCaptureController] Expression-only keyframe {i} @ {entry.TimeSeconds:F2}s — {entry.Note}", this);
+            }
+            _expressionIndex = newIndex;
         }
 
         // ─── Setup ──────────────────────────────────────────────────────────
@@ -552,15 +588,31 @@ namespace OpenDesk.Cinematic
 
         private void OnValidate()
         {
-            if (_timeline == null || _timeline.Count <= 1) return;
-            for (int i = 1; i < _timeline.Count; i++)
+            if (_timeline != null && _timeline.Count > 1)
             {
-                if (_timeline[i].TimeSeconds < _timeline[i - 1].TimeSeconds)
+                for (int i = 1; i < _timeline.Count; i++)
                 {
-                    Debug.LogWarning(
-                        $"[CinematicCaptureController] Timeline entry {i} (t={_timeline[i].TimeSeconds:F2}s) is earlier than entry {i - 1} (t={_timeline[i - 1].TimeSeconds:F2}s). Use the inspector's 'Sort Timeline By Time' button.",
-                        this);
-                    break;
+                    if (_timeline[i].TimeSeconds < _timeline[i - 1].TimeSeconds)
+                    {
+                        Debug.LogWarning(
+                            $"[CinematicCaptureController] Timeline entry {i} (t={_timeline[i].TimeSeconds:F2}s) is earlier than entry {i - 1} (t={_timeline[i - 1].TimeSeconds:F2}s). Use the inspector's 'Sort Timeline By Time' button.",
+                            this);
+                        break;
+                    }
+                }
+            }
+
+            if (_expressionTimeline != null && _expressionTimeline.Count > 1)
+            {
+                for (int i = 1; i < _expressionTimeline.Count; i++)
+                {
+                    if (_expressionTimeline[i].TimeSeconds < _expressionTimeline[i - 1].TimeSeconds)
+                    {
+                        Debug.LogWarning(
+                            $"[CinematicCaptureController] Expression-only entry {i} (t={_expressionTimeline[i].TimeSeconds:F2}s) is earlier than entry {i - 1} (t={_expressionTimeline[i - 1].TimeSeconds:F2}s). Re-order in ascending time.",
+                            this);
+                        break;
+                    }
                 }
             }
         }

@@ -10,10 +10,21 @@ namespace OpenDesk.Core.Persistence
         /// <summary>에이전트별 옷장(아웃핏) 데이터 — WardrobeOutfitData.</summary>
         WardrobeOutfits,
 
+        /// <summary>온보딩 §4에서 수집한 사용자 기본 프로필 — UserProfileData.</summary>
+        UserProfile,
+
+        /// <summary>온보딩 §2에서 선택한 플랜 — PlanSelectionData.</summary>
+        PlanSelection,
+
+        /// <summary>에이전트별 장착 스킬 ID 목록 — AgentSkillLoadoutData.</summary>
+        AgentSkillLoadouts,
+
+        /// <summary>에이전트별 장착 플러그인 ID 목록 — AgentPluginLoadoutData.</summary>
+        AgentPluginLoadouts,
+
         // 향후 도메인 추가 위치 (예시)
         // AgentProfiles,
         // Sessions,
         // ChatHistory,
-        // UserPreferences,
     }
 }

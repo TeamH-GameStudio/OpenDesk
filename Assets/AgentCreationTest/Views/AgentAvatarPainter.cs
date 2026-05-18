@@ -42,19 +42,64 @@ namespace AgentCreationTest.Views
         {
             if (_head == null) return;
 
-            SetBg(_head,     AgentPalette.SkinColors[w.Skin]);
-            SetBg(_top,      AgentPalette.TopColors[w.Top]);
-            SetBg(_bottom,   AgentPalette.BottomColors[w.Bottom]);
-            SetBg(_shoeLeft, AgentPalette.ShoesColors[w.Shoes]);
-            SetBg(_shoeRight, AgentPalette.ShoesColors[w.Shoes]);
+            // Wardrobe.None (-1) is a valid value — every slot except Eyes/Mouth
+            // exposes a None cell in the wizard. Indexing the palette with -1
+            // throws IndexOutOfRangeException, which used to silently kill the
+            // PropertyChanged handler and freeze the option grid. Each lookup
+            // bails on negative / out-of-range indices and the corresponding
+            // visual element is hidden so the avatar still reads as "no item".
+            ApplyColor(_head,      AgentPalette.SkinColors,   w.Skin);
+            ApplyColor(_top,       AgentPalette.TopColors,    w.Top);
+            ApplyColor(_bottom,    AgentPalette.BottomColors, w.Bottom);
+            ApplyColor(_shoeLeft,  AgentPalette.ShoesColors,  w.Shoes);
+            ApplyColor(_shoeRight, AgentPalette.ShoesColors,  w.Shoes);
 
-            var hairColor = AgentPalette.HairColors[w.Hair];
-            SetBg(_hair, hairColor);
-            SetBg(_bunExtra, hairColor);
+            var hairColor = ColorAt(AgentPalette.HairColors, w.Hair);
+            if (hairColor != null)
+            {
+                SetBg(_hair, hairColor);
+                SetBg(_bunExtra, hairColor);
+            }
+            else
+            {
+                Hide(_hair);
+                Hide(_bunExtra);
+            }
 
-            ApplyHairShape(AgentPalette.HairShapes[w.Hair]);
-            ApplyEyeStyle(AgentPalette.EyeStyles[w.Eyes]);
-            ApplyMouthStyle(AgentPalette.MouthStyles[w.Mouth]);
+            if (w.Hair >= 0 && w.Hair < AgentPalette.HairShapes.Length)
+                ApplyHairShape(AgentPalette.HairShapes[w.Hair]);
+            if (w.Eyes >= 0 && w.Eyes < AgentPalette.EyeStyles.Length)
+                ApplyEyeStyle(AgentPalette.EyeStyles[w.Eyes]);
+            if (w.Mouth >= 0 && w.Mouth < AgentPalette.MouthStyles.Length)
+                ApplyMouthStyle(AgentPalette.MouthStyles[w.Mouth]);
+        }
+
+        private static void ApplyColor(VisualElement element, string[] palette, int index)
+        {
+            if (element == null) return;
+            var hex = ColorAt(palette, index);
+            if (hex != null)
+            {
+                SetBg(element, hex);
+                element.style.visibility = Visibility.Visible;
+            }
+            else
+            {
+                Hide(element);
+            }
+        }
+
+        private static string ColorAt(string[] palette, int index)
+        {
+            if (palette == null) return null;
+            if (index < 0 || index >= palette.Length) return null;
+            return palette[index];
+        }
+
+        private static void Hide(VisualElement element)
+        {
+            if (element == null) return;
+            element.style.visibility = Visibility.Hidden;
         }
 
         private void ApplyHairShape(string shape)

@@ -4,6 +4,7 @@ using OpenDesk.AgentCreation.Models;
 using OpenDesk.Claude;
 using OpenDesk.Core.Models;
 using OpenDesk.Core.Services;
+using OpenDesk.Core.Services.Skills;
 using OpenDesk.Presentation.Character;
 using OpenDesk.Pipeline;
 using OpenDesk.SkillDiskette;
@@ -15,14 +16,10 @@ using VContainer;
 namespace OpenDesk.Presentation.UI.Session
 {
     /// <summary>
-    /// 채팅 패널 — Claude CLI 미들웨어 연동.
-    /// 메시지 전송/수신 시 에이전트 HUD + FSM 상태를 동기화.
-    ///
-    /// 흐름:
-    ///   메시지 전송 → Thinking (의자로 이동+생각)
-    ///   → delta 수신 → Chatting (타이핑)
-    ///   → final 수신 → Completed (환호) → Idle
+    /// [Deprecated] uGUI 채팅 패널. UI Toolkit 버전 <see cref="OpenDesk.Presentation.UI.Chat.ChatPanelView"/> 로 대체됨.
+    /// 신규 씬은 ChatPanelView 를 사용하세요. 본 클래스는 마이그레이션 기간 동안 보존됩니다.
     /// </summary>
+    [System.Obsolete("uGUI 채팅 패널은 OpenDesk.Presentation.UI.Chat.ChatPanelView (UI Toolkit) 으로 대체되었습니다.")]
     public class ChatPanelController : MonoBehaviour
     {
         [Header("Panel")]
@@ -56,11 +53,18 @@ namespace OpenDesk.Presentation.UI.Session
         // API 백엔드: AnthropicApiChatService → HTTP 직접 호출
         // 토글: PlayerPrefs `OpenDesk_ChatBackend` ("cli" | "api")
         private IAiChatService _chat;
+        private IAgentSkillLoadoutService _loadoutService;
+        private ISkillCatalogService _catalogService;
 
         [Inject]
-        public void Construct(IAiChatService chat)
+        public void Construct(
+            IAiChatService chat,
+            IAgentSkillLoadoutService loadoutService = null,
+            ISkillCatalogService catalogService = null)
         {
             _chat = chat;
+            _loadoutService = loadoutService;
+            _catalogService = catalogService;
         }
 
         // ── 상태 ────────────────────────────────────────────
@@ -74,7 +78,7 @@ namespace OpenDesk.Presentation.UI.Session
         private string _streamingContent = "";
 
         // ── 에이전트 연결 ───────────────────────────────────
-        private AgentHUDController _linkedHUD;
+        // 레거시 _linkedHUD (AgentHUDController) 제거됨 — AgentHudView 가 상태 구독 담당.
         private AgentCharacterController _linkedCharCtrl;
 
         private static readonly Dictionary<AgentRole, string> RoleNames = new()
@@ -164,23 +168,27 @@ namespace OpenDesk.Presentation.UI.Session
         /// <summary>현재 씬에서 에이전트의 HUD/CharacterController 찾기</summary>
         private void FindLinkedAgent()
         {
-            _linkedHUD = null;
             _linkedCharCtrl = null;
 
-            // 1차: Bootstrapper에서 현재 에이전트 가져오기
-            var boot = Object.FindFirstObjectByType<AgentOfficeBootstrapper>();
-            if (boot?.CurrentAgent != null)
+            // 1차: AgentSpawner 의 SpawnedAgents 에서 첫 번째 에이전트 사용 (단일 에이전트 채팅 가정).
+            // 다중 에이전트 채팅 라우팅은 별건 PR.
+            // 레거시 AgentHUDController 슬롯은 제거됨 — AgentHudView 가 상태를 자체 구독.
+            var spawner = Object.FindFirstObjectByType<AgentSpawner>();
+            if (spawner != null)
             {
-                _linkedHUD = boot.CurrentAgent.HUD;
-                if (boot.CurrentAgent.ModelInstance != null)
-                    _linkedCharCtrl = boot.CurrentAgent.ModelInstance.GetComponent<AgentCharacterController>();
+                foreach (var kv in spawner.SpawnedAgents)
+                {
+                    var spawned = kv.Value;
+                    if (spawned == null) continue;
+                    if (spawned.ModelInstance != null)
+                        _linkedCharCtrl = spawned.ModelInstance.GetComponent<AgentCharacterController>();
+                    break;
+                }
             }
 
-            // 2차: Bootstrapper 없으면 씬에서 직접 탐색
+            // 2차: Spawner 없거나 비었으면 씬에서 직접 탐색.
             if (_linkedCharCtrl == null)
                 _linkedCharCtrl = Object.FindFirstObjectByType<AgentCharacterController>();
-            if (_linkedHUD == null)
-                _linkedHUD = Object.FindFirstObjectByType<AgentHUDController>();
 
             if (_linkedCharCtrl != null)
                 Debug.Log($"[ChatPanel] 에이전트 연결됨: {_currentAgentName} (FSM: {_linkedCharCtrl.SessionId})");
@@ -188,10 +196,9 @@ namespace OpenDesk.Presentation.UI.Session
                 Debug.LogWarning("[ChatPanel] 에이전트 연결 실패 — FSM/HUD 상태 갱신 불가");
         }
 
-        /// <summary>에이전트 상태 변경 → HUD + FSM 동시 갱신</summary>
+        /// <summary>에이전트 상태 변경 → FSM 갱신 (HUD 는 AgentHudView 가 IAgentStateService 로 직접 구독)</summary>
         private void SetAgentState(AgentActionType state)
         {
-            _linkedHUD?.ApplyState(state);
             _linkedCharCtrl?.ForceState(state);
         }
 
@@ -250,10 +257,27 @@ namespace OpenDesk.Presentation.UI.Session
             var equipment = _linkedCharCtrl?.Equipment;
             if (equipment != null)
             {
-                var tone = _linkedCharCtrl.Profile != null
-                    ? _linkedCharCtrl.Profile.Tone
-                    : AgentTone.None;
-                equipment.SetAgentProfile(_currentAgentName, _currentRole, tone);
+                // JSON-SSOT: profile.Source(AgentDraftRecord) 로 BindAgent — traits 까지 손실 없이 전달.
+                // Source 가 비어있는 디자이너 SO 는 옛 SetAgentProfile 로 폴백.
+                var record = _linkedCharCtrl.Profile?.Source;
+                if (record != null)
+                {
+                    equipment.BindAgent(record);
+                }
+                else
+                {
+                    var tone = _linkedCharCtrl.Profile != null
+                        ? _linkedCharCtrl.Profile.Tone
+                        : AgentTone.None;
+#pragma warning disable CS0618 // BindAgent 가 불가능한 디자이너 SO 폴백 경로.
+                    equipment.SetAgentProfile(_currentAgentName, _currentRole, tone, agentId: _currentAgentName);
+#pragma warning restore CS0618
+                }
+
+                // Loadout 영속과 카탈로그를 바인딩 — 마켓 패널의 장착 변경이 즉시 반영된다.
+                // 키는 기존 호환을 위해 _currentAgentName 유지 (record.id 로 갈아끼우면 PlayerPrefs 호환 깨짐).
+                if (_loadoutService != null && _catalogService != null)
+                    equipment.BindLoadoutService(_loadoutService, _catalogService, _currentAgentName);
 
                 var pipeline = FindFirstObjectByType<OfficePipelineManager>();
                 var prompt = pipeline != null
@@ -263,8 +287,9 @@ namespace OpenDesk.Presentation.UI.Session
                 if (!string.IsNullOrEmpty(prompt))
                 {
                     _chat.SetSystemPrompt(prompt);
+                    _chat.SendSkillLoadout(equipment.BuildSkillLoadoutPayload());
                     var fileCount = pipeline?.Inbox?.FilePaths?.Count ?? 0;
-                    Debug.Log($"[ChatPanel] System prompt 적용 ({prompt.Length}자, 디스켓 {equipment.EquippedDisks.Count}개, 파일 {fileCount}개)");
+                    Debug.Log($"[ChatPanel] System prompt 적용 ({prompt.Length}자, 스킬 {equipment.EquippedCount}개, 파일 {fileCount}개)");
                     return;
                 }
             }

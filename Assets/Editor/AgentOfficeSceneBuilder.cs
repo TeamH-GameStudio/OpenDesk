@@ -175,25 +175,14 @@ public static class AgentOfficeSceneBuilder
         orbitSO.FindProperty("_targetPoint").vector3Value = new Vector3(3f, 1f, 3f);
         orbitSO.ApplyModifiedPropertiesWithoutUndo();
 
-        // ── Bootstrapper (PlayerPrefs → 자동 소환) ──────────
-        var bootObj = new GameObject("AgentOfficeBootstrapper");
-        var boot = bootObj.AddComponent<AgentOfficeBootstrapper>();
+        // ── Roster Bootstrapper (AgentDraftJsonStore → 다중 소환) ──
+        var bootObj = new GameObject("AgentRosterBootstrapper");
+        var boot = bootObj.AddComponent<AgentRosterBootstrapper>();
 
         var bootSO = new SerializedObject(boot);
         bootSO.FindProperty("_spawner").objectReferenceValue = spawner;
-
-        // 모델 프리팹 매핑 등록
-        var prefabsProp = bootSO.FindProperty("_modelPrefabs");
-        prefabsProp.arraySize = agent3DPrefab != null ? 2 : 1;
-        var entry0 = prefabsProp.GetArrayElementAtIndex(0);
-        entry0.FindPropertyRelative("PrefabName").stringValue = "Model_Agent3D";
-        entry0.FindPropertyRelative("Prefab").objectReferenceValue = agent3DPrefab != null ? agent3DPrefab : cubePrefab;
-        if (agent3DPrefab != null)
-        {
-            var entry1 = prefabsProp.GetArrayElementAtIndex(1);
-            entry1.FindPropertyRelative("PrefabName").stringValue = "AgentCube_Placeholder";
-            entry1.FindPropertyRelative("Prefab").objectReferenceValue = cubePrefab;
-        }
+        bootSO.FindProperty("_mannequinPrefab").objectReferenceValue =
+            agent3DPrefab != null ? agent3DPrefab : cubePrefab;
         bootSO.ApplyModifiedPropertiesWithoutUndo();
 
         // ── 세션 리스트 UI (Screen Space Overlay) ────────────

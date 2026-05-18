@@ -1,0 +1,163 @@
+/* ============================================================
+   OfficeHud — UI Toolkit styles
+   3D 오피스 씬 위에 얹는 메인 HUD. 풀스크린이지만 picking-mode=Ignore
+   기본값으로 3D 클릭을 통과시키고, 자체 패널(상단바/사이드) 내부에서만
+   클릭을 받는다.
+   ============================================================ */
+
+.office-hud {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+/* ─────────────── 상단바 ─────────────── */
+
+.office-hud__top {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 56px;
+    flex-direction: row;
+    align-items: center;
+    padding: 0 var(--space-lg);
+    background-color: rgba(20, 20, 19, 0.55);
+}
+
+.office-hud__top-left {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+}
+
+.office-hud__top-right {
+    flex-direction: row;
+    align-items: center;
+}
+
+.office-hud__brand {
+    color: var(--n0);
+    -unity-font-style: bold;
+}
+
+.office-hud__btn {
+    margin-left: 8px;
+    padding: 6px 14px;
+    border-radius: var(--r-md);
+    border-width: 0;
+    -unity-font-style: bold;
+    font-size: 13px;
+}
+
+.office-hud__btn--primary {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+}
+.office-hud__btn--primary:hover { background-color: var(--brand-hover); }
+.office-hud__btn--primary:active { background-color: var(--brand-pressed); }
+
+.office-hud__btn--ghost {
+    background-color: rgba(255, 255, 255, 0.10);
+    color: var(--n0);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.30);
+}
+.office-hud__btn--ghost:hover {
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+/* ─────────────── 좌측 사이드 ─────────────── */
+
+.office-hud__side {
+    position: absolute;
+    left: var(--space-md);
+    top: 72px;
+    width: 240px;
+    max-height: 70%;
+    background-color: rgba(20, 20, 19, 0.55);
+    border-radius: var(--r-lg);
+    padding: var(--space-md);
+    flex-direction: column;
+}
+
+.office-hud__side-title {
+    color: var(--n0);
+    -unity-font-style: bold;
+    margin-bottom: var(--space-sm);
+    opacity: 0.85;
+}
+
+.office-hud__agent-list {
+    flex-grow: 1;
+}
+
+.office-hud__agent-list > .unity-scroll-view__content-container {
+    flex-direction: column;
+}
+
+/* ─────────────── 에이전트 카드 ─────────────── */
+
+.office-hud__agent-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    border-radius: var(--r-md);
+    background-color: rgba(255, 255, 255, 0.06);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.10);
+}
+
+.office-hud__agent-card:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-color: var(--brand-signature);
+}
+
+.office-hud__agent-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-full);
+    background-color: var(--brand-tint);
+    margin-right: 10px;
+    -unity-text-align: middle-center;
+    color: var(--brand-pressed);
+    -unity-font-style: bold;
+    font-size: 13px;
+}
+
+.office-hud__agent-meta {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.office-hud__agent-name {
+    color: var(--n0);
+    font-size: 13px;
+    -unity-font-style: bold;
+}
+
+.office-hud__agent-role {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 11px;
+}
+
+.office-hud__agent-action {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: var(--r-full);
+    border-width: 0;
+    background-color: transparent;
+    color: var(--n0);
+    font-size: 14px;
+    -unity-font-style: bold;
+    opacity: 0.55;
+}
+
+.office-hud__agent-action:hover {
+    background-color: rgba(255, 255, 255, 0.18);
+    opacity: 1;
+}

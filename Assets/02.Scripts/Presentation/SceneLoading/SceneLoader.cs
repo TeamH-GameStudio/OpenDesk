@@ -6,6 +6,8 @@ using R3;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+#pragma warning disable CS0618 // ISceneLoader 자체가 Obsolete — 구현체에서는 경고 무시.
+
 namespace OpenDesk.Presentation.SceneLoading
 {
     /// <summary>
@@ -18,6 +20,7 @@ namespace OpenDesk.Presentation.SceneLoading
     ///   - Loading 씬은 static 변수로 목적지를 수신 (씬 간 DI 없이 간단하게)
     ///   - Progress를 ReactiveProperty로 스트리밍 → UI 자동 업데이트
     /// </summary>
+    [Obsolete("Use GameSceneLoader (IGameSceneLoader) instead. 이 클래스는 Loading 씬 경유 패턴이지만 OpenDesk 는 persistent overlay 로 전환됨. Build Settings 에 Loading 씬도 등록되어 있지 않다.")]
     public class SceneLoader : ISceneLoader, IDisposable
     {
         // 로딩 씬 이름 (Build Settings에 등록 필요)

@@ -8,10 +8,10 @@ using UnityEngine.UI;
 namespace OpenDesk.Presentation.UI.Session
 {
     /// <summary>
-    /// 세션 리스트 패널 컨트롤러.
-    /// 에이전트별 대화 세션 목록 표시, 활성 세션 보더 하이라이트,
-    /// 새 대화 생성, 세션 선택 이벤트 발행.
+    /// [Deprecated] uGUI 세션 리스트. UI Toolkit 버전(SessionListView, 작성 예정)으로 대체 예정.
+    /// 본 클래스는 마이그레이션 기간 동안 보존됩니다.
     /// </summary>
+    [System.Obsolete("uGUI 세션 리스트는 UI Toolkit 버전으로 대체 예정입니다. (작업 중)")]
     public class SessionListController : MonoBehaviour
     {
         [Header("Panel")]

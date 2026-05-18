@@ -1,0 +1,124 @@
+using System;
+using System.Collections.Generic;
+using OpenDesk.Core.Models.Skills;
+using UnityEngine;
+
+namespace OpenDesk.Core.Persistence
+{
+    /// <summary>
+    /// 에이전트별 장착 스킬 ID 목록 영속 데이터.
+    /// agentId → List&lt;skillId&gt; 매핑. 슬롯 무제한.
+    /// </summary>
+    [TableName(PersistedDataTable.AgentSkillLoadouts)]
+    public sealed class AgentSkillLoadoutData : IGameData
+    {
+        private const int CURRENT_VERSION = 1;
+
+        private readonly Dictionary<string, List<string>> _loadouts = new();
+        private bool _isDirty;
+
+        public bool IsDirty => _isDirty;
+        public void MarkAsDirty() => _isDirty = true;
+        public void ResetDirty() => _isDirty = false;
+
+        public void InitializeDefault()
+        {
+            _loadouts.Clear();
+            _isDirty = false;
+        }
+
+        public void ResetAllData()
+        {
+            _loadouts.Clear();
+            _isDirty = false;
+        }
+
+        public string ToJson()
+        {
+            var snap = new SerializedSnapshot { version = CURRENT_VERSION };
+            foreach (var kvp in _loadouts)
+            {
+                snap.entries.Add(new SerializedEntry
+                {
+                    agentId = kvp.Key,
+                    skillIds = kvp.Value != null ? new List<string>(kvp.Value) : new List<string>(),
+                });
+            }
+            return JsonUtility.ToJson(snap);
+        }
+
+        public void FromJson(string json)
+        {
+            _loadouts.Clear();
+            if (string.IsNullOrEmpty(json)) return;
+
+            SerializedSnapshot snap;
+            try { snap = JsonUtility.FromJson<SerializedSnapshot>(json); }
+            catch (Exception e)
+            {
+                Debug.LogError($"[AgentSkillLoadoutData] JSON 파싱 실패: {e.Message}");
+                return;
+            }
+
+            if (snap?.entries == null) return;
+            foreach (var entry in snap.entries)
+            {
+                if (entry == null || string.IsNullOrEmpty(entry.agentId)) continue;
+                _loadouts[entry.agentId] = entry.skillIds != null
+                    ? new List<string>(entry.skillIds)
+                    : new List<string>();
+            }
+        }
+
+        // ── Public API ──
+
+        public AgentSkillLoadout GetLoadout(string agentId)
+        {
+            if (string.IsNullOrEmpty(agentId)) return AgentSkillLoadout.Empty(agentId);
+            return _loadouts.TryGetValue(agentId, out var ids)
+                ? new AgentSkillLoadout(agentId, new List<string>(ids))
+                : AgentSkillLoadout.Empty(agentId);
+        }
+
+        public bool Equip(string agentId, string skillId)
+        {
+            if (string.IsNullOrEmpty(agentId) || string.IsNullOrEmpty(skillId)) return false;
+            if (!_loadouts.TryGetValue(agentId, out var ids))
+            {
+                ids = new List<string>();
+                _loadouts[agentId] = ids;
+            }
+            if (ids.Contains(skillId)) return false;
+            ids.Add(skillId);
+            _isDirty = true;
+            return true;
+        }
+
+        public bool Unequip(string agentId, string skillId)
+        {
+            if (string.IsNullOrEmpty(agentId) || string.IsNullOrEmpty(skillId)) return false;
+            if (!_loadouts.TryGetValue(agentId, out var ids)) return false;
+            var removed = ids.Remove(skillId);
+            if (removed) _isDirty = true;
+            return removed;
+        }
+
+        public IReadOnlyDictionary<string, List<string>> All => _loadouts;
+
+        // ── DTO ──
+
+        [Serializable]
+        private sealed class SerializedSnapshot
+        {
+            public int version;
+            public List<SerializedEntry> entries = new();
+        }
+
+        [Serializable]
+        private sealed class SerializedEntry
+        {
+            public string agentId;
+            public List<string> skillIds = new();
+        }
+    }
+}

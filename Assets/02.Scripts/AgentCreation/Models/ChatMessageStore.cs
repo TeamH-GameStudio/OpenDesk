@@ -7,7 +7,7 @@ namespace OpenDesk.AgentCreation.Models
 {
     // ── 메시지 모델 ─────────────────────────────────────────
 
-    public enum ChatSender { User, Agent, System }
+    public enum ChatSender { User, Agent, System, ToolAsk }
 
     [Serializable]
     public class ChatMessage
@@ -27,6 +27,7 @@ namespace OpenDesk.AgentCreation.Models
             ChatSender.User => "user",
             ChatSender.Agent => "assistant",
             ChatSender.System => "system",
+            ChatSender.ToolAsk => "tool",
             _ => "user"
         };
     }

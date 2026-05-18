@@ -1,0 +1,37 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss"/>
+    <Style src="SessionListView.uss"/>
+
+    <ui:VisualElement name="session-list" class="session-list" picking-mode="Position">
+        <ui:VisualElement class="session-list__veil"/>
+
+        <ui:VisualElement class="session-list__panel">
+            <ui:VisualElement class="session-list__header">
+                <ui:VisualElement class="session-list__header-info">
+                    <ui:Label name="session-list-agent-name"
+                              text="에이전트"
+                              class="session-list__agent-name od-heading-md"/>
+                    <ui:Label name="session-list-agent-role"
+                              text=""
+                              class="session-list__agent-role od-body-sm"/>
+                </ui:VisualElement>
+                <ui:Button name="session-list-new"
+                           text="+ 새 대화"
+                           class="session-list__btn session-list__btn--primary"/>
+                <ui:Button name="session-list-close"
+                           text="✕"
+                           class="session-list__btn session-list__btn--close"/>
+            </ui:VisualElement>
+
+            <ui:ScrollView name="session-list-scroll"
+                           class="session-list__scroll"
+                           mode="Vertical"
+                           vertical-scroller-visibility="Auto"
+                           horizontal-scroller-visibility="Hidden"/>
+
+            <ui:Label name="session-list-empty"
+                      text="아직 대화가 없습니다. + 새 대화 로 시작해보세요."
+                      class="session-list__empty od-body-sm"/>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

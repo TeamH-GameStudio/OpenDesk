@@ -108,3 +108,33 @@
     font-size: 12px;
     -unity-font-style: normal;
 }
+
+/* ============================================================
+   Onboarding tokens (namespace: --onb-*)
+   Web prototype mock 기반. AgentCreation 시각 회귀를 막기 위해
+   기존 --brand-* 토큰과 분리해서 정의한다. (#D97757 family)
+   ============================================================ */
+
+:root {
+    --onb-brand-signature: #D97757;
+    --onb-brand-tint:      #F7E8DF;
+    --onb-brand-pressed:   #B85A3D;
+    --onb-brand-disabled:  #E8C5B5;
+    --onb-success:         #5A8C5A;
+    --onb-error:           #C94A3D;
+
+    /* 28/20/16/15/13/11 — 웹 프로토타입과 동일 */
+    --onb-fs-display:  28px;
+    --onb-fs-heading:  20px;
+    --onb-fs-title:    16px;
+    --onb-fs-body:     15px;
+    --onb-fs-meta:     13px;
+    --onb-fs-caption:  11px;
+}
+
+.onb-display    { font-size: 28px; -unity-font-style: bold; letter-spacing: -0.7px; -unity-text-align: middle-center; white-space: normal; }
+.onb-heading-lg { font-size: 20px; -unity-font-style: bold; letter-spacing: -0.4px; }
+.onb-title      { font-size: 16px; -unity-font-style: bold; }
+.onb-body       { font-size: 15px; -unity-font-style: normal; white-space: normal; }
+.onb-meta       { font-size: 13px; -unity-font-style: normal; white-space: normal; }
+.onb-caption    { font-size: 11px; -unity-font-style: normal; }

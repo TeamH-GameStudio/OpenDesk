@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Cysharp.Threading.Tasks;
 using OpenDesk.Characters.Wardrobe.Persistence;
+using OpenDesk.Onboarding.Models;
 using UnityEngine;
 
 namespace OpenDesk.Core.Persistence
@@ -77,6 +78,38 @@ namespace OpenDesk.Core.Persistence
                 {
                     DataType = typeof(WardrobeOutfitData),
                     Table = PersistedDataTable.WardrobeOutfits,
+                    Mode = StorageMode.Local,
+                },
+
+                // 온보딩 §4 — 사용자 프로필. 로컬 저장.
+                new DataRegistration
+                {
+                    DataType = typeof(UserProfileData),
+                    Table = PersistedDataTable.UserProfile,
+                    Mode = StorageMode.Local,
+                },
+
+                // 온보딩 §2 — 플랜 선택. 로컬 저장.
+                new DataRegistration
+                {
+                    DataType = typeof(PlanSelectionData),
+                    Table = PersistedDataTable.PlanSelection,
+                    Mode = StorageMode.Local,
+                },
+
+                // 에이전트별 장착 스킬. 로컬 저장 (개인 설정).
+                new DataRegistration
+                {
+                    DataType = typeof(AgentSkillLoadoutData),
+                    Table = PersistedDataTable.AgentSkillLoadouts,
+                    Mode = StorageMode.Local,
+                },
+
+                // 에이전트별 장착 플러그인. 로컬 저장.
+                new DataRegistration
+                {
+                    DataType = typeof(AgentPluginLoadoutData),
+                    Table = PersistedDataTable.AgentPluginLoadouts,
                     Mode = StorageMode.Local,
                 },
 

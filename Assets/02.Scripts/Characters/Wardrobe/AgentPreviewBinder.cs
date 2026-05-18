@@ -23,6 +23,12 @@ namespace OpenDesk.Characters.Wardrobe
         [SerializeField] private WardrobeApplier _applier;
         [SerializeField] private RenderTexture _previewTexture;
 
+        // Optional rotation pivot. When unset, defaults to applier.transform.parent
+        // (typically CharacterMount) so the model rig itself stays at identity —
+        // any Animator on the model can update without fighting the drag.
+        [SerializeField] private Transform _rotationPivot;
+        [SerializeField] private float _rotationSensitivity = 0.35f;
+
         private AgentCreationViewModel _viewModel;
         private WardrobeCatalogSO _catalog;
 
@@ -57,13 +63,40 @@ namespace OpenDesk.Characters.Wardrobe
             if (_previewTexture != null) _view.SetPreviewTexture(_previewTexture);
 
             _view.ViewModelReady += OnViewModelReady;
+            _view.PreviewDragged += OnPreviewDragged;
             if (_view.ViewModel != null) OnViewModelReady(_view.ViewModel);
         }
 
         private void OnDisable()
         {
-            if (_view != null) _view.ViewModelReady -= OnViewModelReady;
+            if (_view != null)
+            {
+                _view.ViewModelReady -= OnViewModelReady;
+                _view.PreviewDragged -= OnPreviewDragged;
+            }
             UnbindViewModel();
+        }
+
+        private void OnPreviewDragged(Vector2 delta)
+        {
+            var target = ResolveRotationTarget();
+            if (target == null) return;
+            // Drag right (delta.x > 0) → character rotates so its right side
+            // turns away from the camera. Inspector can flip via negative
+            // sensitivity if the preview camera faces the rig from -Z instead.
+            target.Rotate(0f, -delta.x * _rotationSensitivity, 0f, Space.World);
+        }
+
+        // Pivot priority: explicit serialized pivot > applier's parent (Mount) >
+        // applier itself. Rotating the Mount keeps the model's local transform
+        // at identity, so any Animator on the model doesn't fight the drag.
+        private Transform ResolveRotationTarget()
+        {
+            if (_rotationPivot != null) return _rotationPivot;
+            if (_applier == null) return null;
+            return _applier.transform.parent != null
+                ? _applier.transform.parent
+                : _applier.transform;
         }
 
         private void OnViewModelReady(AgentCreationViewModel viewModel)

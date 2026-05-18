@@ -1,3 +1,4 @@
+using OpenDesk.Characters.Wardrobe.Expressions;
 using OpenDesk.Presentation.Character.Context;
 using UnityEngine;
 
@@ -21,7 +22,7 @@ namespace OpenDesk.Presentation.Character.States
             // 이동 중이면 멈추고 바로 타이핑
             _ctx.StopMoving();
             _ctx.Animation.PlayAnimation("Typing", loop: true);
-            _ctx.Expression?.SetExpression("Focused");
+            _ctx.Expression?.SetExpression(AgentExpressionKey.Talking);
             Debug.Log($"[{_ctx.AgentName}] Chatting 진입 -- AI 응답 중");
         }
 
@@ -32,7 +33,7 @@ namespace OpenDesk.Presentation.Character.States
 
         public void Exit()
         {
-            _ctx.Expression?.SetExpression("Neutral");
+            _ctx.Expression?.SetExpression(AgentExpressionKey.Default);
         }
     }
 }

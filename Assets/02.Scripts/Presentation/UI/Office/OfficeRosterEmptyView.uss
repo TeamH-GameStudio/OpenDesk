@@ -1,0 +1,95 @@
+/* ============================================================
+   OfficeRosterEmptyView — 0명 상태 풀스크린 CTA
+   디자인 토큰: opendesk-tokens.uss (Warm Clay + Warm Stone)
+   ============================================================ */
+
+/* ── 루트: 풀스크린 컨테이너 ─────────────────────────── */
+.office-empty {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── 베일: 뒤 3D 씬을 살짝 누르는 반투명 레이어 ──── */
+.office-empty__veil {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(20, 20, 19, 0.45);
+}
+
+/* ── 카드: 중앙 박스 ─────────────────────────────────── */
+.office-empty__card {
+    width: 420px;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--n0);
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: var(--n100);
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+/* ── 아이콘: 브랜드 컬러 원 + 큰 + 글리프 ──────────── */
+.office-empty__icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 100px;
+    background-color: var(--brand-tint);
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+.office-empty__icon-glyph {
+    font-size: 32px;
+    -unity-font-style: bold;
+    color: var(--brand-signature);
+    -unity-text-align: middle-center;
+}
+
+/* ── 타이포 ─────────────────────────────────────────── */
+.office-empty__title {
+    color: var(--n900);
+    -unity-text-align: middle-center;
+    margin-bottom: 8px;
+}
+.office-empty__subtitle {
+    color: var(--n600);
+    -unity-text-align: middle-center;
+    margin-bottom: 24px;
+}
+
+/* ── CTA 버튼 ───────────────────────────────────────── */
+.office-empty__cta {
+    height: 44px;
+    width: 100%;
+    padding-left: 16px;
+    padding-right: 16px;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    font-size: 15px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    cursor: link;
+    transition-property: background-color, scale;
+    transition-duration: 150ms;
+}
+.office-empty__cta:hover {
+    background-color: var(--brand-hover);
+    scale: 1.01 1.01;
+}
+.office-empty__cta:active {
+    background-color: var(--brand-pressed);
+    scale: 0.99 0.99;
+}

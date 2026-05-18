@@ -3,12 +3,25 @@
   "host": "localhost",
   "claude": {
     "systemPrompt": "당신은 친절한 AI 어시스턴트입니다. 한국어로 대답합니다.",
-    "maxTurns": 50,
+    "maxTurns": 12,
     "timeoutSeconds": 120,
-    "cliPath": "claude"
+    "cliPath": "/Users/choiseungmoonpc/.local/bin/claude"
   },
   "formatting": {
     "markdownToTmp": true,
     "maxResponseLength": 10000
+  },
+  "reliability": {
+    "connect_timeout_s": 10,
+    "first_token_timeout_s": 30,
+    "tool_call_timeout_s": 60,
+    "total_request_timeout_s": 300,
+    "max_tool_rounds": 8,
+    "max_tool_rounds_cache_bonus": 4,
+    "cache_hit_bonus_threshold": 0.6
+  },
+  "hooks": {
+    "enabled": true,
+    "chain": ["retry", "rate_limit", "latency", "cache_stats", "telemetry_emitter"]
   }
 }

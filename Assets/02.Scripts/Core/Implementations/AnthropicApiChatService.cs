@@ -28,6 +28,7 @@ namespace OpenDesk.Core.Implementations
     /// 키 소스: IApiKeyVaultService.GetKeyAsync("anthropic")
     /// 모델 디폴트: claude-sonnet-4-5 (PlayerPrefs `OpenDesk_AnthropicModel`로 변경 가능)
     /// </summary>
+    [Obsolete("Use MiddlewareChatService — API 백엔드도 이제 통합 미들웨어 게이트웨이를 경유한다 (anthropic_api provider). 가역 보존용으로만 남아있다.")]
     public class AnthropicApiChatService : IAiChatService, IDisposable
     {
         private const string ApiUrl          = "https://api.anthropic.com/v1/messages";
@@ -53,7 +54,27 @@ namespace OpenDesk.Core.Implementations
         public event Action<bool, string>   OnConnectionChanged;
         public event Action                 OnCleared;
 
+        // 신규 인터랙티브/lifecycle 이벤트 — legacy API 직결은 미들웨어 도구를 안 거치므로 NoOp.
+        public event Action<OpenDesk.Claude.Models.ToolUserAskMessage>       OnToolUserAsk;
+        public event Action<OpenDesk.Claude.Models.SubAgentSpawnedMessage>   OnSubAgentSpawned;
+        public event Action<OpenDesk.Claude.Models.SubAgentCompletedMessage> OnSubAgentCompleted;
+        public event Action<OpenDesk.Claude.Models.SubAgentFailedMessage>    OnSubAgentFailed;
+        public event Action<OpenDesk.Claude.Models.TaskStateMessage>         OnTaskState;
+        public event Action<OpenDesk.Claude.Models.CronStateMessage>         OnCronState;
+
+        private void _SilenceUnusedEvents()
+        {
+            _ = OnToolUserAsk; _ = OnSubAgentSpawned; _ = OnSubAgentCompleted;
+            _ = OnSubAgentFailed; _ = OnTaskState; _ = OnCronState;
+        }
+
+        public void SendToolUserResponse(string toolUseId, string response, string[] selected) { /* NoOp — legacy */ }
+        public void SendToolUserResponse(string toolUseId, string response, string[] selected, bool remember) { /* NoOp — legacy */ }
+        public void SendPluginRegistry(string agentId, OpenDesk.Claude.Models.PluginRegistryEntry[] entries) { /* NoOp — legacy */ }
+        public void SendTaskControl(string action, string taskId) { /* NoOp — legacy */ }
+
         public bool IsConnected => _connected;
+        public bool IsAuthenticated => _connected;
 
         [Inject]
         public AnthropicApiChatService(IApiKeyVaultService vault)
@@ -94,6 +115,9 @@ namespace OpenDesk.Core.Implementations
             Debug.Log($"[ApiChat] System prompt 설정 ({_systemPrompt.Length}자)");
         }
 
+        // [Obsolete] — 신규 흐름은 MiddlewareChatService.SetModel 사용. 호출 무시.
+        public void SetModel(string model) { }
+
         public void SendMessage(string message)
         {
             if (string.IsNullOrEmpty(message)) return;
@@ -129,10 +153,22 @@ namespace OpenDesk.Core.Implementations
             Debug.Log("[ApiChat] 히스토리 초기화");
         }
 
+        public void Abort()
+        {
+            try { _activeCts?.Cancel(); }
+            catch (Exception e) { Debug.LogWarning($"[ApiChat] Abort 실패: {e.Message}"); }
+            Debug.Log("[ApiChat] Abort 호출 — 활성 스트림 취소");
+        }
+
         public void SendMcpConfig(string mcpConfigJson)
         {
             // API 백엔드는 MCP 미지원. 추후 Anthropic MCP support 추가 시 구현.
             Debug.LogWarning("[ApiChat] MCP는 CLI 백엔드에서만 지원. 무시됨.");
+        }
+
+        public void SendSkillLoadout(OpenDesk.Core.Models.Skills.SkillLoadoutPayload payload)
+        {
+            // [Obsolete] — 신규 흐름은 MiddlewareChatService 가 처리. 호출되더라도 no-op.
         }
 
         // ── 크래프팅 ──

@@ -16,12 +16,14 @@ namespace OpenDesk.Core.Implementations
     /// Python 미들웨어(Middleware/server.py)를 ClaudeWebSocketClient로 래핑.
     /// MCP/tools 사용 가능. 추가 프로세스/포트 필요.
     /// </summary>
+    [Obsolete("Use MiddlewareChatService — provider 라우팅이 미들웨어로 이관됨. 가역 보존용으로만 남아있다.")]
     public class AnthropicCliChatService : IAiChatService, IDisposable
     {
         private readonly ClaudeWebSocketClient _client;
         private bool _disposed;
 
         public bool IsConnected => _client != null && _client.IsConnected;
+        public bool IsAuthenticated => IsConnected;
 
         // ── 이벤트 ──
 
@@ -31,6 +33,26 @@ namespace OpenDesk.Core.Implementations
         public event Action<string> OnStatus;
         public event Action<bool, string> OnConnectionChanged;
         public event Action OnCleared;
+
+        // 신규 인터랙티브/lifecycle 이벤트 — legacy 서비스는 미들웨어 게이트웨이를 안 거치므로 NoOp.
+        public event Action<OpenDesk.Claude.Models.ToolUserAskMessage>       OnToolUserAsk;
+        public event Action<OpenDesk.Claude.Models.SubAgentSpawnedMessage>   OnSubAgentSpawned;
+        public event Action<OpenDesk.Claude.Models.SubAgentCompletedMessage> OnSubAgentCompleted;
+        public event Action<OpenDesk.Claude.Models.SubAgentFailedMessage>    OnSubAgentFailed;
+        public event Action<OpenDesk.Claude.Models.TaskStateMessage>         OnTaskState;
+        public event Action<OpenDesk.Claude.Models.CronStateMessage>         OnCronState;
+
+        // 컴파일러가 unused warning 을 띄우지 않도록 silence.
+        private void _SilenceUnusedEvents()
+        {
+            _ = OnToolUserAsk; _ = OnSubAgentSpawned; _ = OnSubAgentCompleted;
+            _ = OnSubAgentFailed; _ = OnTaskState; _ = OnCronState;
+        }
+
+        public void SendToolUserResponse(string toolUseId, string response, string[] selected) { /* NoOp — legacy */ }
+        public void SendToolUserResponse(string toolUseId, string response, string[] selected, bool remember) { /* NoOp — legacy */ }
+        public void SendPluginRegistry(string agentId, OpenDesk.Claude.Models.PluginRegistryEntry[] entries) { /* NoOp — legacy */ }
+        public void SendTaskControl(string action, string taskId) { /* NoOp — legacy */ }
 
         [Inject]
         public AnthropicCliChatService(ClaudeWebSocketClient client)
@@ -54,6 +76,9 @@ namespace OpenDesk.Core.Implementations
             Debug.Log($"[CliChat] System prompt 설정 ({systemPrompt.Length}자)");
         }
 
+        // [Obsolete] — CLI 백엔드는 model 동적 전환 미지원. 신규 흐름은 MiddlewareChatService 사용.
+        public void SetModel(string model) { }
+
         public void SendMessage(string message)
         {
             _client.SendChat(message);
@@ -69,6 +94,13 @@ namespace OpenDesk.Core.Implementations
             _client.SendClear();
         }
 
+        public void Abort()
+        {
+            if (_client == null) return;
+            _client.SendCancel();
+            Debug.Log("[CliChat] Abort 요청 전송");
+        }
+
         public void SendMcpConfig(string mcpConfigJson)
         {
             if (_client == null || !_client.IsConnected || string.IsNullOrEmpty(mcpConfigJson))
@@ -80,6 +112,11 @@ namespace OpenDesk.Core.Implementations
             // 직접 SendText가 불가하므로 SendConfig를 확장하거나 별도 처리
             // 당장은 Debug.Log로 표시 — Day 9에서 프로토콜 확장 시 구현
             Debug.Log($"[CliChat] MCP config 전달 예약 ({mcpConfigJson.Length}자)");
+        }
+
+        public void SendSkillLoadout(OpenDesk.Core.Models.Skills.SkillLoadoutPayload payload)
+        {
+            // [Obsolete] — 신규 흐름은 MiddlewareChatService 가 처리. 호출되더라도 no-op.
         }
 
         // ── 크래프팅 ──

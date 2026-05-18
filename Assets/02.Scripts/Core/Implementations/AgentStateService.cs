@@ -68,6 +68,8 @@ namespace OpenDesk.Core.Implementations
                 AgentActionType.TaskFailed       => AgentActionType.TaskFailed,
                 AgentActionType.Disconnected     => AgentActionType.Disconnected,
                 AgentActionType.Connected        => AgentActionType.Idle,
+                AgentActionType.AwaitingLicense  => AgentActionType.AwaitingLicense,
+                AgentActionType.InsufficientCredits => AgentActionType.InsufficientCredits,
                 _                                => AgentActionType.Idle,
             };
         }

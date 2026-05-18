@@ -1,0 +1,26 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss"/>
+    <Style src="OfficeRosterEmptyView.uss"/>
+
+    <ui:VisualElement name="office-roster-empty" class="office-empty">
+        <ui:VisualElement class="office-empty__veil"/>
+
+        <ui:VisualElement class="office-empty__card">
+            <ui:VisualElement class="office-empty__icon">
+                <ui:Label text="+" class="office-empty__icon-glyph"/>
+            </ui:VisualElement>
+
+            <ui:Label name="office-empty-title"
+                      text="아직 동료가 없습니다"
+                      class="office-empty__title od-heading-lg"/>
+
+            <ui:Label name="office-empty-subtitle"
+                      text="첫 번째 동료를 만들어 함께 일을 시작해보세요."
+                      class="office-empty__subtitle od-body-md"/>
+
+            <ui:Button name="office-empty-cta"
+                       text="+ 동료 추가하기"
+                       class="office-empty__cta"/>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

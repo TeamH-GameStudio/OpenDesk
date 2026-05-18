@@ -11,17 +11,14 @@ namespace OpenDesk.Editor.Wardrobe
     // One-shot builder that wires the SD mannequin's parts into a usable
     // wardrobe baseline:
     //   - Creates 7 default WardrobePartOptionSO assets (skin/hair/eyes/mouth/top/bottom/shoes)
-    //   - Builds a shoes pair prefab (left + right combined under one root) since
-    //     CharacterPartSwapper takes one prefab per slot
     //   - Locates the WardrobeCatalog asset (any in the project) and assigns
     //     each slot's DefaultOption
     //
     // Re-runnable: existing assets are updated in place rather than duplicated.
     public static class WardrobeDefaultsBuilder
     {
-        private const string PartsRoot       = "Assets/03.Models/SD_Maneqquin 1/Parts";
-        private const string OptionsFolder   = "Assets/05.Prefabs/Agent/WardrobeOptions/Defaults";
-        private const string ShoesPairFolder = "Assets/05.Prefabs/Agent/WardrobeOptions/ShoesPairs";
+        private const string PartsRoot     = "Assets/03.Models/SD_Maneqquin 1/Parts";
+        private const string OptionsFolder = "Assets/05.Prefabs/Agent/WardrobeOptions/Defaults";
 
         // A neutral warm-tan default — matches AgentPalette.SkinColors[1] (#EAC9A2).
         private static readonly Color DefaultSkinTint = new Color32(0xEA, 0xC9, 0xA2, 0xFF);
@@ -30,22 +27,17 @@ namespace OpenDesk.Editor.Wardrobe
         public static void Build()
         {
             EnsureFolder(OptionsFolder);
-            EnsureFolder(ShoesPairFolder);
 
-            // ── Locate / build prefab references ─────────────────────────
+            // ── Locate prefab references ─────────────────────────────────
             var hairFbx   = LoadFbx($"{PartsRoot}/hair/hair.000.fbx");           // no fallback exists
             var topFbx    = LoadFbx($"{PartsRoot}/top/top.fallback.fbx");
             var bottomFbx = LoadFbx($"{PartsRoot}/bottom/bottom.fallback.fbx");
-
-            var shoeLeft  = LoadFbx($"{PartsRoot}/shoes/shoes.left.fallback.fbx");
-            var shoeRight = LoadFbx($"{PartsRoot}/shoes/shoes.right.fallback.fbx");
-            var shoesPair = BuildShoesPairPrefab("default", shoeLeft, shoeRight);
+            var shoesFbx  = LoadFbx($"{PartsRoot}/shoes/shoes.fallback.fbx");
 
             WarnIfMissing(hairFbx,   "Parts/hair/hair.000.fbx");
             WarnIfMissing(topFbx,    "Parts/top/top.fallback.fbx");
             WarnIfMissing(bottomFbx, "Parts/bottom/bottom.fallback.fbx");
-            WarnIfMissing(shoeLeft,  "Parts/shoes/shoes.left.fallback.fbx");
-            WarnIfMissing(shoeRight, "Parts/shoes/shoes.right.fallback.fbx");
+            WarnIfMissing(shoesFbx,  "Parts/shoes/shoes.fallback.fbx");
 
             // ── Create / update option SO assets ─────────────────────────
             var skinOpt   = UpsertOption("option_skin_default",   "Default Skin",   "skin-default",
@@ -67,7 +59,7 @@ namespace OpenDesk.Editor.Wardrobe
                                          WardrobeApplyKind.MeshSwap, partPrefab: bottomFbx);
 
             var shoesOpt  = UpsertOption("option_shoes_default",  "Default Shoes",  "shoes-default",
-                                         WardrobeApplyKind.MeshSwap, partPrefab: shoesPair);
+                                         WardrobeApplyKind.MeshSwap, partPrefab: shoesFbx);
 
             // ── Wire into catalogue ──────────────────────────────────────
             var catalog = FindCatalog();
@@ -154,6 +146,10 @@ namespace OpenDesk.Editor.Wardrobe
         public static void BuildBottomVariants()
             => BuildMeshVariants(WardrobePart.Bottom, $"{PartsRoot}/bottom", "bottom.", "bottom");
 
+        [MenuItem("Tools/OpenDesk/Wardrobe/Variants/Shoes", priority = 204)]
+        public static void BuildShoesVariants()
+            => BuildMeshVariants(WardrobePart.Shoes, $"{PartsRoot}/shoes", "shoes.", "shoes");
+
         private static void BuildMeshVariants(WardrobePart part, string folder, string prefix, string idStem)
         {
             EnsureFolder(OptionsFolder);
@@ -181,45 +177,6 @@ namespace OpenDesk.Editor.Wardrobe
             Debug.Log($"[WardrobeDefaultsBuilder] {part} variants built ({options.Count}).");
         }
 
-        // ─── Shoes (pair L+R, build composite prefab per pair) ────────
-
-        [MenuItem("Tools/OpenDesk/Wardrobe/Variants/Shoes", priority = 204)]
-        public static void BuildShoesVariants()
-        {
-            EnsureFolder(OptionsFolder);
-            EnsureFolder(ShoesPairFolder);
-
-            var leftEntries = ScanNumberedFbx($"{PartsRoot}/shoes", "shoes.left.");
-            if (leftEntries.Count == 0)
-            {
-                Debug.LogWarning("[WardrobeDefaultsBuilder] No shoes.left.* fbx files found.");
-                return;
-            }
-
-            var options = new List<WardrobePartOptionSO>();
-            foreach (var (leftPath, suffix) in leftEntries)
-            {
-                var rightPath = leftPath.Replace("shoes.left.", "shoes.right.");
-                var leftPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(leftPath);
-                var rightPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(rightPath);
-                if (leftPrefab == null && rightPrefab == null) continue;
-                if (rightPrefab == null)
-                {
-                    Debug.LogWarning($"[WardrobeDefaultsBuilder] Missing right pair for {leftPath}");
-                }
-
-                var pair = BuildShoesPairPrefab(suffix, leftPrefab, rightPrefab);
-                var fileName = $"option_shoes_{suffix}";
-                var id = $"shoes-{suffix}";
-                options.Add(UpsertOption(fileName, $"Shoes {suffix}", id,
-                    WardrobeApplyKind.MeshSwap, partPrefab: pair));
-            }
-
-            ReplaceCatalogOptions(WardrobePart.Shoes, options);
-            FlushAssets();
-            Debug.Log($"[WardrobeDefaultsBuilder] Shoes variants built ({options.Count}).");
-        }
-
         // ─── helpers ────────────────────────────────────────────────────
 
         private static WardrobePartOptionSO UpsertOption(
@@ -238,33 +195,6 @@ namespace OpenDesk.Editor.Wardrobe
             asset.EditorSet(id, displayName, kind, partPrefab, tint, texture);
             Debug.Log($"[WardrobeDefaultsBuilder] {(created ? "Created" : "Updated")}: {path}");
             return asset;
-        }
-
-        private static GameObject BuildShoesPairPrefab(string suffix, GameObject left, GameObject right)
-        {
-            var path = $"{ShoesPairFolder}/shoes_pair_{suffix}.prefab";
-
-            var temp = new GameObject($"shoes_pair_{suffix}");
-            try
-            {
-                if (left != null)
-                {
-                    var l = (GameObject)PrefabUtility.InstantiatePrefab(left);
-                    l.transform.SetParent(temp.transform, false);
-                }
-                if (right != null)
-                {
-                    var r = (GameObject)PrefabUtility.InstantiatePrefab(right);
-                    r.transform.SetParent(temp.transform, false);
-                }
-                var prefab = PrefabUtility.SaveAsPrefabAsset(temp, path);
-                Debug.Log($"[WardrobeDefaultsBuilder] Shoes pair prefab → {path}");
-                return prefab;
-            }
-            finally
-            {
-                Object.DestroyImmediate(temp);
-            }
         }
 
         private static GameObject LoadFbx(string assetPath)

@@ -1,0 +1,919 @@
+/* ============================================================
+   ChatPanelView — OpenDesk 도메인용 채팅 패널 UI Toolkit 스타일
+   Source: ChatTest/UI/ChatStyles.uss (디자인 동일) + 도메인 확장
+   (System 메시지 / status / empty hint 등)
+   ============================================================ */
+
+.chat-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.chat-panel__body {
+    flex-grow: 1;
+    flex-direction: row;
+    overflow: hidden;
+}
+
+.chat-panel__deco {
+    width: 40%;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* ───────────── Deco menu — 좌측 캐릭터 영역 우하단 햄버거 + 팝업 메뉴 ───────────── */
+/* 부모(.chat-panel__deco) 는 picking-mode="Ignore" 라서 빈 데코 영역 클릭은 통과되고,
+   메뉴 자체와 자식 버튼만 hit-test 를 받는다. */
+.deco-menu {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.deco-menu__toggle {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: var(--r-full);
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    align-items: center;
+    justify-content: center;
+    transition-property: background-color, border-color, scale;
+    transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out, ease-out;
+}
+.deco-menu__toggle:hover {
+    background-color: var(--brand-tint);
+    border-color: var(--brand-signature);
+}
+.deco-menu__toggle:hover .hamburger-line { background-color: var(--brand-pressed); }
+.deco-menu__toggle:active { scale: 0.95 0.95; }
+
+/* 팝업 패널 — 토글 위쪽으로 열린다. 닫혀있을 때는 display:none 으로 hit-test 도 차단. */
+.deco-menu__panel {
+    display: none;
+    flex-direction: column;
+    margin-bottom: 8px;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    padding: 6px;
+    min-width: 168px;
+}
+
+.deco-menu--open .deco-menu__panel {
+    display: flex;
+}
+
+.deco-menu__item {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: var(--n800);
+    -unity-text-align: middle-left;
+    padding: 8px 12px;
+    margin: 2px 0;
+    border-radius: var(--r-sm);
+    transition-property: background-color, color;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+}
+.deco-menu__item:hover {
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+}
+
+/* ───────────── Deco skills — 좌측 캐릭터 영역 좌하단 스킬 빠른보기 ───────────── */
+.deco-skills {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.deco-skills__toggle {
+    height: 36px;
+    padding: 0 18px;
+    border-radius: var(--r-full);
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    color: var(--n800);
+    -unity-font-style: bold;
+    transition-property: background-color, border-color, color, scale;
+    transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out, ease-out, ease-out;
+    scale: 1 1;
+}
+.deco-skills__toggle:hover {
+    background-color: var(--brand-tint);
+    border-color: var(--brand-signature);
+    color: var(--brand-pressed);
+}
+.deco-skills__toggle:active { scale: 0.95 0.95; }
+
+.deco-skills__panel {
+    display: none;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 8px;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+}
+
+.deco-skills--open .deco-skills__panel {
+    display: flex;
+}
+
+.deco-skills__list {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+/* 공통 chip — 평소엔 둥근 아이콘만 보이고, 호버 시 배경 바가 옆으로 펼쳐지며 이름 라벨이 등장. */
+.deco-skills__chip {
+    flex-direction: row;
+    align-items: center;
+    padding: 4px;
+    margin: 3px 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: var(--r-full);
+    transition-property: background-color, padding, scale;
+    transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out, ease-out;
+    scale: 1 1;
+}
+.deco-skills__chip:hover {
+    background-color: var(--brand-tint);
+    padding: 4px 14px 4px 4px;
+}
+.deco-skills__chip:active { scale: 0.97 0.97; }
+
+/* 둥근 아이콘 본체 — DisplayName 첫 글자 / + / ... 등을 표시 */
+.deco-skills__chip-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: var(--r-full);
+    background-color: var(--brand-tint);
+    color: var(--brand-pressed);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    transition-property: background-color, color, border-color;
+    transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out, ease-out;
+}
+.deco-skills__chip:hover .deco-skills__chip-icon {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    border-color: var(--brand-signature);
+}
+
+/* 호버 라벨 — 평소엔 layout 에서 제외, 호버 시에만 display:flex 로 등장 */
+.deco-skills__chip-label {
+    display: none;
+    margin-left: 10px;
+    color: var(--brand-pressed);
+    -unity-font-style: bold;
+    white-space: nowrap;
+}
+.deco-skills__chip:hover .deco-skills__chip-label {
+    display: flex;
+}
+
+/* + 버튼 variant — 평소에도 brand 색으로 채워 액션 신호 강조 */
+.deco-skills__chip--add { display: none; }
+.deco-skills__chip--add.deco-skills__chip--show { display: flex; }
+.deco-skills__chip-icon--add {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    border-color: var(--brand-signature);
+    font-size: 18px;
+}
+.deco-skills__chip--add:hover .deco-skills__chip-icon {
+    background-color: var(--brand-hover);
+    border-color: var(--brand-hover);
+}
+
+/* ... 더보기 variant — 회색 톤 (장식 액션) */
+.deco-skills__chip--more { display: none; }
+.deco-skills__chip--more.deco-skills__chip--show { display: flex; }
+.deco-skills__chip-icon--more {
+    background-color: var(--n100);
+    color: var(--n500);
+    border-color: var(--n200);
+}
+.deco-skills__chip--more:hover .deco-skills__chip-icon {
+    background-color: var(--n200);
+    color: var(--n700);
+    border-color: var(--n300);
+}
+.deco-skills__chip--more .deco-skills__chip-label { color: var(--n600); }
+.deco-skills__chip--more:hover { background-color: var(--n100); }
+
+.chat-pane {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: var(--n0);
+    overflow: hidden;
+}
+
+.chat-pane__brand-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: var(--brand-signature);
+}
+
+/* ───────────── Header ───────────── */
+
+.chat-header {
+    flex-direction: row;
+    align-items: center;
+    height: 56px;
+    flex-shrink: 0;
+    padding: 0 16px 0 28px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n200);
+}
+
+.chat-header__title-row {
+    flex-direction: row;
+    align-items: baseline;
+}
+
+.chat-header__name  { color: var(--n900); }
+.chat-header__sep   { color: var(--n400); font-size: 14px; margin: 0 6px; }
+.chat-header__role  { color: var(--n500); }
+.chat-header__status{ color: var(--brand-pressed); margin-left: 12px; }
+.chat-header__spacer{ flex-grow: 1; }
+
+.icon-btn {
+    width: 32px; height: 32px;
+    margin-left: 4px;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: var(--r-md);
+    color: var(--n400);
+    -unity-text-align: middle-center;
+    font-size: 20px;
+    align-items: center;
+    justify-content: center;
+    transition-property: background-color, color;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+}
+.icon-btn:hover { background-color: rgba(20, 20, 19, 0.04); color: var(--n700); }
+
+.icon-btn--accent {
+    color: var(--brand-signature);
+    font-size: 22px;
+    -unity-font-style: bold;
+}
+.icon-btn--accent:hover { background-color: var(--brand-tint); color: var(--brand-pressed); }
+
+.hamburger-icon { width: 18px; height: 12px; flex-direction: column; justify-content: space-between; }
+.hamburger-line { height: 1.6px; background-color: var(--n400); }
+.icon-btn:hover .hamburger-line { background-color: var(--n700); }
+
+/* Model dropdown — 헤더 우측 컴팩트 표시 */
+.chat-model-dropdown {
+    min-width: 140px;
+    margin-right: 6px;
+    height: 28px;
+}
+.chat-model-dropdown > .unity-base-popup-field__input {
+    background-color: var(--n50);
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    padding: 0 10px;
+    color: var(--n800);
+    font-size: 12px;
+    min-height: 28px;
+}
+.chat-model-dropdown > .unity-base-popup-field__input:hover {
+    border-color: var(--brand-signature);
+}
+
+/* ───────────── Messages ───────────── */
+
+.chat-scroll {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-height: 0;          /* flex column 내부 ScrollView 가 부모 잔여공간만 차지하도록. */
+    background-color: var(--n0);
+}
+
+/* ScrollView 의 contentContainer 가 곧 messages-container.
+   column flex + 자식 stretch 로 각 메시지 행이 ScrollView 가로폭 100% 를 차지하도록 한다. */
+.messages-container {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--space-lg) var(--space-lg) var(--space-md-) var(--space-lg);
+}
+
+.message {
+    width: 100%;             /* 행 자체는 가로 100% — 안의 bubble 만 좌/우 정렬 */
+    flex-direction: column;
+    flex-shrink: 0;          /* 각 메시지 행은 자기 콘텐츠 높이 유지 — 다른 행 위로 겹침 방지. */
+    margin-bottom: var(--space-md);
+    transition-property: opacity;
+    transition-duration: var(--motion-base);
+    transition-timing-function: ease-out;
+}
+
+.message--user      { align-items: flex-end; }
+.message--assistant { align-items: flex-start; }
+.message--system    { align-items: center; }
+
+.message__sender-label {
+    font-size: 12px;
+    color: var(--n500);
+    margin-bottom: var(--space-xs);
+}
+
+/* Bubble wrapper — max-width 를 여기에 둔다. Label 에 직접 percent max-width 를 주면
+   Unity UI Toolkit 이 첫 measure 패스에서 intrinsic width 기준으로 height 를 계산하고
+   wrap 후 갱신하지 않아 마지막 줄이 잘리는 버그 발생. wrapper 가 확정 픽셀 폭을 제공하면
+   Label 이 그 안에서 정상적으로 wrap + height 재측정. */
+.message__bubble-wrap {
+    flex-direction: column;
+    flex-shrink: 0;
+    flex-grow: 0;
+    max-width: 82%;
+}
+
+.message--user > .message__bubble-wrap      { max-width: 75%; }
+.message--assistant > .message__bubble-wrap { max-width: 85%; }
+.message--system > .message__bubble-wrap    { max-width: 80%; }
+
+.message__bubble {
+    font-size: 15px;
+    white-space: normal;
+    flex-shrink: 0;
+    flex-grow: 0;
+}
+
+.message--user > .message__bubble-wrap > .message__bubble {
+    background-color: var(--n900);
+    color: var(--n0);
+    padding: 12px 16px;
+    border-top-left-radius: var(--r-xl);
+    border-top-right-radius: var(--r-xl);
+    border-bottom-right-radius: var(--r-sm);
+    border-bottom-left-radius: var(--r-xl);
+}
+
+.message--assistant > .message__bubble-wrap > .message__bubble {
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n700);
+    padding: 0;
+}
+
+.message--system > .message__bubble-wrap > .message__bubble {
+    background-color: var(--chip-warning-bg);
+    color: var(--chip-warning-fg);
+    padding: 6px 12px;
+    border-radius: var(--r-full);
+    font-size: 12px;
+}
+
+/* ───────────── Activity row — 진행 중 thinking / tool 한 줄 표시 ─────────────
+   사용자 메시지와 assistant bubble 사이에 inline 삽입되어 현재 상태(사고/도구호출/응답)를
+   한 줄로 보여준다. status 메시지가 도착할 때마다 텍스트가 교체된다. 응답 본문 delta 가
+   시작되면 dim 처리되고, final 시 dot 이 회색으로 전환되어 흔적으로 남는다. */
+.message--activity {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-bottom: var(--space-md);
+    padding: 0 4px;
+    transition-property: opacity;
+    transition-duration: var(--motion-base);
+    transition-timing-function: ease-out;
+}
+
+.activity__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--r-full);
+    background-color: var(--brand-signature);
+    margin-right: 10px;
+    flex-shrink: 0;
+    transition-property: background-color;
+    transition-duration: var(--motion-base);
+}
+
+.activity__dot--done {
+    background-color: var(--n400);
+}
+
+.activity__text {
+    color: var(--n500);
+    font-size: 13px;
+    -unity-font-style: italic;
+    flex-shrink: 1;
+    white-space: normal;
+}
+
+.message--activity--dim {
+    opacity: 0.55;
+}
+
+/* ───────────── Message actions — 복사/수정 버튼 상시 표시 ───────────── */
+.message__actions {
+    display: flex;
+    flex-direction: row;
+    margin-top: 4px;
+    /* row 의 align-items (flex-end/flex-start) 에 의해 자동으로 우/좌 정렬 — 별도 align-self 불필요. */
+}
+
+.message__action-btn {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    margin: 0 4px 0 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-full);
+    align-items: center;
+    justify-content: center;
+    transition-property: background-color, border-color, scale;
+    transition-duration: var(--motion-fast), var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out, ease-out;
+    scale: 1 1;
+}
+.message__action-btn:hover {
+    background-color: var(--brand-tint);
+    border-color: var(--brand-signature);
+}
+.message__action-btn:active { scale: 0.95 0.95; }
+
+/* ── 복사 아이콘 — 두 개의 겹친 둥근 사각형 ── */
+.icon-copy {
+    width: 14px;
+    height: 14px;
+    position: relative;
+}
+.icon-copy__back,
+.icon-copy__front {
+    position: absolute;
+    width: 9px;
+    height: 10px;
+    border-width: 1.2px;
+    border-color: var(--n500);
+    background-color: rgba(0, 0, 0, 0);
+    border-radius: 2px;
+    transition-property: border-color, background-color;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+}
+.icon-copy__back { top: 0; left: 0; }
+.icon-copy__front { top: 3px; left: 4px; background-color: var(--n0); }
+.message__action-btn:hover .icon-copy__back,
+.message__action-btn:hover .icon-copy__front {
+    border-color: var(--brand-pressed);
+}
+.message__action-btn:hover .icon-copy__front { background-color: var(--brand-tint); }
+
+/* ── 수정 아이콘 — 45° 기울어진 가는 막대 + 작은 펜촉 점 ── */
+.icon-edit {
+    width: 14px;
+    height: 14px;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+}
+.icon-edit__bar {
+    position: absolute;
+    width: 14px;
+    height: 3px;
+    background-color: var(--n500);
+    border-radius: 1px;
+    rotate: -45deg;
+    transition-property: background-color;
+    transition-duration: var(--motion-fast);
+}
+.icon-edit__tip {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background-color: var(--n500);
+    bottom: 1px;
+    left: 1px;
+    transition-property: background-color;
+    transition-duration: var(--motion-fast);
+}
+.message__action-btn:hover .icon-edit__bar,
+.message__action-btn:hover .icon-edit__tip {
+    background-color: var(--brand-pressed);
+}
+
+/* ───────────── Empty hint ───────────── */
+.chat-empty-hint {
+    color: var(--n500);
+    -unity-text-align: middle-center;
+    padding: var(--space-md);
+    flex-shrink: 0;
+}
+
+/* ───────────── Input area ───────────── */
+
+.chat-input-area {
+    flex-direction: column;
+    flex-shrink: 0;          /* 채팅 내용이 늘어나도 입력창 영역은 줄어들지 않음 */
+    min-height: 92px;
+    padding: var(--space-md);
+    background-color: var(--n50);
+    border-top-width: 1px;
+    border-top-color: var(--n200);
+}
+
+.chat-input-row {
+    flex-direction: row;
+    align-items: flex-end;
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    padding: 4px 6px 4px 14px;
+    transition-property: border-color;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: ease-out;
+    /* 부모 가용 폭을 넘어가지 않도록 — 긴 입력에서 send button 이 밖으로 밀려나는 현상 방지. */
+    overflow: hidden;
+}
+.chat-input-row--focused { border-color: var(--brand-signature); }
+
+/* flex-grow:1 만으로는 부족 — flex item 의 default min-width 가 content size 라서
+ * 긴 텍스트가 들어가면 input 이 가로로 늘어남. min-width:0 으로 강제 축소 허용. */
+.chat-input {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+.chat-input > .unity-text-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    padding: 8px 0;
+    color: var(--n900);
+    font-size: 15px;
+    min-height: 24px;
+    max-height: 120px;
+    white-space: normal;
+}
+.chat-input > .unity-text-field__input:focus {
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* ───────────── Send button ───────────── */
+
+.send-button {
+    width: 32px; height: 32px;
+    margin-left: 8px; margin-bottom: 4px;
+    padding: 0;
+    border-radius: var(--r-md);
+    background-color: var(--brand-signature);
+    border-width: 0;
+    align-items: center;
+    justify-content: center;
+    transition-property: background-color, scale;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+    scale: 1 1;
+}
+.send-button:hover  { background-color: var(--brand-hover); }
+.send-button:active { scale: 0.94 0.94; background-color: var(--brand-pressed); }
+.send-button:disabled { background-color: var(--n100); opacity: 1; }
+
+.send-arrow {
+    width: 10px; height: 10px;
+    border-top-width: 2px;
+    border-left-width: 2px;
+    border-color: var(--n0);
+    rotate: 45deg;
+    margin-top: 3px;
+}
+.send-button:disabled .send-arrow { border-color: var(--n400); }
+
+/* Stop button — 응답 진행 중일 때 send 버튼 자리에 표시 */
+.stop-button {
+    width: 32px; height: 32px;
+    margin-left: 8px; margin-bottom: 4px;
+    padding: 0;
+    border-radius: var(--r-md);
+    background-color: var(--chip-warning-fg);
+    border-width: 0;
+    align-items: center;
+    justify-content: center;
+    display: none;
+    transition-property: background-color, scale;
+    transition-duration: var(--motion-fast), var(--motion-fast);
+    transition-timing-function: ease-out, ease-out;
+    scale: 1 1;
+}
+.stop-button:hover  { background-color: var(--n900); }
+.stop-button:active { scale: 0.94 0.94; }
+.stop-icon {
+    width: 12px;
+    height: 12px;
+    background-color: var(--n0);
+    border-radius: 2px;
+}
+.chat-input-row--streaming .send-button { display: none; }
+.chat-input-row--streaming .stop-button { display: flex; }
+
+.chat-input-hint {
+    margin-top: var(--space-sm);
+    color: var(--n400);
+    -unity-text-align: middle-left;
+}
+
+/* ============================================================
+   Sessions Drawer — chat pane 좌측에 슬라이드 in 되는 오버레이
+   햄버거 버튼 클릭 시 .sessions-drawer--open 추가
+   ============================================================ */
+
+/* sessions-drawer 는 채팅 본문을 완전 교체하는 풀스크린 뷰.
+   햄버거 클릭 시 .sessions-drawer--open 추가. */
+.sessions-drawer {
+    position: absolute;
+    left: 4px;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: var(--n0);
+    flex-direction: column;
+    display: none;
+}
+
+.sessions-drawer--open {
+    display: flex;
+}
+
+.sessions-drawer__header {
+    flex-direction: row;
+    align-items: center;
+    padding: var(--space-md) var(--space-md) var(--space-md) 28px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--n200);
+}
+
+.sessions-drawer__title {
+    color: var(--n900);
+    flex-grow: 1;
+}
+
+.sessions-drawer__btn {
+    margin-left: 6px;
+    padding: 6px 12px;
+    border-radius: var(--r-md);
+    border-width: 0;
+    -unity-font-style: bold;
+    font-size: 12px;
+}
+
+.sessions-drawer__btn--primary {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+}
+.sessions-drawer__btn--primary:hover { background-color: var(--brand-hover); }
+
+.sessions-drawer__btn--close {
+    background-color: transparent;
+    color: var(--n600);
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: var(--r-full);
+    font-size: 18px;
+}
+.sessions-drawer__btn--close:hover { background-color: var(--n200); color: var(--n900); }
+
+.sessions-drawer__scroll {
+    flex-grow: 1;
+}
+
+.sessions-drawer__scroll > .unity-scroll-view__content-container {
+    padding: var(--space-sm);
+}
+
+.sessions-drawer__empty {
+    color: var(--n500);
+    -unity-text-align: middle-center;
+    padding: var(--space-lg) var(--space-md);
+    white-space: normal;
+}
+
+.session-item {
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border-radius: var(--r-md);
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--n200);
+    flex-direction: column;
+}
+
+.session-item:hover {
+    border-color: var(--brand-signature);
+    background-color: var(--brand-tint);
+}
+
+.session-item--active {
+    border-color: var(--brand-signature);
+    background-color: var(--brand-tint);
+}
+
+.session-item__top {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.session-item__title {
+    color: var(--n900);
+    -unity-font-style: bold;
+    font-size: 13px;
+    flex-grow: 1;
+}
+
+.session-item__time {
+    color: var(--n500);
+    font-size: 11px;
+}
+
+.session-item__preview {
+    color: var(--n600);
+    font-size: 12px;
+    white-space: normal;
+}
+
+/* ───────────────────────────────────────────────
+ *  ToolAsk 인라인 카드 (ask_user 도구 응답 UI)
+ * ─────────────────────────────────────────────── */
+
+.message--tool-ask {
+    align-items: stretch;
+}
+
+.tool-ask {
+    background-color: var(--n0);
+    border-width: 1px;
+    border-color: var(--brand-signature);
+    border-radius: var(--r-md);
+    padding: var(--space-md);
+    margin: var(--space-xs) 0;
+    flex-direction: column;
+}
+
+.tool-ask--locked {
+    border-color: var(--n300);
+    background-color: var(--n50);
+    opacity: 0.85;
+}
+
+.tool-ask__header {
+    align-self: flex-start;
+    background-color: var(--brand-tint);
+    color: var(--brand-signature);
+    -unity-font-style: bold;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.tool-ask__question {
+    color: var(--n900);
+    -unity-font-style: bold;
+    font-size: 13px;
+    margin-bottom: var(--space-sm);
+}
+
+.tool-ask__options {
+    flex-direction: column;
+    margin-bottom: var(--space-sm);
+}
+
+.tool-ask__option-row {
+    flex-direction: column;
+    margin-bottom: 4px;
+}
+
+.tool-ask__option-desc {
+    color: var(--n600);
+    font-size: 11px;
+    margin-left: 24px;
+    margin-top: 2px;
+}
+
+.tool-ask__free-input {
+    margin-top: var(--space-xs);
+    margin-bottom: var(--space-sm);
+}
+
+.tool-ask__submit-row {
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+.tool-ask__submit {
+    background-color: var(--brand-signature);
+    color: var(--n0);
+    border-width: 0;
+    border-radius: var(--r-md);
+    padding: 6px 16px;
+    -unity-font-style: bold;
+}
+
+.tool-ask__submit:hover {
+    background-color: var(--brand-deep);
+}
+
+.tool-ask__answered-badge {
+    align-self: flex-end;
+    margin-top: var(--space-xs);
+    background-color: var(--n300);
+    color: var(--n700);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
+}
+
+/* 응답 요약 — 기본 hidden, collapsed 상태에서만 표시 */
+.tool-ask__answer-summary {
+    display: none;
+    color: var(--n800);
+    font-size: 12px;
+    padding: 6px 8px;
+    margin-top: var(--space-xs);
+    background-color: var(--brand-tint);
+    border-radius: var(--r-sm);
+    border-left-width: 3px;
+    border-left-color: var(--brand-signature);
+}
+
+/* Collapsed: 응답 후 — 옵션/입력/전송 버튼 숨김, 응답 요약만 노출 */
+.tool-ask--collapsed .tool-ask__options { display: none; }
+.tool-ask--collapsed .tool-ask__free-input { display: none; }
+.tool-ask--collapsed .tool-ask__submit-row { display: none; }
+.tool-ask--collapsed .tool-ask__remember { display: none; }
+.tool-ask--collapsed .tool-ask__remember-hint { display: none; }
+.tool-ask--collapsed .tool-ask__answer-summary { display: flex; }
+
+/* route_capability 카드 — askUserQuestion 카드와 시각 패밀리 공유, 좌측 강조선만 다르게.
+   파란 띠로 "도구 선택" 컨텍스트임을 한눈에 구분 (info 색). */
+.tool-ask--capability {
+    border-left-color: var(--info);
+}
+
+.tool-ask__option-row--plugin {
+    background-color: var(--n50);
+    border-width: 1px;
+    border-color: var(--n200);
+    border-radius: var(--r-md);
+    padding: 8px 10px;
+}
+
+.tool-ask__remember {
+    margin-top: 12px;
+    padding: 8px 10px;
+    background-color: var(--n50);
+    border-radius: var(--r-md);
+}
+
+.tool-ask__remember-hint {
+    color: var(--n500);
+    font-size: 11px;
+    margin: 2px 10px 0 10px;
+}
+
+.tool-ask__submit--ghost {
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--n700);
+    border-width: 1px;
+    border-color: var(--n200);
+}
+
+.tool-ask__submit--ghost:hover {
+    border-color: var(--n400);
+    color: var(--n900);
+}

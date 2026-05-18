@@ -1,6 +1,8 @@
+using System;
+using System.Collections.Generic;
+using OpenDesk.Core.Models.Skills;
 using OpenDesk.SkillDiskette;
 using R3;
-using R3.Triggers;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,8 +10,9 @@ using UnityEngine.UI;
 namespace OpenDesk.Presentation.UI
 {
     /// <summary>
-    /// 에이전트 장착 디스켓 슬롯 UI.
-    /// AgentEquipmentManager의 상태를 실시간 표시.
+    /// 에이전트 장착 스킬 슬롯 UI.
+    /// 슬롯 무제한 — 장착된 스킬만 동적 리스트로 표시. 빈 슬롯 placeholder 없음.
+    /// 헤더에 "스킬 추가" 버튼이 있으면 OnAddRequested 이벤트 발행 → 마켓 패널 오픈.
     /// </summary>
     public class EquipmentSlotUI : MonoBehaviour
     {
@@ -17,15 +20,18 @@ namespace OpenDesk.Presentation.UI
         [SerializeField] private Transform _slotContainer;
         [SerializeField] private GameObject _slotItemPrefab;
         [SerializeField] private TextMeshProUGUI _headerText;
+        [SerializeField] private Button _addSkillButton;
 
         // slotItemPrefab 구조:
-        //   Image (디스켓 색상) + Text (디스켓 이름) + Button (해제)
+        //   Image (스킬 카테고리 색상) + Text (스킬 이름) + Button (해제)
 
         private AgentEquipmentManager _equipment;
         private DisketteShelfUI _shelfUI;
-        private readonly System.Collections.Generic.List<GameObject> _slotItems = new();
+        private readonly List<GameObject> _slotItems = new();
 
-        /// <summary>장착 관리자 바인딩</summary>
+        /// <summary>"스킬 추가" 버튼 클릭 시 발행. SkillMarketPanelController 가 구독.</summary>
+        public event Action OnAddRequested;
+
         public void Bind(AgentEquipmentManager equipment, DisketteShelfUI shelfUI = null)
         {
             _equipment = equipment;
@@ -35,18 +41,23 @@ namespace OpenDesk.Presentation.UI
                 .Subscribe(_ => RefreshSlots())
                 .AddTo(this);
 
-            // 해제 시 선반에 복귀
+            // 레거시 호환: 해제된 디스켓을 선반으로 복귀
             if (_shelfUI != null)
             {
-                equipment.OnUnequipped
-                    .Subscribe(disk => _shelfUI.ReturnDiskette(disk))
+                equipment.OnUnequippedDisk
+                    .Subscribe(disk => { if (disk != null) _shelfUI.ReturnDiskette(disk); })
                     .AddTo(this);
+            }
+
+            if (_addSkillButton != null)
+            {
+                _addSkillButton.onClick.RemoveAllListeners();
+                _addSkillButton.onClick.AddListener(() => OnAddRequested?.Invoke());
             }
 
             RefreshSlots();
         }
 
-        /// <summary>장착 관리자 해제</summary>
         public void Unbind()
         {
             _equipment = null;
@@ -58,74 +69,44 @@ namespace OpenDesk.Presentation.UI
             ClearSlotItems();
             if (_equipment == null) return;
 
-            // 헤더
+            var equipped = _equipment.EquippedDescriptors;
+            var count = equipped?.Count ?? 0;
+
             if (_headerText != null)
-                _headerText.SetText($"장착 스킬 ({_equipment.EquippedDisks.Count}/{_equipment.MaxSlots})");
+                _headerText.SetText($"장착 스킬 ({count}개)");
 
-            // 장착된 디스켓 표시
-            foreach (var disk in _equipment.EquippedDisks)
+            if (equipped == null) return;
+            foreach (var descriptor in equipped)
             {
-                var item = CreateSlotItem(disk.DisplayName, disk.Color, disk.SkillId);
-                _slotItems.Add(item);
-            }
-
-            // 빈 슬롯 표시
-            for (int i = 0; i < _equipment.RemainingSlots; i++)
-            {
-                var item = CreateEmptySlotItem();
-                _slotItems.Add(item);
+                var item = CreateSlotItem(descriptor);
+                if (item != null) _slotItems.Add(item);
             }
         }
 
-        private GameObject CreateSlotItem(string name, Color color, string skillId)
+        private GameObject CreateSlotItem(SkillDescriptor descriptor)
         {
-            if (_slotItemPrefab == null || _slotContainer == null) return null;
+            if (_slotItemPrefab == null || _slotContainer == null || descriptor == null) return null;
 
             var item = Instantiate(_slotItemPrefab, _slotContainer);
             item.SetActive(true);
 
-            // 이름 텍스트
             var label = item.GetComponentInChildren<TextMeshProUGUI>();
             if (label != null)
-                label.SetText(name);
+                label.SetText(descriptor.DisplayName);
 
-            // 색상 이미지
             var img = item.GetComponentInChildren<Image>();
             if (img != null)
-                img.color = color;
+                img.color = descriptor.Category.DisplayColor();
 
-            // 해제 버튼
             var button = item.GetComponentInChildren<Button>();
             if (button != null)
             {
-                var capturedId = skillId;
+                var capturedId = descriptor.Id;
                 button.onClick.AddListener(() =>
                 {
                     _equipment?.TryUnequip(capturedId);
                 });
             }
-
-            return item;
-        }
-
-        private GameObject CreateEmptySlotItem()
-        {
-            if (_slotItemPrefab == null || _slotContainer == null) return null;
-
-            var item = Instantiate(_slotItemPrefab, _slotContainer);
-            item.SetActive(true);
-
-            var label = item.GetComponentInChildren<TextMeshProUGUI>();
-            if (label != null)
-                label.SetText("(빈 슬롯)");
-
-            var img = item.GetComponentInChildren<Image>();
-            if (img != null)
-                img.color = new Color(0.3f, 0.3f, 0.3f, 0.5f);
-
-            var button = item.GetComponentInChildren<Button>();
-            if (button != null)
-                button.gameObject.SetActive(false);
 
             return item;
         }

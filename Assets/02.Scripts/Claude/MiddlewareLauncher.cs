@@ -2,7 +2,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using OpenDesk.Core;
+using OpenDesk.Core.Services.Auth;
 using UnityEngine;
+using VContainer;
 using Debug = UnityEngine.Debug;
 
 namespace OpenDesk.Claude
@@ -30,6 +33,13 @@ namespace OpenDesk.Claude
 
         private Process _process;
         private CancellationTokenSource _cts;
+        private IAnthropicCredentialService _credentials;
+
+        [Inject]
+        public void Construct(IAnthropicCredentialService credentials = null)
+        {
+            _credentials = credentials;
+        }
 
         private void Start() => StartAsync().Forget();
 
@@ -41,14 +51,8 @@ namespace OpenDesk.Claude
                 return;
             }
 
-            // API 백엔드 선택 시 미들웨어 불필요 — 스킵
-            var backend = PlayerPrefs.GetString("OpenDesk_ChatBackend", "cli");
-            if (backend == "api")
-            {
-                Debug.Log("[MiddlewareLauncher] AI 백엔드: api — Python 미들웨어 기동 스킵");
-                return;
-            }
-
+            // 양쪽 provider(anthropic_cli / anthropic_api) 모두 미들웨어를 경유한다.
+            // 백엔드 분기 분기 제거 — 통합 게이트웨이 패턴.
             _cts = new CancellationTokenSource();
 
             try
@@ -104,9 +108,17 @@ namespace OpenDesk.Claude
                     CreateNoWindow   = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError  = true,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8,
+                    StandardErrorEncoding  = System.Text.Encoding.UTF8,
                 },
                 EnableRaisingEvents = true,
             };
+            // Python 측에 강제 UTF-8 stdout 환경변수 (Python 3.7+).
+            _process.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+            _process.StartInfo.EnvironmentVariables["PYTHONUTF8"] = "1";
+
+            // Claude CLI 격리 — 글로벌 ~/.claude/ 가 아닌 OpenDesk 전용 디렉토리 사용.
+            ApplyClaudeIsolation(_process.StartInfo);
 
             _process.OutputDataReceived += (_, e) =>
             {
@@ -150,15 +162,81 @@ namespace OpenDesk.Claude
                 EnableRaisingEvents = true,
             };
 
+            ApplyClaudeIsolation(_process.StartInfo);
+
             _process.Start();
         }
 
-        /// <summary>Python 실행 경로 탐색 — Inspector 지정 > 플랫폼별 일반 경로 > PATH 폴백</summary>
+        /// <summary>
+        /// Claude Code CLI 의 글로벌 설정(~/.claude/)을 건드리지 않도록 OpenDesk 전용
+        /// 격리 디렉토리(OpenDeskPaths.ClaudeConfigDir) 를 CLAUDE_CONFIG_DIR 환경변수로 주입한다.
+        /// 자식 subprocess(Claude CLI) 가 이 환경변수를 상속해 격리된 settings/credentials/sessions 를 사용한다.
+        ///
+        /// 추가로 사용자가 OpenDesk 안에서 직접 입력한 ANTHROPIC_API_KEY 가 있으면 환경변수로 주입한다.
+        /// API Key 가 있으면 anthropic_api provider 즉시 동작 + anthropic_cli 도 OAuth 토큰 없이 동작.
+        /// </summary>
+        private void ApplyClaudeIsolation(ProcessStartInfo info)
+        {
+            var dir = OpenDeskPaths.ClaudeConfigDir;
+            try
+            {
+                Directory.CreateDirectory(dir);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[MiddlewareLauncher] CLAUDE_CONFIG_DIR 생성 실패: {dir} ({ex.Message})");
+            }
+            info.EnvironmentVariables["CLAUDE_CONFIG_DIR"] = dir;
+            info.EnvironmentVariables["OPENDESK_BASE_DIR"] = OpenDeskPaths.Base;
+
+            var apiKey = ReadApiKeyBlocking();
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                info.EnvironmentVariables["ANTHROPIC_API_KEY"] = apiKey;
+                Debug.Log($"[MiddlewareLauncher] Claude 격리 + ANTHROPIC_API_KEY 주입 (키 {apiKey.Length}자): CLAUDE_CONFIG_DIR={dir}");
+            }
+            else
+            {
+                Debug.Log($"[MiddlewareLauncher] Claude CLI 격리 활성: CLAUDE_CONFIG_DIR={dir}");
+            }
+        }
+
+        /// <summary>UniTask 를 동기 컨텍스트에서 짧게 await — Inspector 의 IAnthropicCredentialService 가 비주입이면 null.</summary>
+        private string ReadApiKeyBlocking()
+        {
+            if (_credentials == null) return null;
+            try
+            {
+                // 파일 IO 한 번이라 매우 짧음. UniTask 를 동기 wait 로 변환.
+                return _credentials.GetApiKeyAsync().GetAwaiter().GetResult();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[MiddlewareLauncher] API Key 로드 실패: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Python 실행 경로 탐색 우선순위:
+        /// 1) Inspector 지정 경로
+        /// 2) Middleware/.venv (개발 시 의존성 격리 — 권장)
+        /// 3) 플랫폼별 시스템 Python
+        /// 4) PATH 폴백
+        /// </summary>
         private string ResolvePythonPath()
         {
             // 1) Inspector에서 직접 지정한 경우
             if (!string.IsNullOrEmpty(_pythonPath) && File.Exists(_pythonPath))
                 return _pythonPath;
+
+            // 2) Middleware/.venv 우선 — 개발 시 의존성 격리
+            var venvPython = TryResolveVenvPython();
+            if (!string.IsNullOrEmpty(venvPython))
+            {
+                Debug.Log($"[MiddlewareLauncher] venv Python 사용: {venvPython}");
+                return venvPython;
+            }
 
 #if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
             // macOS: python3 우선 (system python은 macOS 12.3+에서 제거됨)
@@ -171,7 +249,8 @@ namespace OpenDesk.Claude
             foreach (var p in macCandidates)
                 if (File.Exists(p)) return p;
 
-            Debug.LogWarning("[MiddlewareLauncher] macOS Python 경로를 찾을 수 없음 — 'python3' 로 시도");
+            Debug.LogWarning("[MiddlewareLauncher] macOS Python 경로를 찾을 수 없음 — 'python3' 로 시도. " +
+                             "권장: cd Middleware && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt");
             return "python3";
 #elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
             var linuxCandidates = new[] { "/usr/bin/python3", "/usr/local/bin/python3" };
@@ -217,6 +296,31 @@ namespace OpenDesk.Claude
             Debug.LogWarning("[MiddlewareLauncher] Python 경로를 찾을 수 없음 — 'python' 으로 시도");
             return "python";
 #endif
+        }
+
+        /// <summary>
+        /// Middleware/.venv 의 Python 인터프리터 경로 반환. 없으면 null.
+        /// 플랫폼별 표준 venv 레이아웃을 따른다.
+        /// </summary>
+        private string TryResolveVenvPython()
+        {
+            var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            var venvRoot = Path.Combine(projectRoot, _middlewareDir, ".venv");
+            if (!Directory.Exists(venvRoot)) return null;
+
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+            var winPython = Path.Combine(venvRoot, "Scripts", "python.exe");
+            if (File.Exists(winPython)) return winPython;
+#else
+            var nixCandidates = new[]
+            {
+                Path.Combine(venvRoot, "bin", "python3"),
+                Path.Combine(venvRoot, "bin", "python"),
+            };
+            foreach (var p in nixCandidates)
+                if (File.Exists(p)) return p;
+#endif
+            return null;
         }
 
         private void OnApplicationQuit()
