@@ -17,14 +17,44 @@ namespace OpenDesk.Core.Services.Plugins
         private readonly Subject<Unit> _onChanged = new();
         private readonly object _gate = new();
         private readonly Dictionary<string, PluginDescriptor> _byId = new();
+        private bool _seeded;
 
         public Observable<Unit> OnCatalogChanged => _onChanged;
         public bool IsLoaded => _byId.Count > 0;
 
+        public InMemoryPluginCatalogService()
+        {
+            // v4: BuiltInPluginFallback 으로 ctor 즉시 seed — SkillMarketView 가 통합 마켓에서
+            // "플러그인" 섹션을 비어 있지 않게 보여주려면 catalog 가 미리 채워져 있어야 한다.
+            SeedFromFallback();
+        }
+
         public UniTask<bool> RefreshAsync(bool forceRefresh, CancellationToken ct)
         {
-            // InMemory 구현은 원격 fetch 가 없다. 이미 로드되어 있으면 false (변경 없음) 반환.
+            // forceRefresh 시 fallback 으로 다시 채워 넣음 (원격 fetch 가 도입되기 전 임시 동작).
+            if (forceRefresh || !_seeded)
+            {
+                SeedFromFallback();
+                _onChanged.OnNext(Unit.Default);
+                return UniTask.FromResult(true);
+            }
             return UniTask.FromResult(false);
+        }
+
+        private void SeedFromFallback()
+        {
+            var entries = BuiltInPluginFallback.Build();
+            lock (_gate)
+            {
+                foreach (var d in entries)
+                {
+                    if (d == null || string.IsNullOrEmpty(d.Id)) continue;
+                    // 이미 등록된 plugin (예: RegisterLocal 결과) 은 덮어쓰지 않음 — install state 보존.
+                    if (!_byId.ContainsKey(d.Id))
+                        _byId[d.Id] = d;
+                }
+                _seeded = true;
+            }
         }
 
         public IReadOnlyList<PluginDescriptor> GetAll()

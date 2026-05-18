@@ -23,8 +23,10 @@ from typing import Final
 CREDIT_USD: Final[float] = float(os.environ.get("OPENDESK_CREDIT_USD", "0.003"))
 MARKUP_FACTOR: Final[float] = float(os.environ.get("OPENDESK_MARKUP_FACTOR", "2.5"))
 LONG_CONTEXT_SURCHARGE: Final[float] = float(
-    os.environ.get("OPENDESK_LONG_CTX_SURCHARGE", "2.0")
+    os.environ.get("OPENDESK_LONG_CTX_SURCHARGE", "1.0")
 )
+# 2026-05-18: Anthropic 가 Claude 4.5+ 부터 1M context 를 standard pricing 에 포함.
+# 옛 [1m] suffix surcharge 가 불필요. 환경변수로 강제 오버라이드는 보존.
 
 
 # ── 모델 가격표 (USD per million tokens) ──────────────────────
@@ -38,10 +40,13 @@ class ModelPrice:
     output_per_mtok_usd: float
 
 
+# 가격: 2026-05-18 Anthropic 공식 페이지 기준 (claude.com/pricing).
+# - Haiku 4.5 / Sonnet 4.5+4.6 / Opus 4.5+4.6+4.7 기준.
+# - Opus 4.1 이전 모델은 별도 단가 ($15/$75) 이지만 OpenDesk 는 4.x 만 노출 → 단일 alias.
 MODEL_PRICING: Final[dict[str, ModelPrice]] = {
-    "haiku": ModelPrice(input_per_mtok_usd=0.80, output_per_mtok_usd=4.00),
+    "haiku": ModelPrice(input_per_mtok_usd=1.00, output_per_mtok_usd=5.00),
     "sonnet": ModelPrice(input_per_mtok_usd=3.00, output_per_mtok_usd=15.00),
-    "opus": ModelPrice(input_per_mtok_usd=15.00, output_per_mtok_usd=75.00),
+    "opus": ModelPrice(input_per_mtok_usd=5.00, output_per_mtok_usd=25.00),
 }
 
 DEFAULT_ALIAS: Final[str] = "sonnet"

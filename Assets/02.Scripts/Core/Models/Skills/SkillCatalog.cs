@@ -25,6 +25,10 @@ namespace OpenDesk.Core.Models.Skills
         public float rating;
         public List<string> recommendedRoles = new();   // AgentRole enum 이름
 
+        // v4: 스킬 → 플러그인 의존성. catalog.json 에 같이 실리거나, 빈 경우 manifest 에서 보강.
+        public List<string> requiredPlugins = new();
+        public List<string> optionalPlugins = new();
+
         public SkillDescriptor ToDescriptor(SkillManifest manifestOrNull, bool isInstalled, string installPath)
         {
             var resolvedCategory = SkillCategoryExtensions.ParseCategory(category);
@@ -35,6 +39,17 @@ namespace OpenDesk.Core.Models.Skills
             var tokens = manifestOrNull?.requiredTokens != null
                 ? new List<string>(manifestOrNull.requiredTokens)
                 : new List<string>();
+            // catalog 의존성이 있으면 우선, 없으면 manifest 의 의존성 사용.
+            var required = (requiredPlugins != null && requiredPlugins.Count > 0)
+                ? new List<string>(requiredPlugins)
+                : (manifestOrNull?.requiredPlugins != null
+                    ? new List<string>(manifestOrNull.requiredPlugins)
+                    : new List<string>());
+            var optional = (optionalPlugins != null && optionalPlugins.Count > 0)
+                ? new List<string>(optionalPlugins)
+                : (manifestOrNull?.optionalPlugins != null
+                    ? new List<string>(manifestOrNull.optionalPlugins)
+                    : new List<string>());
 
             return new SkillDescriptor(
                 Id: id ?? string.Empty,
@@ -54,7 +69,9 @@ namespace OpenDesk.Core.Models.Skills
                 Downloads: downloads,
                 Rating: rating,
                 IsInstalled: isInstalled,
-                InstallPath: installPath ?? string.Empty
+                InstallPath: installPath ?? string.Empty,
+                RequiredPlugins: required,
+                OptionalPlugins: optional
             );
         }
 

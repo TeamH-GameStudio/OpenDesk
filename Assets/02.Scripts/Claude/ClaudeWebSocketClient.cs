@@ -699,37 +699,65 @@ namespace OpenDesk.Claude
 
                 case "license.activated":
                     var licOk = JsonUtility.FromJson<LicenseActivatedMessage>(json);
-                    if (licOk != null) OnLicenseActivated?.Invoke(licOk);
+                    if (licOk != null)
+                    {
+                        Debug.Log($"[Credit] license.activated user={licOk.userId} plan={licOk.planTier} balance={licOk.balance}");
+                        OnLicenseActivated?.Invoke(licOk);
+                    }
                     break;
 
                 case "license.error":
                     var licErr = JsonUtility.FromJson<LicenseErrorMessage>(json);
-                    if (licErr != null) OnLicenseError?.Invoke(licErr);
+                    if (licErr != null)
+                    {
+                        Debug.LogWarning($"[Credit] license.error code={licErr.code} message={licErr.message}");
+                        OnLicenseError?.Invoke(licErr);
+                    }
                     break;
 
                 case "auth_status":
                     var authSt = JsonUtility.FromJson<AuthStatusMessage>(json);
-                    if (authSt != null) OnAuthStatus?.Invoke(authSt);
+                    if (authSt != null)
+                    {
+                        Debug.Log($"[Credit] auth_status authenticated={authSt.authenticated}");
+                        OnAuthStatus?.Invoke(authSt);
+                    }
                     break;
 
                 case "credit.routing":
                     var crRoute = JsonUtility.FromJson<CreditRoutingMessage>(json);
-                    if (crRoute != null) OnCreditRouting?.Invoke(crRoute);
+                    if (crRoute != null)
+                    {
+                        Debug.Log($"[Credit] routing task={crRoute.taskId} model={crRoute.model} tier={crRoute.tier} estimated={crRoute.estimatedCredits} (reason: {crRoute.reasoning})");
+                        OnCreditRouting?.Invoke(crRoute);
+                    }
                     break;
 
                 case "credit.balance":
                     var crBal = JsonUtility.FromJson<CreditBalanceMessage>(json);
-                    if (crBal != null) OnCreditBalance?.Invoke(crBal);
+                    if (crBal != null)
+                    {
+                        Debug.Log($"[Credit] balance={crBal.balance} held={crBal.held}");
+                        OnCreditBalance?.Invoke(crBal);
+                    }
                     break;
 
                 case "credit.settled":
                     var crSet = JsonUtility.FromJson<CreditSettledMessage>(json);
-                    if (crSet != null) OnCreditSettled?.Invoke(crSet);
+                    if (crSet != null)
+                    {
+                        Debug.Log($"[Credit] settled task={crSet.taskId} actual={crSet.actualCredits} (in={crSet.inputTokens}, out={crSet.outputTokens}) balance={crSet.balance}");
+                        OnCreditSettled?.Invoke(crSet);
+                    }
                     break;
 
                 case "credit.insufficient":
                     var crIns = JsonUtility.FromJson<CreditInsufficientMessage>(json);
-                    if (crIns != null) OnCreditInsufficient?.Invoke(crIns);
+                    if (crIns != null)
+                    {
+                        Debug.LogWarning($"[Credit] insufficient required={crIns.required} balance={crIns.balance} code={crIns.code}");
+                        OnCreditInsufficient?.Invoke(crIns);
+                    }
                     break;
 
                 default:

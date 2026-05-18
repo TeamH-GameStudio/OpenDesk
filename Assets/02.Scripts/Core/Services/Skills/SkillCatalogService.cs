@@ -150,6 +150,10 @@ namespace OpenDesk.Core.Services.Skills
             Debug.Log($"[SkillCatalogService] 카탈로그 적용: {_byId.Count}개 스킬");
         }
 
+        // v4: 스킬/플러그인 분리 + 의존성 필드 도입으로 스키마가 바뀜.
+        // 이 버전과 일치하지 않는 옛 캐시는 자동 무시 → BuiltInFallback 으로 재시드.
+        private const string CurrentSchemaVersion = "2.0-v4";
+
         private void TryLoadDiskCache()
         {
             try
@@ -162,6 +166,13 @@ namespace OpenDesk.Core.Services.Skills
 
                 var envelope = JsonUtility.FromJson<CacheEnvelope>(json);
                 if (envelope == null || envelope.catalog == null) return;
+
+                // 스키마 버전 mismatch — plugin-like 도구가 SkillDescriptor 로 들어 있던 옛 캐시를 거부.
+                if (!string.Equals(envelope.catalog.schemaVersion, CurrentSchemaVersion, StringComparison.Ordinal))
+                {
+                    Debug.Log($"[SkillCatalogService] 캐시 스키마 mismatch (cache='{envelope.catalog.schemaVersion}' vs current='{CurrentSchemaVersion}') — 무시하고 fallback 사용");
+                    return;
+                }
 
                 _etag = envelope.etag ?? string.Empty;
                 _lastFetchedAt = envelope.fetchedAt > 0

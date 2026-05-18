@@ -83,6 +83,22 @@ namespace OpenDesk.AgentCreation.Installers
             TryRegisterAnyComponent<CreditBalanceBadge>(builder);
             TryRegisterAnyComponent<InsufficientCreditsModal>(builder);
 
+            // VContainer Lifetime.Scoped 는 lazy — 아무도 resolve 하지 않으면 생성자가 호출되지 않음.
+            // LicenseService 가 인스턴스화되어야 WS OnConnectionChanged 구독 → JWT RebindIfActive
+            // 가 동작한다 (PlayerPrefs 의 JWT 를 set_auth 로 미들웨어에 송신). 강제 인스턴스화.
+            // CreditBalanceService 도 동일 — UI 가 없어도 cache/PlayerPrefs 동기화는 항상 필요.
+            // RoutingHintService 도 동일 — OnConnectionChanged 에서 hint 를 자동 push.
+            builder.RegisterBuildCallback(resolver =>
+            {
+                try { resolver.Resolve<ILicenseService>(); }
+                catch (System.Exception e) { Debug.LogWarning($"[VContainer] ILicenseService 강제 resolve 실패: {e.Message}"); }
+                try { resolver.Resolve<ICreditBalanceService>(); }
+                catch (System.Exception e) { Debug.LogWarning($"[VContainer] ICreditBalanceService 강제 resolve 실패: {e.Message}"); }
+                try { resolver.Resolve<IRoutingHintService>(); }
+                catch (System.Exception e) { Debug.LogWarning($"[VContainer] IRoutingHintService 강제 resolve 실패: {e.Message}"); }
+                Debug.Log("[VContainer] 라이선스/크레딧 서비스 자동 인스턴스화 완료");
+            });
+
             // 미들웨어 sub_agent_* WS 이벤트 → ISubAgentService 어댑터 (IAiChatService + ISubAgentService 둘 다 보임).
             builder.RegisterEntryPoint<SubAgentEventBridge>();
 

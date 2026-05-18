@@ -985,21 +985,17 @@ namespace OpenDesk.Presentation.UI.SkillMarket
         {
             if (_listScroll == null || _catalog == null) return;
 
-            // v4: kind 필터에 따라 스킬/플러그인 row 를 함께 노출.
-            var includeSkills = _kindFilter != MarketKindFilter.Plugin;
-            var includePlugins = _kindFilter != MarketKindFilter.Skill;
+            // v4: 카테고리 탭은 그 자체가 "스킬 카테고리" 의미를 가진다 — kind 필터를 적용하지 않고
+            // 스킬 + 매칭 플러그인을 항상 함께 노출한다. (kind 필터는 featured 패널의 시각적 보조용)
+            var skillList = (_catalog.GetAll() ?? new List<SkillDescriptor>())
+                .Where(d => d.Category == category)
+                .Where(MatchesQuery)
+                .OrderByDescending(d => d.IsInstalled)
+                .ThenByDescending(d => d.Downloads)
+                .ThenBy(d => d.DisplayName)
+                .ToList();
 
-            var skillList = includeSkills
-                ? (_catalog.GetAll() ?? new List<SkillDescriptor>())
-                    .Where(d => d.Category == category)
-                    .Where(MatchesQuery)
-                    .OrderByDescending(d => d.IsInstalled)
-                    .ThenByDescending(d => d.Downloads)
-                    .ThenBy(d => d.DisplayName)
-                    .ToList()
-                : new List<SkillDescriptor>();
-
-            var pluginList = includePlugins && _pluginCatalog != null
+            var pluginList = _pluginCatalog != null
                 ? (_pluginCatalog.GetAll() ?? Array.Empty<PluginDescriptor>())
                     .Where(p => PluginMatchesCategory(p, category))
                     .Where(MatchesQueryPlugin)
@@ -1732,6 +1728,11 @@ namespace OpenDesk.Presentation.UI.SkillMarket
             style.marginRight = new StyleLength(new Length(gap, LengthUnit.Pixel));
             style.marginBottom = new StyleLength(new Length(gap, LengthUnit.Pixel));
 
+            // Type badge — "스킬" (Plugin 카드의 "플러그인" 뱃지와 대칭, warm clay 톤)
+            var typeBadge = new Label("스킬");
+            typeBadge.AddToClassList("skill-card__type-badge");
+            Add(typeBadge);
+
             // Head: monogram + name/author
             var head = new VisualElement();
             head.AddToClassList("skill-card__head");
@@ -1922,9 +1923,18 @@ namespace OpenDesk.Presentation.UI.SkillMarket
             text.AddToClassList("skill-row__text");
             Add(text);
 
+            // v4: 이름 옆에 "스킬" 타입 뱃지 — 카테고리 pane 에서도 플러그인과 한눈에 구분.
+            var nameLine = new VisualElement();
+            nameLine.AddToClassList("skill-row__name-line");
+            text.Add(nameLine);
+
             _name = new Label(descriptor?.DisplayName ?? string.Empty);
             _name.AddToClassList("skill-row__name");
-            text.Add(_name);
+            nameLine.Add(_name);
+
+            var typeBadge = new Label("스킬");
+            typeBadge.AddToClassList("skill-row__type-badge");
+            nameLine.Add(typeBadge);
 
             _desc = new Label(descriptor?.Description ?? string.Empty);
             _desc.AddToClassList("skill-row__desc");
@@ -2022,9 +2032,18 @@ namespace OpenDesk.Presentation.UI.SkillMarket
             titleWrap.AddToClassList("skill-detail__title-wrap");
             head.Add(titleWrap);
 
+            // v4: 제목 줄에 "스킬" 뱃지 — 우측 패널에서도 스킬임을 한눈에.
+            var titleLine = new VisualElement();
+            titleLine.AddToClassList("skill-detail__title-line");
+            titleWrap.Add(titleLine);
+
             _title = new Label();
             _title.AddToClassList("skill-detail__title");
-            titleWrap.Add(_title);
+            titleLine.Add(_title);
+
+            var typeBadge = new Label("스킬");
+            typeBadge.AddToClassList("skill-detail__type-badge");
+            titleLine.Add(typeBadge);
 
             _meta = new Label();
             _meta.AddToClassList("skill-detail__meta");

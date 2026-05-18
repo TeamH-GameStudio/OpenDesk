@@ -805,6 +805,21 @@
     letter-spacing: -0.3px;
 }
 
+/* v4: "스킬" 타입 뱃지 — PluginCard 의 "플러그인" 뱃지와 대칭, warm clay 톤, 둥근 사각형 */
+.skill-card__type-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 2px 8px;
+    background-color: var(--brand-tint);
+    border-width: 1px;
+    border-color: #F2DDD0;
+    border-radius: var(--r-sm);
+    color: var(--brand-pressed);
+    font-size: 10px;
+    -unity-font-style: bold;
+}
+
 .skill-card__head-text {
     flex-grow: 1;
     flex-direction: column;
@@ -971,6 +986,42 @@
     justify-content: center;
     flex-shrink: 0;
     margin-right: 12px;
+}
+
+/* v4: 스킬 row 이름 줄 (스킬명 + "스킬" 뱃지) */
+.skill-row__name-line {
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-row__type-badge {
+    margin-left: 6px;
+    padding: 1px 6px;
+    background-color: var(--brand-tint);
+    border-width: 1px;
+    border-color: #F2DDD0;
+    border-radius: var(--r-sm);
+    color: var(--brand-pressed);
+    font-size: 10px;
+    -unity-font-style: bold;
+}
+
+/* v4: 우측 detail pane 제목 줄 (제목 + "스킬" 뱃지) */
+.skill-detail__title-line {
+    flex-direction: row;
+    align-items: center;
+}
+
+.skill-detail__type-badge {
+    margin-left: 8px;
+    padding: 2px 8px;
+    background-color: var(--brand-tint);
+    border-width: 1px;
+    border-color: #F2DDD0;
+    border-radius: var(--r-sm);
+    color: var(--brand-pressed);
+    font-size: 11px;
+    -unity-font-style: bold;
 }
 
 .skill-row__mono-char {
@@ -1285,7 +1336,7 @@
     background-color: #DFE6EE;
     border-width: 1px;
     border-color: #D5DDE6;
-    border-radius: var(--r-full);
+    border-radius: var(--r-sm);
     color: #48607A;
     font-size: 10px;
     -unity-font-style: bold;
@@ -1304,7 +1355,7 @@
     background-color: #DFE6EE;
     border-width: 1px;
     border-color: #D5DDE6;
-    border-radius: 10px;                 /* 사각 둥근 — Skill 의 circle 과 대비 */
+    border-radius: 10px;
     align-items: center;
     justify-content: center;
     margin-right: 10px;
@@ -1531,7 +1582,7 @@
 .skill-market__plugin-list-badge {
     padding: 1px 6px;
     background-color: #DFE6EE;
-    border-radius: var(--r-full);
+    border-radius: var(--r-sm);
     color: #48607A;
     font-size: 10px;
     -unity-font-style: bold;

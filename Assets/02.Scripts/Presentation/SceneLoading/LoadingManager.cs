@@ -9,7 +9,7 @@ namespace OpenDesk.Presentation.SceneLoading
     /// <summary>
     /// 로딩 오버레이 매니저. <see cref="LoadingManagerBootstrap"/> 가 코드로 GameObject 를 생성한 뒤
     /// VContainer 가 <see cref="Construct"/> 로 주입한다. Canvas / Slider / TMP 텍스트는 모두
-    /// 코드로 빌드 — prefab 의존 0, NotoSansKR 디폴트 폰트만 가정.
+    /// 코드로 빌드 — prefab 의존 0. 한글 글리프는 TMP_Settings.fallbackFontAssets 의 NotoSansKR 가 커버한다.
     ///
     /// IGameSceneLoader 의 LoadStarted/Progress/LoadCompleted 이벤트를 받아 페이드/슬라이더/펄스를 제어한다.
     /// </summary>

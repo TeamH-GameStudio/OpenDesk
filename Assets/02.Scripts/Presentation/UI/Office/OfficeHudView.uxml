@@ -1,6 +1,19 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/02.Scripts/UI/Theme/opendesk-tokens.uss"/>
     <Style src="OfficeHudView.uss"/>
+    <Style src="project://database/Assets/02.Scripts/Presentation/UI/Credits/CreditBalanceBadge.uss"/>
+
+    <!-- 캐릭터 화면 좌상단 고정 — office-hud 의 sibling 으로 분리해 ChatPanel 이 열려도
+         가시 상태 유지. picking-mode=Ignore 로 클릭 차단도 안 함. -->
+    <ui:VisualElement name="office-credit-anchor" class="office-credit-anchor" picking-mode="Ignore">
+        <ui:VisualElement name="office-credit-badge" class="credit-badge">
+            <ui:VisualElement class="credit-badge__icon"/>
+            <ui:VisualElement class="credit-badge__content">
+                <ui:Label name="office-credit-badge__amount" class="credit-badge__amount" text="—"/>
+                <ui:Label name="office-credit-badge__held" class="credit-badge__held credit-badge__held--hidden" text=""/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
 
     <ui:VisualElement name="office-hud" class="office-hud" picking-mode="Ignore">
 

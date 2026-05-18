@@ -1,4 +1,12 @@
-/* Credit balance badge — TopBar inset. */
+/* Credit balance badge — TopBar inset 또는 absolute floating anchor. */
+
+/* 캐릭터 화면 좌상단 고정 위치 (OfficeHud 의 office-hud__top 가 가려져도 보임). */
+.office-credit-anchor {
+    position: absolute;
+    top: 16px;
+    left: 24px;
+}
+
 
 .credit-badge {
     flex-direction: row;

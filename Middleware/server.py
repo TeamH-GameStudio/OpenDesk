@@ -859,17 +859,19 @@ async def _handle_set_auth(websocket, session: ChatSession, msg: dict[str, Any])
     try:
         get_routing_client().bind_user(jwt)
     except LicenseError as e:
+        # 라이선스 관련 실패는 generic "error" 가 아니라 license.error 채널로 분리.
+        # Unity LicenseService.HandleLicenseError 가 코드별로 분기 (invalid_jwt → 자동 재활성화).
         await _send(websocket, {
-            "type": "error",
-            "message": f"라이선스 인증 실패: {e}",
+            "type": "license.error",
             "code": e.code,
+            "message": f"라이선스 인증 실패: {e}",
         })
         return
     except Exception as e:  # noqa: BLE001
         await _send(websocket, {
-            "type": "error",
-            "message": f"라이선스 바인딩 실패: {e}",
+            "type": "license.error",
             "code": "auth_bind_failed",
+            "message": f"라이선스 바인딩 실패: {e}",
         })
         return
 

@@ -184,6 +184,16 @@ namespace OpenDesk.Core.Implementations.Licensing
         private void HandleLicenseError(LicenseErrorMessage err)
         {
             if (err == null) return;
+
+            // 자동 복구 — JWT 가 stale 한 경우 (미들웨어 재시작 등) 캐시된 라이선스 키로 자동 재활성화.
+            // mock 미들웨어 / 실서버 모두 동일 — JWT 발급 측 상태가 휘발되면 invalid_jwt 응답.
+            // 사용자가 활성화 화면을 다시 거치지 않도록 transparently 복구.
+            if (IsJwtRejection(err.code) && TryAutoReactivate())
+            {
+                Debug.Log($"[License] stale JWT 감지 ({err.code}) — 캐시된 키로 자동 재활성화 시도");
+                return; // Transition 은 재활성화 결과 이벤트에서 처리
+            }
+
             var phase = err.code switch
             {
                 "device_limit_reached" => LicensePhase.DeviceLimitReached,
@@ -198,6 +208,35 @@ namespace OpenDesk.Core.Implementations.Licensing
                 ErrorMessage = err.message ?? string.Empty,
             });
             CompletePendingActivation(new LicenseActivationOutcome(false, err.code ?? string.Empty, err.message ?? string.Empty));
+        }
+
+        private static bool IsJwtRejection(string code) => code switch
+        {
+            "invalid_jwt" => true,
+            "expired" => true,
+            "auth_bind_failed" => true,
+            _ => false,
+        };
+
+        /// <summary>
+        /// 캐시된 라이선스 키 + fingerprint 로 자동 재활성화 시도.
+        /// 성공하면 새 JWT 가 PlayerPrefs 에 덮어쓰기되고 set_auth 가 자동 송신된다.
+        /// </summary>
+        private bool TryAutoReactivate()
+        {
+            var key = PlayerPrefs.GetString(PrefsKeyLicenseKey, string.Empty);
+            if (string.IsNullOrEmpty(key) || _ws == null || !_ws.IsConnected) return false;
+
+            // stale JWT 삭제 — 재활성화 결과로 덮어쓰기되지만 안전망.
+            PlayerPrefs.DeleteKey(PrefsKeyJwt);
+            PlayerPrefs.Save();
+
+            // 비동기 — outcome 은 HandleActivated / HandleLicenseError 에서 처리.
+            // ActivateAsync 는 pending activation 충돌 방지로 lock 사용 — 진행 중이면 skip.
+            var deviceName = PlayerPrefs.GetString(PrefsKeyUserId, string.Empty);
+            if (string.IsNullOrEmpty(deviceName)) deviceName = _fingerprint.GetSuggestedDeviceName();
+            ActivateAsync(key, deviceName).Forget();
+            return true;
         }
 
         private void HandleAuthStatus(AuthStatusMessage status)

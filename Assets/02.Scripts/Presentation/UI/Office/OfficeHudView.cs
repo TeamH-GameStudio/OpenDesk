@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using OpenDesk.AgentCreation.Models;
 using OpenDesk.AgentCreation.Persistence;
+using OpenDesk.Core.Services.Credits;
 using OpenDesk.Presentation.Cameras;
 using OpenDesk.Presentation.Character;
 using OpenDesk.Presentation.UI.Chat;
+using OpenDesk.Presentation.UI.Credits;
 using OpenDesk.Presentation.UI.SkillMarket;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -36,6 +38,8 @@ namespace OpenDesk.Presentation.UI.Office
         private SkillMarketView _market;
         private ChatPanelView _chatPanel;
         private ICameraFocusService _cameraFocus;
+        private ICreditBalanceService _credits;
+        private CreditBalanceBinder _creditBinder;
 
         // 현재 선택된 에이전트 (스킬 마켓 진입 시 컨텍스트로 전달)
         private string _selectedAgentId;
@@ -46,12 +50,14 @@ namespace OpenDesk.Presentation.UI.Office
             AgentDraftJsonStore store,
             AgentCreationOpener opener,
             AgentRosterBootstrapper roster,
-            ICameraFocusService cameraFocus = null)
+            ICameraFocusService cameraFocus = null,
+            ICreditBalanceService credits = null)
         {
             _store = store;
             _opener = opener;
             _roster = roster;
             _cameraFocus = cameraFocus;
+            _credits = credits;
         }
 
         private void Awake()
@@ -81,6 +87,8 @@ namespace OpenDesk.Presentation.UI.Office
             UnbindChatPanel();
             if (_addAgentButton != null) _addAgentButton.clicked -= OnAddAgentClicked;
             if (_openMarketButton != null) _openMarketButton.clicked -= OnOpenMarketClicked;
+            _creditBinder?.Dispose();
+            _creditBinder = null;
         }
 
         // ────────────────────────────────────────────────
@@ -139,6 +147,9 @@ namespace OpenDesk.Presentation.UI.Office
 
             if (_addAgentButton != null) _addAgentButton.clicked += OnAddAgentClicked;
             if (_openMarketButton != null) _openMarketButton.clicked += OnOpenMarketClicked;
+
+            // 잔액 배지 — opendesk_routed 모드에서만 의미. anthropic_api (BYOK) 면 0 표시.
+            _creditBinder = CreditBalanceBinder.BindByPrefix(rootEl, "office-credit-badge", _credits);
         }
 
         // ────────────────────────────────────────────────

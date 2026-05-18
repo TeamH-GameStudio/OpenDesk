@@ -202,6 +202,9 @@ namespace OpenDesk.Presentation.UI.Chat
             _vm = null;
         }
 
+        // Complexity hint UI 는 2026-05-18 제거됨 — 추후 Mixture of Agents 방식으로 모델 선택 대체 예정.
+        // IRoutingHintService 백엔드는 보존 (mock 라우터가 여전히 hint 를 읽음, Editor 메뉴/추후 UI 에서 활용 가능).
+
         // ══════════════════════════════════════════════════
         //  Agent Repository 구독 — 위저드/외부 변경 시 system prompt 자동 재합성
         // ══════════════════════════════════════════════════

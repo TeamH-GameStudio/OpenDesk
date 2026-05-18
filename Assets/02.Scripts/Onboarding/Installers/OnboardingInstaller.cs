@@ -1,3 +1,4 @@
+using OpenDesk.Claude;
 using OpenDesk.Core.Implementations.Credits;
 using OpenDesk.Core.Implementations.Licensing;
 using OpenDesk.Core.Services.Credits;
@@ -60,8 +61,23 @@ namespace OpenDesk.Onboarding.Installers
                    .As<IGoogleAuthService>();
 
             // ── 라이선스 활성화 (Hybrid routing — Phase 1: mock 미들웨어) ──
-            // ClaudeWebSocketClient 가 Onboarding 씬에 없으면 LicenseService 는 활성화 불가하나,
-            // 'skip (BYOK)' 버튼으로 우회 가능. PlayerPrefs JWT 가 source of truth.
+            // VContainer 가 C# 디폴트 파라미터(`ws = null`) 를 존중하지 않고 항상 resolve 를 시도하므로,
+            // OnboardingScene 에 ClaudeWebSocketClient 가 배치되지 않은 경우를 위해 null 팩토리를 등록.
+            // (AgentOfficeInstaller 의 AnthropicAuthModal 패턴과 동일.)
+            // 씬에 ClaudeWebSocketClient 가 실제로 있으면 그 인스턴스가 우선 등록되고, 없으면 null.
+            // LicenseService 는 _ws == null 분기를 가지고 있어 '건너뛰기 (BYOK)' 로 우회 가능.
+            var ws = FindFirstObjectByType<ClaudeWebSocketClient>(FindObjectsInactive.Include);
+            if (ws != null)
+            {
+                builder.RegisterComponent(ws);
+                Debug.Log("[VContainer] ClaudeWebSocketClient 등록됨 (Onboarding)");
+            }
+            else
+            {
+                builder.Register<ClaudeWebSocketClient>(_ => null, Lifetime.Scoped);
+                Debug.LogWarning("[VContainer] ClaudeWebSocketClient 미배치 — null stub 등록 (라이선스 활성화 불가, BYOK 우회)");
+            }
+
             builder.Register<LicenseService>(Lifetime.Scoped)
                    .As<ILicenseService>();
 
